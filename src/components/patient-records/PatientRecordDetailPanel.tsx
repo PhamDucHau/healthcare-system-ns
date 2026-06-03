@@ -1,0 +1,122 @@
+import { Loader2, UserRound } from "lucide-react";
+import type { PatientPortalDetail } from "@/types/patient-portal";
+
+function formatDob(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("vi-VN");
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium text-foreground">{value || "—"}</p>
+    </div>
+  );
+}
+
+type PatientRecordDetailPanelProps = {
+  profile: PatientPortalDetail | null;
+  isLoading?: boolean;
+  isError?: boolean;
+};
+
+const PatientRecordDetailPanel = ({
+  profile,
+  isLoading = false,
+  isError = false,
+}: PatientRecordDetailPanelProps) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        Đang tải chi tiết…
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <p className="py-8 text-sm text-destructive" role="alert">
+        Không tải được hồ sơ. Kiểm tra quyền truy cập hoặc thử lại.
+      </p>
+    );
+  }
+
+  if (!profile) {
+    return <p className="py-8 text-sm text-muted-foreground">Không tìm thấy hồ sơ.</p>;
+  }
+
+  const displayId =
+    profile.id_number?.trim() || `QC-${profile.id.slice(0, 8).toUpperCase()}`;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-primary to-primary/80 p-4 text-primary-foreground">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-foreground/20">
+          <UserRound className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <div>
+          <p className="text-xl font-bold">{profile.full_name}</p>
+          <p className="text-sm opacity-90">
+            ID: {displayId} · DOB: {formatDob(profile.date_of_birth)}
+          </p>
+          {profile.preferred_pronouns ? (
+            <p className="text-xs opacity-80">{profile.preferred_pronouns}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <section>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">Thông tin cá nhân</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Họ tên" value={profile.full_name} />
+          <Field label="Ngày sinh" value={formatDob(profile.date_of_birth)} />
+          <Field label="Email" value={profile.email_address ?? ""} />
+          <Field label="Số điện thoại" value={profile.phone_number ?? ""} />
+          <Field label="Đại từ" value={profile.preferred_pronouns ?? ""} />
+          <Field
+            label="Trạng thái"
+            value={profile.submitted_at ? "Đã nộp" : "Bản nháp"}
+          />
+          <Field
+            label="Đồng ý xử lý dữ liệu"
+            value={profile.consent_accepted ? "Có" : "Chưa"}
+          />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">Giấy tờ tùy thân</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Số CCCD/ID" value={profile.id_number ?? ""} />
+          <Field label="Nơi cấp" value={profile.id_issuer ?? ""} />
+          <Field label="Ngày cấp" value={formatDob(profile.id_issued_date)} />
+          <Field label="Ngày hết hạn" value={formatDob(profile.id_expiration_date)} />
+          <Field label="Địa chỉ" value={profile.residential_address ?? ""} />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">Bảo hiểm (BHYT)</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Nhà cung cấp" value={profile.insurance_provider ?? ""} />
+          <Field label="Mã thành viên / BHYT" value={profile.member_id ?? ""} />
+          <Field label="Mã nhóm" value={profile.group_number ?? ""} />
+          <Field label="Họ tên trên BHYT" value={profile.bhyt_name ?? ""} />
+          <Field label="Ngày sinh (BHYT)" value={formatDob(profile.bhyt_dob)} />
+          <Field label="Giới tính" value={profile.bhyt_gender ?? ""} />
+          <Field label="Mã KCB" value={profile.bhyt_kcb_code ?? ""} />
+          <Field label="Nơi đăng ký KCB" value={profile.bhyt_kcb ?? ""} />
+          <Field label="Địa chỉ / đơn vị" value={profile.bhyt_address ?? ""} />
+          <Field label="Hiệu lực từ" value={formatDob(profile.bhyt_valid_from)} />
+          <Field label="Ngày 5 năm" value={formatDob(profile.bhyt_five_year)} />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+export default PatientRecordDetailPanel;

@@ -1,0 +1,581 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
+import {
+  NotebookPen,
+  SquareChartGantt,
+  Stethoscope,
+  UserRound,
+  Microscope,
+  Pill,
+  Siren,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import {
+  mapPatientListRowBase,
+  mapPatientPortalRow,
+  type PatientListItem,
+  type PatientPortalDetail,
+} from "@/types/patient-portal";
+
+const OVERVIEW_TABS = [
+  { id: "overview", icon: SquareChartGantt, label: "Overview" },
+  { id: "records", icon: NotebookPen, label: "Health Records" },
+  { id: "labs", icon: Microscope, label: "Labs" },
+  { id: "prescriptions", icon: Pill, label: "Prescriptions" },
+] as const;
+
+type OverviewTabId = (typeof OVERVIEW_TABS)[number]["id"];
+
+type DemoPatient = {
+  key: string;
+  name: string;
+  dob: string;
+  last: string;
+  status: string;
+  pronouns?: string;
+  email?: string;
+  phone?: string;
+};
+
+function demoPatientId(key: string) {
+  return `demo:${key}`;
+}
+
+function isDemoPatientId(id: string | null) {
+  return Boolean(id?.startsWith("demo:"));
+}
+
+function noteStorageKey(patientKey: string) {
+  return `qcare_provider_note_${patientKey}`;
+}
+
+function readNote(key: string): string {
+  if (typeof window === "undefined") return "";
+  return window.sessionStorage.getItem(noteStorageKey(key)) ?? "";
+}
+
+function writeNote(key: string, text: string) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(noteStorageKey(key), text);
+}
+
+function readOnboardingPersonalDraft(): {
+  legalFirstName?: string;
+  legalLastName?: string;
+  dateOfBirth?: string;
+  email?: string;
+  pronouns?: string;
+} {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem("qcare_onboarding_draft");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { personal?: Record<string, string> };
+    return parsed.personal ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function formatDob(iso: string | null | undefined, fallback: string): string {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+function statusBadgeClass(status: string | null | undefined) {
+  if (status === "Stable" || status === "Active") return "bg-emerald-100 text-emerald-700";
+  if (status === "Review Needed") return "bg-amber-100 text-amber-700";
+  if (status === "Draft") return "bg-slate-100 text-slate-700";
+  return "bg-slate-100 text-slate-700";
+}
+
+function demoToDetail(demo: DemoPatient): PatientPortalDetail {
+  const parts = demo.name.split(" ");
+  const legal_first_name = parts[0] ?? demo.name;
+  const legal_last_name = parts.slice(1).join(" ") || null;
+  return {
+    id: demoPatientId(demo.key),
+    user_id: "",
+    legal_first_name,
+    legal_last_name,
+    full_name: demo.name,
+    date_of_birth: null,
+    preferred_pronouns: demo.pronouns ?? null,
+    email_address: demo.email ?? null,
+    phone_number: demo.phone ?? null,
+    id_number: null,
+    residential_address: null,
+    id_expiration_date: null,
+    id_issued_date: null,
+    id_issuer: null,
+    insurance_provider: null,
+    member_id: null,
+    group_number: null,
+    submitted_at: null,
+    consent_accepted: true,
+  };
+}
+
+const PATIENT_LIST_QUERY_KEY = ["patient", "list"] as const;
+
+const ProviderPatientsPage = () => {
+  const draftPersonal = useMemo(() => readOnboardingPersonalDraft(), []);
+
+  const draftFullName =
+    [draftPersonal.legalFirstName, draftPersonal.legalLastName].filter(Boolean).join(" ") ||
+    "Alex Rivera";
+  const draftDob = formatDob(draftPersonal.dateOfBirth ?? null, "05/12/1994");
+
+  const demoPatients: DemoPatient[] = useMemo(
+    () => [
+      {
+        key: "demo1",
+        name: draftFullName,
+        dob: draftDob,
+        last: "2 days ago",
+        status: "Stable",
+        pronouns: draftPersonal.pronouns,
+        email: draftPersonal.email,
+      },
+      {
+        key: "demo2",
+        name: "Jordan Smith",
+        dob: "11/24/1988",
+        last: "1 week ago",
+        status: "Review Needed",
+        email: "jordan.smith@example.com",
+      },
+      {
+        key: "demo3",
+        name: "Marcus Chen",
+        dob: "02/03/1972",
+        last: "3 weeks ago",
+        status: "Routine",
+        phone: "(555) 010-2030",
+      },
+    ],
+    [draftDob, draftFullName, draftPersonal.email, draftPersonal.pronouns],
+  );
+
+  const [activeTab, setActiveTab] = useState<OverviewTabId>("overview");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+
+  const { data: patientSummaries = [], isLoading: isListLoading, isError, error } = useQuery({
+    queryKey: PATIENT_LIST_QUERY_KEY,
+    queryFn: async (): Promise<PatientListItem[]> => {
+      const { data: rpcData, error: rpcError } = await supabase.rpc("list_patients_for_staff");
+      let data = rpcData;
+      let fetchError = rpcError;
+      if (rpcError) {
+        const fallback = await supabase
+          .from("patient")
+          .select("id, legal_first_name, legal_last_name, date_of_birth, submitted_at, id_number, email_address")
+          .order("created_at", { ascending: false });
+        data = fallback.data;
+        fetchError = fallback.error;
+      }
+      if (fetchError) throw fetchError;
+      const rows = (data ?? []) as Record<string, unknown>[];
+      return rows.map((row) => {
+        const base = mapPatientListRowBase(row);
+        const { submitted_at, ...core } = base;
+        let last_visit_label = "—";
+        if (submitted_at) {
+          try {
+            last_visit_label = formatDistanceToNow(new Date(submitted_at), { addSuffix: true });
+          } catch {
+            last_visit_label = submitted_at.slice(0, 10);
+          }
+        }
+        const status = submitted_at ? "Active" : "Draft";
+        return { ...core, last_visit_label, status };
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (patientSummaries.length > 0) {
+      setSelectedId((prev) => {
+        if (prev && !isDemoPatientId(prev) && patientSummaries.some((r) => r.id === prev)) {
+          return prev;
+        }
+        return patientSummaries[0].id;
+      });
+      return;
+    }
+    setSelectedId((prev) => {
+      if (prev && isDemoPatientId(prev)) return prev;
+      return demoPatientId(demoPatients[0].key);
+    });
+  }, [patientSummaries, demoPatients]);
+
+  const activeNoteKey = selectedId ?? demoPatientId(demoPatients[0].key);
+
+  useEffect(() => {
+    setNoteDraft(readNote(activeNoteKey));
+  }, [activeNoteKey]);
+
+  const {
+    data: patientDetailFromDb,
+    isLoading: isDetailLoading,
+  } = useQuery({
+    queryKey: ["patient", "detail", selectedId],
+    queryFn: async (): Promise<PatientPortalDetail> => {
+      const { data: rpcRow, error: rpcErr } = await supabase.rpc("get_patient_for_staff", {
+        p_patient_id: selectedId as string,
+      });
+      if (!rpcErr && rpcRow) {
+        const row = Array.isArray(rpcRow) ? rpcRow[0] : rpcRow;
+        if (row) return mapPatientPortalRow(row as Record<string, unknown>);
+      }
+      const { data, error: fetchError } = await supabase
+        .from("patient")
+        .select("*")
+        .eq("id", selectedId as string)
+        .single();
+
+      if (fetchError) throw fetchError;
+      return mapPatientPortalRow(data as Record<string, unknown>);
+    },
+    enabled: Boolean(selectedId) && !isDemoPatientId(selectedId),
+  });
+
+  const demoDetail = useMemo(() => {
+    if (!selectedId || !isDemoPatientId(selectedId)) return null;
+    const key = selectedId.replace(/^demo:/, "");
+    const demo = demoPatients.find((p) => p.key === key);
+    return demo ? demoToDetail(demo) : null;
+  }, [selectedId, demoPatients]);
+
+  const patientDetail = patientDetailFromDb ?? demoDetail;
+
+  const selectedDemo = useMemo(() => {
+    if (!selectedId || !isDemoPatientId(selectedId)) return null;
+    const key = selectedId.replace(/^demo:/, "");
+    return demoPatients.find((p) => p.key === key) ?? null;
+  }, [selectedId, demoPatients]);
+
+  const displayName = patientDetail?.full_name ?? draftFullName;
+  const displayDob = patientDetail?.date_of_birth
+    ? formatDob(patientDetail.date_of_birth, draftDob)
+    : selectedDemo?.dob ?? draftDob;
+  const displayId =
+    patientDetail?.id_number?.trim() ||
+    (patientDetail?.id && !isDemoPatientId(patientDetail.id)
+      ? `QC-${patientDetail.id.slice(0, 8).toUpperCase()}`
+      : "QC-DEMO-8842");
+  const pronouns = patientDetail?.preferred_pronouns ?? draftPersonal.pronouns ?? "Not set";
+
+  const diagnoses = ["Type 2 Diabetes", "Mild Hypertension"];
+  const medications = ["Metformin 500mg", "Lisinopril 10mg"];
+  const allergies = ["Penicillin", "Peanuts"];
+
+  const vitals = [
+    { label: "Heart Rate", value: "72 bpm" },
+    { label: "Temp", value: "98.6 F" },
+    { label: "BP", value: "118/76 mmHg" },
+  ];
+
+  const recentLabs = [
+    { name: "Blood Panel", date: "2024-01-12" },
+    { name: "Chest X-Ray", date: "2023-12-28" },
+  ];
+
+  const emergencyName = `${displayName.split(" ")[0] ?? "Patient"} Contact`;
+  const emergencyPhone =
+    patientDetail?.phone_number ?? selectedDemo?.phone ?? draftPersonal.email ?? "123-4567";
+
+  const handleSelectPatient = useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
+
+  const handleSaveNote = useCallback(() => {
+    writeNote(activeNoteKey, noteDraft);
+    toast.success("Đã lưu ghi chú phiên làm việc (session)");
+  }, [activeNoteKey, noteDraft]);
+
+  const isListBusy = isListLoading;
+  const isDetailBusy = Boolean(selectedId) && !isDemoPatientId(selectedId) && isDetailLoading;
+
+  return (
+    <>
+      {isListBusy ? (
+        <p className="text-sm text-muted-foreground">Loading patient profiles…</p>
+      ) : null}
+      {isError ? (
+        <div
+          className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          role="alert"
+        >
+          <p className="font-medium">
+            {(error as { message?: string })?.message ??
+              "Could not load patient data. Check Supabase table and RLS."}
+          </p>
+          <p className="mt-2 text-xs font-normal leading-relaxed text-destructive/90">
+            Bác sĩ cần policy <code className="rounded bg-destructive/15 px-1 py-0.5 font-mono text-[11px]">patient_select_doctor</code>.
+            Chạy migration mới nhất hoặc dùng bệnh nhân demo bên dưới.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
+        <section className="rounded-xl border bg-card p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Patient Panel</h2>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              {(patientSummaries.length || demoPatients.length)} Active
+            </span>
+          </div>
+          <div className="space-y-3">
+            {patientSummaries.length > 0
+              ? patientSummaries.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => handleSelectPatient(row.id)}
+                    className={`w-full cursor-pointer rounded-lg border p-3 text-left transition-colors hover:bg-muted ${
+                      selectedId === row.id ? "border-primary/40 bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">{row.full_name ?? "Patient"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          DOB: {formatDob(row.date_of_birth, "—")}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Last visit: {row.last_visit_label ?? "—"}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(row.status)}`}
+                      >
+                        {row.status ?? "Active"}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              : demoPatients.map((patient) => {
+                  const id = demoPatientId(patient.key);
+                  return (
+                    <button
+                      key={patient.key}
+                      type="button"
+                      onClick={() => handleSelectPatient(id)}
+                      className={`w-full cursor-pointer rounded-lg border p-3 text-left transition-colors hover:bg-muted ${
+                        selectedId === id ? "border-primary/40 bg-primary/5" : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">{patient.name}</p>
+                          <p className="text-xs text-muted-foreground">DOB: {patient.dob}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Last visit: {patient.last}</p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(patient.status)}`}
+                        >
+                          {patient.status}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+          </div>
+          {patientSummaries.length === 0 && !isListBusy ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Đang dùng <strong>bệnh nhân demo</strong> (có thể bấm chọn). Để load dữ liệu thật: hoàn tất onboarding
+              patient hoặc chạy migration RLS cho role doctor.
+            </p>
+          ) : null}
+        </section>
+
+        <section className="space-y-6">
+          {isDetailBusy ? (
+            <p className="text-sm text-muted-foreground">Loading patient detail…</p>
+          ) : null}
+
+          <div className="rounded-2xl bg-gradient-to-r from-primary to-pink-400 p-5 text-primary-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-card/20">
+                  <UserRound className="h-8 w-8" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold">{displayName}</h2>
+                  <p className="text-sm opacity-90">
+                    ID: {displayId} · DOB: {displayDob} · {pronouns}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="min-h-11 rounded-lg bg-card px-5 text-sm font-semibold text-primary hover:bg-card/90"
+                onClick={() => toast.info("Chỉnh sửa hồ sơ — tích hợp form sau")}
+              >
+                Edit Profile
+              </button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-card/20 px-3 py-1">Blood: O+</span>
+              <span className="rounded-full bg-card/20 px-3 py-1">Height: 182cm</span>
+              <span className="rounded-full bg-card/20 px-3 py-1">Weight: 78kg</span>
+              {(patientDetail?.email_address ?? draftPersonal.email) ? (
+                <span className="rounded-full bg-card/20 px-3 py-1">
+                  {patientDetail?.email_address ?? draftPersonal.email}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+            <section className="rounded-xl border bg-card p-4">
+              <div className="mb-4 flex flex-wrap items-center gap-2 border-b pb-3 text-sm">
+                {OVERVIEW_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 transition-colors ${
+                        activeTab === tab.id
+                          ? "bg-primary/10 font-semibold text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeTab === "overview" ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <article className="rounded-lg border bg-background p-3">
+                      <h3 className="text-sm font-semibold">Past Diagnoses</h3>
+                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        {diagnoses.map((item) => (
+                          <li key={item}>• {item}</li>
+                        ))}
+                      </ul>
+                    </article>
+                    <article className="rounded-lg border bg-background p-3">
+                      <h3 className="text-sm font-semibold">Medication</h3>
+                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        {medications.map((item) => (
+                          <li key={item}>• {item}</li>
+                        ))}
+                      </ul>
+                    </article>
+                    <article className="rounded-lg border bg-background p-3">
+                      <h3 className="text-sm font-semibold">Allergies</h3>
+                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        {allergies.map((item) => (
+                          <li key={item}>• {item}</li>
+                        ))}
+                      </ul>
+                    </article>
+                  </div>
+
+                  <div className="mt-4 rounded-lg border bg-background p-4">
+                    <h3 className="mb-2 text-lg font-semibold">Clinical Note</h3>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Ghi chú lưu trong phiên trình duyệt (sessionStorage), không ghi vào bảng patient.
+                    </p>
+                    <textarea
+                      value={noteDraft}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                      className="min-h-28 w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                      placeholder="Document patient reported symptoms and observations..."
+                    />
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        className="min-h-11 rounded-lg px-4 text-sm text-muted-foreground hover:bg-muted"
+                        onClick={() => {
+                          setNoteDraft("");
+                          writeNote(activeNoteKey, "");
+                        }}
+                      >
+                        Discard
+                      </button>
+                      <button
+                        type="button"
+                        className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        onClick={handleSaveNote}
+                      >
+                        Save Record
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  {OVERVIEW_TABS.find((t) => t.id === activeTab)?.label} — đang phát triển.
+                </p>
+              )}
+            </section>
+
+            <aside className="space-y-4">
+              <div className="rounded-xl border bg-card p-4">
+                <h3 className="mb-3 text-sm font-semibold">Latest Vitals</h3>
+                <ul className="space-y-2">
+                  {vitals.map((vital) => (
+                    <li key={vital.label} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{vital.label}</span>
+                      <span className="font-semibold">{vital.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border bg-card p-4">
+                <h3 className="mb-3 text-sm font-semibold">Recent Labs</h3>
+                <div className="space-y-2 text-sm">
+                  {recentLabs.map((lab) => (
+                    <p key={`${lab.name}-${lab.date}`} className="rounded-lg bg-muted px-3 py-2">
+                      {lab.name} · {lab.date}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Emergency Contact</h3>
+                <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                  <Siren className="h-4 w-4 text-primary" aria-hidden="true" />
+                  {emergencyName}
+                </p>
+                <p className="text-sm text-muted-foreground">{emergencyPhone}</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+
+      <div className="mt-6">
+        <Link
+          to="/onboarding/profile"
+          className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm hover:bg-muted"
+        >
+          <Stethoscope className="mr-2 h-4 w-4" aria-hidden="true" />
+          Update from Onboarding Data
+        </Link>
+      </div>
+    </>
+  );
+};
+
+export default ProviderPatientsPage;

@@ -1,0 +1,80 @@
+# Supabase local configuration (adjust project_id when linking remote)
+# Docs: https://supabase.com/docs/guides/cli/config
+
+project_id = "responsive-web-app"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:8080"
+additional_redirect_urls = [
+  "http://localhost:8080",
+  "http://localhost:8080/auth/callback",
+  "http://localhost:5173",
+  "http://localhost:5173/auth/callback",
+  "http://localhost:5190",
+  "http://localhost:5190/auth/callback",
+  "https://localhost:5173",
+  "https://localhost:5173/auth/callback",
+]
+enable_signup = true
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
+
+[auth.email]
+enable_signup = true
+# OTP 6 số qua signInWithOtp (client), không dùng link Confirm signup
+enable_confirmations = false
+otp_length = 6
+otp_expiry = 300
+
+[functions.signup-send-otp]
+verify_jwt = false
+
+[functions.signup-verify-otp]
+verify_jwt = false
+
+[functions.signup-complete]
+verify_jwt = false
+
+[functions.forgot-password-send-otp]
+verify_jwt = false
+
+[functions.forgot-password-verify-otp]
+verify_jwt = false
+
+[functions.reset-password-complete]
+verify_jwt = false
+
+[functions.portal-login]
+verify_jwt = false
+
+[functions.portal-logout]
+verify_jwt = false
