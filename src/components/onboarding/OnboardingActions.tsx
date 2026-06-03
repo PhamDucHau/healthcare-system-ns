@@ -6,6 +6,7 @@ type OnboardingActionsProps = {
   previousPath?: string;
   nextLabel: string;
   isSubmitting?: boolean;
+  disabled?: boolean;
   onNext?: () => void;
 };
 
@@ -13,6 +14,7 @@ const OnboardingActions = ({
   previousPath,
   nextLabel,
   isSubmitting = false,
+  disabled = false,
   onNext,
 }: OnboardingActionsProps) => {
   return (
@@ -31,7 +33,7 @@ const OnboardingActions = ({
       <Button
         type="button"
         onClick={onNext}
-        disabled={isSubmitting}
+        disabled={isSubmitting || disabled}
         size="lg"
         className="min-h-11 min-w-56 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-6 shadow-lg shadow-primary/20"
       >

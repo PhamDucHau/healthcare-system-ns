@@ -82,6 +82,7 @@ export async function submitPatientProfile(
     card_back_storage_path: null,
     consent_accepted: form.acceptedPrivacy,
     submitted_at: submittedAt,
+    status: "UNVERIFIED",
   };
 
   const { error } = await supabase.from("patient").upsert(row, { onConflict: "user_id" });

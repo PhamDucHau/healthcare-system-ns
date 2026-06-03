@@ -1,13 +1,31 @@
 import { useState } from "react";
 import { AlertTriangle, Pill, FileText, Scissors, Shield, CheckCircle2, FileUser } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import HealthSection from "./HealthSection";
 import ProfileSummary from "./ProfileSummary";
 import PatientProfileDialog from "@/components/patient/PatientProfileDialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/lib/supabase";
 
 const HealthHistory = () => {
   const [profileOpen, setProfileOpen] = useState(false);
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+
+  const { data: hasProfile } = useQuery({
+    queryKey: ["patient", "has-profile", userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("patient")
+        .select("submitted_at")
+        .eq("user_id", userId as string)
+        .maybeSingle();
+      return Boolean(data?.submitted_at);
+    },
+    enabled: Boolean(userId),
+  });
 
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -22,12 +40,14 @@ const HealthHistory = () => {
             New patient? Complete your personal, identity, and insurance onboarding to speed up care.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              to="/onboarding/personal"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              Start onboarding
-            </Link>
+            {!hasProfile ? (
+              <Link
+                to="/onboarding/personal"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Start onboarding
+              </Link>
+            ) : null}
             <Link
               to="/provider-portal/patients"
               className="inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted"

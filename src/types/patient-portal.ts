@@ -26,6 +26,9 @@ export type PatientPortalDetail = {
   bhyt_kcb_code: string | null;
   bhyt_valid_from: string | null;
   bhyt_five_year: string | null;
+  id_document_storage_path: string | null;
+  id_document_back_storage_path: string | null;
+  card_front_storage_path: string | null;
   submitted_at: string | null;
   updated_at: string | null;
   consent_accepted: boolean;
@@ -104,6 +107,9 @@ export function mapPatientPortalRow(row: Record<string, unknown>): PatientPortal
     bhyt_kcb_code: row.bhyt_kcb_code != null ? String(row.bhyt_kcb_code) : null,
     bhyt_valid_from: row.bhyt_valid_from != null ? String(row.bhyt_valid_from) : null,
     bhyt_five_year: row.bhyt_five_year != null ? String(row.bhyt_five_year) : null,
+    id_document_storage_path: row.id_document_storage_path != null ? String(row.id_document_storage_path) : null,
+    id_document_back_storage_path: row.id_document_back_storage_path != null ? String(row.id_document_back_storage_path) : null,
+    card_front_storage_path: row.card_front_storage_path != null ? String(row.card_front_storage_path) : null,
     submitted_at: row.submitted_at != null ? String(row.submitted_at) : null,
     updated_at: row.updated_at != null ? String(row.updated_at) : null,
     consent_accepted: Boolean(row.consent_accepted),
