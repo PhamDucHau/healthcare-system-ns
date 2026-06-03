@@ -12,11 +12,11 @@ const OnboardingLayout = () => {
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <span className="inline-flex min-h-9 items-center gap-1 rounded-full border bg-card px-3 py-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-              HIPAA Compliant
+              Tuân thủ HIPAA
             </span>
             <span className="inline-flex min-h-9 items-center gap-1 rounded-full border bg-card px-3 py-1.5">
               <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-              Inclusive Care
+              Chăm sóc toàn diện
             </span>
           </div>
         </div>
@@ -34,9 +34,9 @@ const OnboardingLayout = () => {
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 py-4 text-xs text-muted-foreground md:flex-row md:px-8">
           <p>Qcare Plus Clinical Network</p>
           <div className="flex items-center gap-4">
-            <button className="hover:text-foreground">Privacy Policy</button>
-            <button className="hover:text-foreground">Terms of Service</button>
-            <button className="hover:text-foreground">Patient Rights</button>
+            <button className="hover:text-foreground">Chính sách bảo mật</button>
+            <button className="hover:text-foreground">Điều khoản dịch vụ</button>
+            <button className="hover:text-foreground">Quyền bệnh nhân</button>
           </div>
         </div>
       </footer>

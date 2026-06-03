@@ -23,7 +23,7 @@ const OnboardingActions = ({
         <Button asChild variant="ghost" className="min-h-11 px-1 text-muted-foreground hover:text-foreground">
           <Link to={previousPath}>
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Previous
+            Quay lại
           </Link>
         </Button>
       ) : (
@@ -37,7 +37,7 @@ const OnboardingActions = ({
         size="lg"
         className="min-h-11 min-w-56 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-6 shadow-lg shadow-primary/20"
       >
-        {isSubmitting ? "Please wait..." : nextLabel}
+        {isSubmitting ? "Vui lòng chờ..." : nextLabel}
         {!isSubmitting ? <ArrowRight className="h-4 w-4" aria-hidden="true" /> : null}
       </Button>
     </div>

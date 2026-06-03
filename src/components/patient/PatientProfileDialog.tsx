@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, FileUser, Loader2, Pencil, UploadCloud, UserRound, X } from "lucide-react";
+import { AlertTriangle, FileText, FileUser, Loader2, Pencil, UploadCloud, UserRound, X, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useDuplicateCheck } from "@/hooks/useDuplicateCheck";
 import { supabase } from "@/lib/supabase";
 import { mapPatientPortalRow, type PatientPortalDetail } from "@/types/patient-portal";
 import {
@@ -147,20 +148,31 @@ function EditField({
   label,
   value,
   onChange,
+  onBlur,
   type = "text",
+  highlight,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   type?: string;
+  highlight?: "error" | "warn";
 }) {
+  const borderClass =
+    highlight === "error"
+      ? "border-destructive/60 bg-destructive/5"
+      : highlight === "warn"
+        ? "border-warning/60 bg-warning/5"
+        : "border-primary/40 bg-primary/5";
   return (
-    <div className="rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+    <div className={`rounded-lg border px-3 py-2 ${borderClass}`}>
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         className="mt-0.5 w-full bg-transparent text-sm font-medium text-foreground outline-none"
       />
     </div>
@@ -295,6 +307,13 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
   const [editData, setEditData] = useState<EditData | null>(null);
   const [editFiles, setEditFiles] = useState<EditFiles>(emptyEditFiles);
 
+  const {
+    dupState, bypassed,
+    isBlocked: dupIsBlocked, hasUnbypassedWarning,
+    checkCccd, checkPhone, checkNameDob, checkAll,
+    bypassPhone, bypassNameDob, reset: resetDup,
+  } = useDuplicateCheck(userId, "edit");
+
   const { data: queryResult, isLoading, isError } = useQuery({
     queryKey: ["patient", "my-profile", userId],
     queryFn: async () => {
@@ -386,10 +405,32 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     setIsEditing(false);
     setEditData(null);
     setEditFiles(emptyEditFiles);
+    resetDup();
   };
 
   const handleSave = async () => {
     if (!userId || !editData) return;
+
+    // Final duplicate check before saving
+    const fullName = [editData.legalFirstName, editData.legalLastName].filter(Boolean).join(" ");
+    const finalDup = await checkAll({
+      cccd: editData.idNumber,
+      phone: editData.phoneNumber,
+      name: fullName,
+      dob: editData.dateOfBirth,
+    });
+    if (finalDup.cccdMatchId) {
+      toast.error("Trùng CCCD", { description: "Số CCCD này đã có hồ sơ khác trong hệ thống." });
+      return;
+    }
+    if (
+      (finalDup.phoneMatchId && !bypassed.phone) ||
+      (finalDup.nameDobMatchId && !bypassed.nameDob)
+    ) {
+      toast.warning("Vui lòng xác nhận các cảnh báo trùng trước khi lưu.");
+      return;
+    }
+
     setIsSaving(true);
 
     // Upload any new images first
@@ -556,12 +597,40 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
               <h3 className="mb-2 text-sm font-semibold text-foreground">Thông tin cá nhân</h3>
               {isEditing && editData ? (
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <EditField label="Họ" value={editData.legalLastName} onChange={set("legalLastName")} />
-                  <EditField label="Tên" value={editData.legalFirstName} onChange={set("legalFirstName")} />
-                  <EditField label="Ngày sinh" value={editData.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
-                  <EditField label="Số điện thoại" value={editData.phoneNumber} onChange={set("phoneNumber")} type="tel" />
+                  <EditField
+                    label="Họ" value={editData.legalLastName} onChange={set("legalLastName")}
+                    onBlur={() => { const n = [editData.legalFirstName, editData.legalLastName].filter(Boolean).join(" "); void checkNameDob(n, editData.dateOfBirth); }}
+                    highlight={dupState.nameDobMatchId && !bypassed.nameDob ? "warn" : undefined}
+                  />
+                  <EditField
+                    label="Tên" value={editData.legalFirstName} onChange={set("legalFirstName")}
+                    onBlur={() => { const n = [editData.legalFirstName, editData.legalLastName].filter(Boolean).join(" "); void checkNameDob(n, editData.dateOfBirth); }}
+                    highlight={dupState.nameDobMatchId && !bypassed.nameDob ? "warn" : undefined}
+                  />
+                  <EditField
+                    label="Ngày sinh" value={editData.dateOfBirth} onChange={set("dateOfBirth")} type="date"
+                    onBlur={() => { const n = [editData.legalFirstName, editData.legalLastName].filter(Boolean).join(" "); void checkNameDob(n, editData.dateOfBirth); }}
+                    highlight={dupState.nameDobMatchId && !bypassed.nameDob ? "warn" : undefined}
+                  />
+                  <EditField
+                    label="Số điện thoại" value={editData.phoneNumber} onChange={set("phoneNumber")} type="tel"
+                    onBlur={() => void checkPhone(editData.phoneNumber)}
+                    highlight={dupState.phoneMatchId && !bypassed.phone ? "warn" : undefined}
+                  />
                   <EditField label="Email" value={editData.email} onChange={set("email")} type="email" />
                   <EditField label="Đại từ" value={editData.pronouns} onChange={set("pronouns")} />
+                  {dupState.phoneMatchId && !bypassed.phone ? (
+                    <div className="sm:col-span-2 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span><strong>SĐT đã tồn tại.</strong>{" "}<button type="button" onClick={bypassPhone} className="font-semibold underline">Vẫn lưu</button></span>
+                    </div>
+                  ) : null}
+                  {dupState.nameDobMatchId && !bypassed.nameDob ? (
+                    <div className="sm:col-span-2 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span><strong>Họ tên + ngày sinh đã khớp hồ sơ khác.</strong>{" "}<button type="button" onClick={bypassNameDob} className="font-semibold underline">Vẫn lưu</button></span>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -580,7 +649,17 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
               <h3 className="mb-2 text-sm font-semibold text-foreground">Giấy tờ tùy thân</h3>
               {isEditing && editData ? (
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <EditField label="Số CCCD/ID" value={editData.idNumber} onChange={set("idNumber")} />
+                  <EditField
+                    label="Số CCCD/ID" value={editData.idNumber} onChange={set("idNumber")}
+                    onBlur={() => void checkCccd(editData.idNumber)}
+                    highlight={dupState.cccdMatchId ? "error" : undefined}
+                  />
+                  {dupState.cccdMatchId ? (
+                    <div className="sm:col-span-2 -mt-1 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span><strong>Trùng CCCD.</strong> Số CCCD này đã có hồ sơ khác trong hệ thống. Không thể lưu.</span>
+                    </div>
+                  ) : null}
                   <EditField label="Nơi cấp" value={editData.idIssuer} onChange={set("idIssuer")} />
                   <EditField label="Ngày cấp" value={editData.idIssuedDate} onChange={set("idIssuedDate")} type="date" />
                   <EditField label="Ngày hết hạn" value={editData.idExpirationDate} onChange={set("idExpirationDate")} type="date" />
@@ -707,7 +786,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                 <Button
                   type="button"
                   onClick={() => void handleSave()}
-                  disabled={isSaving}
+                  disabled={isSaving || dupIsBlocked}
                   className="gap-2"
                 >
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

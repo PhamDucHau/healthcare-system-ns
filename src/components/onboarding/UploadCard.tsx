@@ -70,10 +70,10 @@ const UploadCard = ({
       )}
       <p className="text-base font-semibold text-foreground">{title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-      <p className="mt-3 text-xs text-muted-foreground">PNG, JPG, JPEG, PDF (max 10MB)</p>
+      <p className="mt-3 text-xs text-muted-foreground">PNG, JPG, JPEG, PDF (tối đa 10MB)</p>
       {fileName ? (
         <p className="mt-3 rounded-md bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-          Selected: {fileName}
+          Đã chọn: {fileName}
         </p>
       ) : null}
     </label>
