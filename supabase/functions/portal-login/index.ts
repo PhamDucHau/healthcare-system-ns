@@ -21,9 +21,21 @@ import {
   normalizePortalRole,
   syncRoleToAppMetadata,
 } from "../_shared/user-profile.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ADMIN_MFA_TTL_SECONDS = 300;
+const ADMIN_MFA_COOLDOWN_SECONDS = 60;
+
+function getAnonClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anonKey) throw new Error("Supabase anon credentials not configured");
+  return createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
@@ -84,6 +96,7 @@ Deno.serve(async (req) => {
     }
 
     const admin = getAdminClient();
+    const anonForAuth = getAnonClient(); // dùng riêng cho signInWithPassword — tránh nhiễm user JWT vào admin client
     const redis = getRedis();
 
     const lock = await redis.get(loginLockKey(email));
@@ -106,7 +119,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: signInData, error: signInError } = await admin.auth
+    const { data: signInData, error: signInError } = await anonForAuth.auth
       .signInWithPassword({ email, password });
 
     if (signInError || !signInData.session || !signInData.user) {
@@ -233,6 +246,90 @@ Deno.serve(async (req) => {
 
     await redis.del(loginAttemptKey(email));
     await syncRoleToAppMetadata(admin, userId, userRole);
+
+    // Admin phải xác minh OTP trước khi nhận session
+    if (userRole === "admin") {
+      // Kiểm tra cooldown qua DB
+      const now = new Date().toISOString();
+      const { data: existing } = await admin
+        .from("admin_mfa_sessions")
+        .select("cooldown_until")
+        .eq("email", email)
+        .gt("cooldown_until", now)
+        .maybeSingle();
+
+      if (existing) {
+        const retryAfter = Math.ceil(
+          (new Date(existing.cooldown_until as string).getTime() - Date.now()) / 1000,
+        );
+        await revokeSession(session.access_token, session.refresh_token);
+        return jsonResponse({
+          error: "MFA_COOLDOWN",
+          message: "OTP vừa được gửi. Vui lòng kiểm tra email hoặc đợi trước khi gửi lại.",
+          retryAfter: retryAfter > 0 ? retryAfter : ADMIN_MFA_COOLDOWN_SECONDS,
+        }, 429);
+      }
+
+      // Gửi OTP qua anon client — giống luồng signup
+      const anonClient = getAnonClient();
+      const { error: otpError } = await anonClient.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false },
+      });
+
+      console.log("[portal-login] signInWithOtp result:", otpError
+        ? { status: otpError.status, code: (otpError as { code?: string }).code, message: otpError.message }
+        : "OK (no error)"
+      );
+
+      if (otpError) {
+        console.error("[portal-login] signInWithOtp error:", JSON.stringify(otpError));
+        return jsonResponse({ error: "MFA_SEND_FAILED", message: "Không thể gửi mã OTP" }, 500);
+      }
+
+      const mfaToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + ADMIN_MFA_TTL_SECONDS * 1000).toISOString();
+      const cooldownUntil = new Date(Date.now() + ADMIN_MFA_COOLDOWN_SECONDS * 1000).toISOString();
+
+      // Xóa session cũ và lưu session mới vào DB
+      const { error: delError } = await admin.from("admin_mfa_sessions").delete().eq("email", email);
+      if (delError) console.error("[portal-login] delete mfa_sessions error:", delError.message);
+
+      const { error: insertError } = await admin.from("admin_mfa_sessions").insert({
+        mfa_token: mfaToken,
+        user_id: userId,
+        email,
+        portal: unifiedMode ? "unified" : (requestedPortal ?? "admin"),
+        expires_at: expiresAt,
+        cooldown_until: cooldownUntil,
+      });
+
+      if (insertError) {
+        console.error("[portal-login] insert mfa_sessions error:", insertError.message, insertError.code);
+        return jsonResponse({ error: "MFA_SESSION_FAILED", message: "Không thể tạo phiên MFA" }, 500);
+      }
+
+      console.log("[portal-login] mfa session inserted, token:", mfaToken);
+
+      // Revoke session tạm từ signInWithPassword (chưa cấp cho client)
+      await revokeSession(session.access_token, session.refresh_token);
+
+      await writeAuditLog(admin, {
+        eventType: "ADMIN_MFA_SENT",
+        userId,
+        email,
+        ipAddress: ip,
+        userAgent,
+        metadata: { portal: unifiedMode ? "unified" : requestedPortal },
+      });
+
+      return jsonResponse({
+        requiresMfa: true,
+        mfaToken,
+        expiresIn: ADMIN_MFA_TTL_SECONDS,
+        message: "Vui lòng nhập mã OTP đã gửi tới email của bạn",
+      });
+    }
 
     await writeAuditLog(admin, {
       eventType: "LOGIN_SUCCESS",
