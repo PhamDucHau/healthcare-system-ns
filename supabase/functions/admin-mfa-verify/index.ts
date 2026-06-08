@@ -5,23 +5,11 @@ import {
   ACCESS_TTL_BY_ROLE,
   REFRESH_TTL_SECONDS,
 } from "../_shared/portal.ts";
-import {
-  adminMfaAttemptKey,
-  adminMfaSessionKey,
-  ADMIN_MFA_TTL_SECONDS,
-  getRedis,
-  MAX_MFA_ATTEMPTS,
-} from "../_shared/redis.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 
 const OTP_RE = /^\d{6}$/;
-
-type PendingMfa = {
-  email: string;
-  password: string;
-  portal: string;
-  userId: string;
-};
+const MAX_MFA_ATTEMPTS = 3;
+const ADMIN_MFA_TTL_SECONDS = 300;
 
 function getAnonClient() {
   const url = Deno.env.get("SUPABASE_URL");
@@ -53,80 +41,80 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "INVALID_OTP", message: "OTP không hợp lệ" }, 422);
     }
 
-    const redis = getRedis();
+    const admin = getAdminClient();
 
-    const sessionJson = await redis.get(adminMfaSessionKey(mfaToken));
-    if (!sessionJson) {
+    // Tra cứu session từ DB
+    const now = new Date().toISOString();
+    const { data: sessionRow, error: dbError } = await admin
+      .from("admin_mfa_sessions")
+      .select("*")
+      .eq("mfa_token", mfaToken)
+      .gt("expires_at", now)
+      .maybeSingle();
+
+    console.log("[admin-mfa-verify] lookup token:", mfaToken, "now:", now, "found:", !!sessionRow, "dbError:", dbError?.message ?? null);
+
+    if (dbError || !sessionRow) {
       return jsonResponse({
         error: "MFA_TOKEN_EXPIRED",
         message: "Phiên MFA đã hết hạn. Vui lòng đăng nhập lại.",
       }, 410);
     }
 
-    const pending: PendingMfa = JSON.parse(sessionJson);
-    const admin = getAdminClient();
     const anonClient = getAnonClient();
 
-    // Xác minh OTP qua Supabase (admin client, như forgot-password-verify-otp)
-    const { error: verifyError } = await admin.auth.verifyOtp({
-      email: pending.email,
+    // Xác minh OTP qua anon client — phải khớp với client đã gửi OTP
+    const { data: verifyData, error: verifyError } = await anonClient.auth.verifyOtp({
+      email: sessionRow.email,
       token: otp,
       type: "email",
     });
 
-    if (verifyError) {
-      const attempts = await redis.incr(adminMfaAttemptKey(mfaToken));
-      await redis.expire(adminMfaAttemptKey(mfaToken), ADMIN_MFA_TTL_SECONDS);
+    if (verifyError || !verifyData?.session) {
+      const newAttempts = (sessionRow.attempts as number) + 1;
 
       await writeAuditLog(admin, {
         eventType: "ADMIN_MFA_FAILED",
-        userId: pending.userId,
-        email: pending.email,
+        userId: sessionRow.user_id,
+        email: sessionRow.email,
         ipAddress: ip,
         userAgent,
-        metadata: { attempts },
+        metadata: { attempts: newAttempts },
       });
 
-      if (attempts >= MAX_MFA_ATTEMPTS) {
-        await redis.del(adminMfaSessionKey(mfaToken));
-        await redis.del(adminMfaAttemptKey(mfaToken));
+      if (newAttempts >= MAX_MFA_ATTEMPTS) {
+        await admin.from("admin_mfa_sessions").delete().eq("mfa_token", mfaToken);
         return jsonResponse({
           error: "MFA_LOCKED",
           message: "Nhập sai OTP quá nhiều lần. Vui lòng đăng nhập lại.",
         }, 429);
       }
 
+      await admin
+        .from("admin_mfa_sessions")
+        .update({ attempts: newAttempts })
+        .eq("mfa_token", mfaToken);
+
       return jsonResponse({
         error: "INVALID_OTP",
         message: "Mã OTP không đúng",
-        attemptsLeft: MAX_MFA_ATTEMPTS - attempts,
+        attemptsLeft: MAX_MFA_ATTEMPTS - newAttempts,
       }, 400);
     }
 
-    // OTP đúng — sign in lại với password để lấy session chuẩn
-    const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({
-      email: pending.email,
-      password: pending.password,
-    });
-
-    if (signInError || !signInData?.session) {
-      console.error("[admin-mfa-verify] re-signin error:", signInError?.message);
-      return jsonResponse({ error: "SESSION_CREATE_FAILED", message: "Không thể tạo phiên đăng nhập" }, 500);
-    }
-
-    await redis.del(adminMfaSessionKey(mfaToken));
-    await redis.del(adminMfaAttemptKey(mfaToken));
+    // OTP đúng — dùng session từ verifyOtp trực tiếp, không cần re-signin
+    await admin.from("admin_mfa_sessions").delete().eq("mfa_token", mfaToken);
 
     await writeAuditLog(admin, {
       eventType: "ADMIN_MFA_SUCCESS",
-      userId: pending.userId,
-      email: pending.email,
+      userId: sessionRow.user_id,
+      email: sessionRow.email,
       ipAddress: ip,
       userAgent,
-      metadata: { portal: pending.portal },
+      metadata: { portal: sessionRow.portal },
     });
 
-    const newSession = signInData.session;
+    const newSession = verifyData.session;
     return jsonResponse({
       message: "Đăng nhập thành công",
       portal: "admin",

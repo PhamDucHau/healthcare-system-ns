@@ -14,10 +14,6 @@ import {
   loginLockKey,
   LOGIN_LOCK_TTL_SECONDS,
   MAX_LOGIN_ATTEMPTS,
-  adminMfaSessionKey,
-  adminMfaCooldownKey,
-  ADMIN_MFA_TTL_SECONDS,
-  ADMIN_MFA_COOLDOWN_SECONDS,
 } from "../_shared/redis.ts";
 import {
   getUserProfileForLogin,
@@ -25,9 +21,21 @@ import {
   normalizePortalRole,
   syncRoleToAppMetadata,
 } from "../_shared/user-profile.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ADMIN_MFA_TTL_SECONDS = 300;
+const ADMIN_MFA_COOLDOWN_SECONDS = 60;
+
+function getAnonClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anonKey) throw new Error("Supabase anon credentials not configured");
+  return createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
@@ -88,6 +96,7 @@ Deno.serve(async (req) => {
     }
 
     const admin = getAdminClient();
+    const anonForAuth = getAnonClient(); // dùng riêng cho signInWithPassword — tránh nhiễm user JWT vào admin client
     const redis = getRedis();
 
     const lock = await redis.get(loginLockKey(email));
@@ -110,7 +119,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: signInData, error: signInError } = await admin.auth
+    const { data: signInData, error: signInError } = await anonForAuth.auth
       .signInWithPassword({ email, password });
 
     if (signInError || !signInData.session || !signInData.user) {
@@ -240,9 +249,19 @@ Deno.serve(async (req) => {
 
     // Admin phải xác minh OTP trước khi nhận session
     if (userRole === "admin") {
-      const cooldown = await redis.get(adminMfaCooldownKey(email));
-      if (cooldown) {
-        const retryAfter = await redis.ttl(adminMfaCooldownKey(email));
+      // Kiểm tra cooldown qua DB
+      const now = new Date().toISOString();
+      const { data: existing } = await admin
+        .from("admin_mfa_sessions")
+        .select("cooldown_until")
+        .eq("email", email)
+        .gt("cooldown_until", now)
+        .maybeSingle();
+
+      if (existing) {
+        const retryAfter = Math.ceil(
+          (new Date(existing.cooldown_until as string).getTime() - Date.now()) / 1000,
+        );
         await revokeSession(session.access_token, session.refresh_token);
         return jsonResponse({
           error: "MFA_COOLDOWN",
@@ -251,8 +270,9 @@ Deno.serve(async (req) => {
         }, 429);
       }
 
-      // signInWithOtp gửi email qua Supabase (admin client, như forgot-password-send-otp)
-      const { error: otpError } = await admin.auth.signInWithOtp({
+      // Gửi OTP qua anon client — giống luồng signup
+      const anonClient = getAnonClient();
+      const { error: otpError } = await anonClient.auth.signInWithOtp({
         email,
         options: { shouldCreateUser: false },
       });
@@ -267,21 +287,29 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "MFA_SEND_FAILED", message: "Không thể gửi mã OTP" }, 500);
       }
 
-      await redis.set(adminMfaCooldownKey(email), "1", { ex: ADMIN_MFA_COOLDOWN_SECONDS });
-
       const mfaToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + ADMIN_MFA_TTL_SECONDS * 1000).toISOString();
+      const cooldownUntil = new Date(Date.now() + ADMIN_MFA_COOLDOWN_SECONDS * 1000).toISOString();
 
-      // Lưu thông tin để dùng sau khi xác minh OTP
-      const sessionPayload = JSON.stringify({
+      // Xóa session cũ và lưu session mới vào DB
+      const { error: delError } = await admin.from("admin_mfa_sessions").delete().eq("email", email);
+      if (delError) console.error("[portal-login] delete mfa_sessions error:", delError.message);
+
+      const { error: insertError } = await admin.from("admin_mfa_sessions").insert({
+        mfa_token: mfaToken,
+        user_id: userId,
         email,
-        password: body.password as string,
-        portal: unifiedMode ? "unified" : requestedPortal,
-        userId,
+        portal: unifiedMode ? "unified" : (requestedPortal ?? "admin"),
+        expires_at: expiresAt,
+        cooldown_until: cooldownUntil,
       });
 
-      await redis.set(adminMfaSessionKey(mfaToken), sessionPayload, {
-        ex: ADMIN_MFA_TTL_SECONDS,
-      });
+      if (insertError) {
+        console.error("[portal-login] insert mfa_sessions error:", insertError.message, insertError.code);
+        return jsonResponse({ error: "MFA_SESSION_FAILED", message: "Không thể tạo phiên MFA" }, 500);
+      }
+
+      console.log("[portal-login] mfa session inserted, token:", mfaToken);
 
       // Revoke session tạm từ signInWithPassword (chưa cấp cho client)
       await revokeSession(session.access_token, session.refresh_token);
