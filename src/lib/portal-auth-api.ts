@@ -81,6 +81,15 @@ export type PortalLoginResult = {
   session: PortalSession;
 };
 
+export type AdminMfaRequired = {
+  requiresMfa: true;
+  mfaToken: string;
+  expiresIn: number;
+  message: string;
+};
+
+export type LoginResponse = PortalLoginResult | AdminMfaRequired;
+
 async function applyLoginSession(result: PortalLoginResult): Promise<PortalLoginResult> {
   const { error } = await supabase.auth.setSession({
     access_token: result.session.access_token,
@@ -94,11 +103,25 @@ async function applyLoginSession(result: PortalLoginResult): Promise<PortalLogin
 export async function unifiedLogin(
   email: string,
   password: string,
-): Promise<PortalLoginResult> {
-  const result = await postJson<PortalLoginResult>("portal-login", {
+): Promise<LoginResponse> {
+  const result = await postJson<LoginResponse>("portal-login", {
     email,
     password,
     portal: "auto",
+  });
+  if ("requiresMfa" in result && result.requiresMfa) {
+    return result;
+  }
+  return applyLoginSession(result as PortalLoginResult);
+}
+
+export async function verifyAdminMfa(
+  mfaToken: string,
+  otp: string,
+): Promise<PortalLoginResult> {
+  const result = await postJson<PortalLoginResult>("admin-mfa-verify", {
+    mfaToken,
+    otp,
   });
   return applyLoginSession(result);
 }

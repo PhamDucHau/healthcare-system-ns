@@ -174,3 +174,24 @@ export function loginAttemptKey(email: string) {
 export function loginLockKey(email: string) {
   return `login:lock:${email.toLowerCase()}`;
 }
+
+/** Admin MFA (OTP 2FA) */
+export const ADMIN_MFA_TTL_SECONDS = 300; // 5 phút
+export const MAX_MFA_ATTEMPTS = 3;
+
+/** Lưu pending session JSON (chờ MFA) */
+export function adminMfaSessionKey(mfaToken: string) {
+  return `admin:mfa:session:${mfaToken}`;
+}
+
+/** Đếm số lần nhập OTP sai */
+export function adminMfaAttemptKey(mfaToken: string) {
+  return `admin:mfa:attempt:${mfaToken}`;
+}
+
+/** Cooldown gửi OTP (60s) — tránh Supabase silently drop duplicate sends */
+export const ADMIN_MFA_COOLDOWN_SECONDS = 60;
+
+export function adminMfaCooldownKey(email: string) {
+  return `admin:mfa:cooldown:${email.toLowerCase()}`;
+}

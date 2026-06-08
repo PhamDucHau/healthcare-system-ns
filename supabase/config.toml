@@ -78,3 +78,6 @@ verify_jwt = false
 
 [functions.portal-logout]
 verify_jwt = false
+
+[functions.admin-mfa-verify]
+verify_jwt = false

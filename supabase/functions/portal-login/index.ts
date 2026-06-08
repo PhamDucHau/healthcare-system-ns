@@ -14,6 +14,10 @@ import {
   loginLockKey,
   LOGIN_LOCK_TTL_SECONDS,
   MAX_LOGIN_ATTEMPTS,
+  adminMfaSessionKey,
+  adminMfaCooldownKey,
+  ADMIN_MFA_TTL_SECONDS,
+  ADMIN_MFA_COOLDOWN_SECONDS,
 } from "../_shared/redis.ts";
 import {
   getUserProfileForLogin,
@@ -233,6 +237,71 @@ Deno.serve(async (req) => {
 
     await redis.del(loginAttemptKey(email));
     await syncRoleToAppMetadata(admin, userId, userRole);
+
+    // Admin phải xác minh OTP trước khi nhận session
+    if (userRole === "admin") {
+      const cooldown = await redis.get(adminMfaCooldownKey(email));
+      if (cooldown) {
+        const retryAfter = await redis.ttl(adminMfaCooldownKey(email));
+        await revokeSession(session.access_token, session.refresh_token);
+        return jsonResponse({
+          error: "MFA_COOLDOWN",
+          message: "OTP vừa được gửi. Vui lòng kiểm tra email hoặc đợi trước khi gửi lại.",
+          retryAfter: retryAfter > 0 ? retryAfter : ADMIN_MFA_COOLDOWN_SECONDS,
+        }, 429);
+      }
+
+      // signInWithOtp gửi email qua Supabase (admin client, như forgot-password-send-otp)
+      const { error: otpError } = await admin.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false },
+      });
+
+      console.log("[portal-login] signInWithOtp result:", otpError
+        ? { status: otpError.status, code: (otpError as { code?: string }).code, message: otpError.message }
+        : "OK (no error)"
+      );
+
+      if (otpError) {
+        console.error("[portal-login] signInWithOtp error:", JSON.stringify(otpError));
+        return jsonResponse({ error: "MFA_SEND_FAILED", message: "Không thể gửi mã OTP" }, 500);
+      }
+
+      await redis.set(adminMfaCooldownKey(email), "1", { ex: ADMIN_MFA_COOLDOWN_SECONDS });
+
+      const mfaToken = crypto.randomUUID();
+
+      // Lưu thông tin để dùng sau khi xác minh OTP
+      const sessionPayload = JSON.stringify({
+        email,
+        password: body.password as string,
+        portal: unifiedMode ? "unified" : requestedPortal,
+        userId,
+      });
+
+      await redis.set(adminMfaSessionKey(mfaToken), sessionPayload, {
+        ex: ADMIN_MFA_TTL_SECONDS,
+      });
+
+      // Revoke session tạm từ signInWithPassword (chưa cấp cho client)
+      await revokeSession(session.access_token, session.refresh_token);
+
+      await writeAuditLog(admin, {
+        eventType: "ADMIN_MFA_SENT",
+        userId,
+        email,
+        ipAddress: ip,
+        userAgent,
+        metadata: { portal: unifiedMode ? "unified" : requestedPortal },
+      });
+
+      return jsonResponse({
+        requiresMfa: true,
+        mfaToken,
+        expiresIn: ADMIN_MFA_TTL_SECONDS,
+        message: "Vui lòng nhập mã OTP đã gửi tới email của bạn",
+      });
+    }
 
     await writeAuditLog(admin, {
       eventType: "LOGIN_SUCCESS",

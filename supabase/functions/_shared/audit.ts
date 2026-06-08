@@ -16,7 +16,10 @@ export type AuditEventType =
   | "ADMIN_PASSWORD_RESET"
   | "ROLE_CREATED"
   | "ROLE_UPDATED"
-  | "ROLE_DELETED";
+  | "ROLE_DELETED"
+  | "ADMIN_MFA_SENT"
+  | "ADMIN_MFA_SUCCESS"
+  | "ADMIN_MFA_FAILED";
 
 type AuditParams = {
   eventType: AuditEventType;
