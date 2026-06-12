@@ -46,6 +46,33 @@ function getOcrBaseUrl(): string {
   return base;
 }
 
+function getOcrServiceUrl(): string {
+  const raw = import.meta.env.VITE_OCR_SERVICE_URL;
+  return (typeof raw === "string" && raw.trim() ? raw.trim() : "http://187.127.103.1:5000").replace(/\/$/, "");
+}
+
+/** Call the OCR service for a single image slot. */
+export async function fetchOcrSingle(
+  file: File,
+  type: "cccd" | "bhyt",
+  slot: "front" = "front",
+): Promise<CccdOcrResponse & BhytOcrResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("type", type);
+  formData.append(slot, file);
+
+  const url = `${getOcrServiceUrl()}/ocr`;
+  const res = await fetch(url, { method: "POST", body: formData });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `OCR request failed (${res.status})`);
+  }
+
+  return (await res.json()) as CccdOcrResponse & BhytOcrResponse;
+}
+
 /** Convert dd/mm/yyyy (or d/m/yyyy) to yyyy-mm-dd for HTML date inputs. */
 export function parseDdMmYyyyToIso(value: string): string {
   const t = value.trim();

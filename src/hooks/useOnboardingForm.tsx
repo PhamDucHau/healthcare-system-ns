@@ -2,12 +2,9 @@ import {
   createContext,
   ReactNode,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from "react";
-
-const STORAGE_KEY = "qcare_onboarding_draft";
 
 type PersonalData = {
   legalFirstName: string;
@@ -106,25 +103,6 @@ type OnboardingContextValue = {
 
 const OnboardingFormContext = createContext<OnboardingContextValue | null>(null);
 
-function parseStoredDraft(rawDraft: string | null): OnboardingFormData {
-  if (!rawDraft) {
-    return defaultData;
-  }
-
-  try {
-    const parsed = JSON.parse(rawDraft) as Partial<OnboardingFormData>;
-    return {
-      ...defaultData,
-      ...parsed,
-      personal: { ...defaultData.personal, ...parsed.personal },
-      identity: { ...defaultData.identity, ...parsed.identity },
-      insurance: { ...defaultData.insurance, ...parsed.insurance },
-    };
-  } catch {
-    return defaultData;
-  }
-}
-
 const emptyUploadFiles: PatientOnboardingUploadFiles = {
   idFile: null,
   idBackFile: null,
@@ -132,18 +110,9 @@ const emptyUploadFiles: PatientOnboardingUploadFiles = {
 };
 
 export const OnboardingFormProvider = ({ children }: { children: ReactNode }) => {
-  const [data, setData] = useState<OnboardingFormData>(() => {
-    if (typeof window === "undefined") {
-      return defaultData;
-    }
-    return parseStoredDraft(window.localStorage.getItem(STORAGE_KEY));
-  });
+  const [data, setData] = useState<OnboardingFormData>(defaultData);
 
   const [uploadFiles, setUploadFiles] = useState<PatientOnboardingUploadFiles>(emptyUploadFiles);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
 
   const value = useMemo<OnboardingContextValue>(
     () => ({
@@ -173,7 +142,6 @@ export const OnboardingFormProvider = ({ children }: { children: ReactNode }) =>
       resetForm: () => {
         setData(defaultData);
         setUploadFiles(emptyUploadFiles);
-        window.localStorage.removeItem(STORAGE_KEY);
       },
     }),
     [data, uploadFiles],

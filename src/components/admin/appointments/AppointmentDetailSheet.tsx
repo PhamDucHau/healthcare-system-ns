@@ -1,0 +1,207 @@
+import { useState } from "react";
+import { format, differenceInYears, parseISO } from "date-fns";
+import { vi } from "date-fns/locale";
+import { Clock, Stethoscope, Phone, CalendarCheck, X } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import CancelDialog from "./CancelDialog";
+import RescheduleDialog from "./RescheduleDialog";
+import type { AdminAppointment } from "@/types/admin-appointment";
+import {
+  ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR, ADMIN_STATUS_DOT,
+} from "@/types/admin-appointment";
+import { adminCheckinAppointment } from "@/lib/admin-appointment-api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+
+interface Props {
+  appointment: AdminAppointment | null;
+  open: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+}
+
+export default function AppointmentDetailSheet({ appointment, open, onClose, onRefresh }: Props) {
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  if (!appointment) return null;
+
+  const initials = appointment.patient_name
+    ? appointment.patient_name.trim().split(" ").pop()?.charAt(0).toUpperCase() ?? "?"
+    : "?";
+
+  const age = appointment.patient_dob
+    ? differenceInYears(new Date(), parseISO(appointment.patient_dob))
+    : null;
+
+  const appointmentTime = appointment.slot_date && appointment.start_time
+    ? `${appointment.start_time.slice(0, 5)} · ${format(parseISO(appointment.slot_date), "dd/MM/yyyy", { locale: vi })}`
+    : `Walk-in · ${format(parseISO(appointment.created_at), "dd/MM/yyyy", { locale: vi })}`;
+
+  const shortId = appointment.id.slice(0, 6).toUpperCase();
+
+  const canCheckin = appointment.status === "CONFIRMED";
+  const canCancel  = !["CANCELLED", "COMPLETED"].includes(appointment.status);
+  const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(appointment.status) && !appointment.walk_in;
+
+  const handleCheckin = async () => {
+    setCheckingIn(true);
+    try {
+      await adminCheckinAppointment(appointment.id);
+      toast.success("Check-in thành công.");
+      onRefresh();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Check-in thất bại.");
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onClose}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Chi tiết lịch hẹn</SheetTitle>
+          </SheetHeader>
+
+          {/* Patient card */}
+          <div className="rounded-2xl bg-card border p-5 mb-4 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
+                {initials}
+              </div>
+              <div>
+                <p className="font-semibold text-lg leading-tight">{appointment.patient_name || "—"}</p>
+                {age !== null && (
+                  <p className="text-sm text-muted-foreground">{age} tuổi</p>
+                )}
+              </div>
+            </div>
+
+            {appointment.patient_phone && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Phone className="h-4 w-4" />
+                {appointment.patient_phone}
+              </div>
+            )}
+
+            {appointment.specialty_name && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Stethoscope className="h-4 w-4" />
+                {appointment.specialty_name}
+              </div>
+            )}
+          </div>
+
+          {/* Time + Doctor cards */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="rounded-2xl bg-cyan-50 border border-cyan-100 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-4 w-4 text-cyan-600" />
+                <span className="text-xs font-medium text-cyan-700 uppercase tracking-wide">Giờ hẹn</span>
+              </div>
+              <p className="text-lg font-bold text-cyan-900">
+                {appointment.slot_date && appointment.start_time
+                  ? appointment.start_time.slice(0, 5)
+                  : "Walk-in"}
+              </p>
+              {appointment.slot_date && (
+                <p className="text-xs text-cyan-700 mt-0.5">
+                  {format(parseISO(appointment.slot_date), "dd/MM/yyyy")}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarCheck className="h-4 w-4 text-purple-600" />
+                <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">Bác sĩ</span>
+              </div>
+              <p className="text-sm font-bold text-purple-900 leading-tight">
+                {appointment.doctor_name || "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Reason */}
+          {appointment.note && (
+            <div className="rounded-2xl bg-muted/50 border p-4 mb-4 space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lý do khám</p>
+              <p className="text-sm italic">"{appointment.note}"</p>
+            </div>
+          )}
+
+          {/* Status + walk-in badge */}
+          <div className="flex items-center justify-between rounded-2xl bg-muted/30 border px-4 py-3 mb-6">
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${ADMIN_STATUS_DOT[appointment.status]}`} />
+              <span className="text-sm font-medium">{ADMIN_STATUS_LABEL[appointment.status]}</span>
+              {appointment.walk_in && (
+                <Badge variant="secondary" className="text-xs">Walk-in</Badge>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground font-mono">#{shortId}</span>
+          </div>
+
+          {/* Cancel reason if cancelled */}
+          {appointment.status === "CANCELLED" && appointment.cancel_reason && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 mb-6 flex gap-3">
+              <X className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-destructive mb-0.5">Lý do hủy</p>
+                <p className="text-sm text-destructive/80">{appointment.cancel_reason}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="space-y-2">
+            {canCheckin && (
+              <Button className="w-full" onClick={handleCheckin} disabled={checkingIn}>
+                {checkingIn
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <CalendarCheck className="mr-2 h-4 w-4" />
+                }
+                Check-in ngay
+              </Button>
+            )}
+
+            {canReschedule && (
+              <Button variant="outline" className="w-full" onClick={() => setRescheduleOpen(true)}>
+                Đổi lịch
+              </Button>
+            )}
+
+            {canCancel && (
+              <Button variant="ghost" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setCancelOpen(true)}>
+                Hủy lịch hẹn
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <CancelDialog
+        appointment={appointment}
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        onSuccess={() => { setCancelOpen(false); onRefresh(); onClose(); }}
+      />
+
+      {rescheduleOpen && (
+        <RescheduleDialog
+          appointment={appointment}
+          open={rescheduleOpen}
+          onClose={() => setRescheduleOpen(false)}
+          onSuccess={() => { setRescheduleOpen(false); onRefresh(); onClose(); }}
+        />
+      )}
+    </>
+  );
+}

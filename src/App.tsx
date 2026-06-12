@@ -8,6 +8,7 @@ import Home from "./pages/Home.tsx";
 import Index from "./pages/Index.tsx";
 import Labs from "./pages/Labs.tsx";
 import Appointments from "./pages/Appointments.tsx";
+import BookAppointment from "./pages/BookAppointment.tsx";
 import Support from "./pages/Support.tsx";
 import Messages from "./pages/Messages.tsx";
 import Login, { AdminLogin, DoctorLogin, PatientLogin } from "./pages/Login.tsx";
@@ -20,6 +21,8 @@ import AdminOverview from "./pages/admin/AdminOverview.tsx";
 import AdminSectionPlaceholder from "./pages/admin/AdminSectionPlaceholder.tsx";
 import AdminUsersContent from "./components/admin/AdminUsersContent.tsx";
 import AdminRolesContent from "./components/admin/AdminRolesContent.tsx";
+import MasterDataContent from "./components/admin/MasterDataContent.tsx";
+import AdminAppointmentsContent from "./components/admin/AdminAppointmentsContent.tsx";
 import PatientRecordsManagement from "./components/patient-records/PatientRecordsManagement.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { AuthProvider } from "./hooks/use-auth.tsx";
@@ -72,6 +75,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPortal="patient">
                   <Appointments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/appointments/book"
+              element={
+                <ProtectedRoute requiredPortal="patient">
+                  <BookAppointment />
                 </ProtectedRoute>
               }
             />
@@ -150,6 +161,8 @@ const App = () => (
                 path="patient-records"
                 element={<PatientRecordsManagement portal="admin" />}
               />
+              <Route path="appointments" element={<AdminAppointmentsContent />} />
+              <Route path="master-data" element={<MasterDataContent />} />
               <Route path="users" element={<AdminUsersContent />} />
               <Route path="roles" element={<AdminRolesContent />} />
               <Route path="tasks" element={<AdminSectionPlaceholder title="Clinical Tasks" />} />

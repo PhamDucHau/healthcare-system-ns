@@ -1,21 +1,25 @@
 import { useState } from "react";
 import {
-  LayoutGrid, Users, ClipboardList, FileText, Settings, Search, Bell, HelpCircle,
-  User, Shield, LogOut, FileBarChart, Menu, Loader2, FileUser,
+  LayoutGrid, Users, ClipboardList, FileText, Settings, Search, HelpCircle,
+  User, Shield, LogOut, FileBarChart, Menu, Loader2, FileUser, Database, CalendarDays,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import NotificationPanel from "@/components/admin/NotificationPanel";
+import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
 const sidebarItems = [
-  { icon: LayoutGrid, label: "Overview", path: "/admin/overview" },
-  { icon: FileUser, label: "Hồ sơ BN", path: "/admin/patient-records" },
-  { icon: Users, label: "Users", path: "/admin/users" },
-  { icon: Shield, label: "Roles", path: "/admin/roles" },
-  { icon: ClipboardList, label: "Clinical Tasks", path: "/admin/tasks" },
-  { icon: FileText, label: "System Logs", path: "/admin/logs" },
-  { icon: Settings, label: "Settings", path: "/admin/settings" },
+  { icon: LayoutGrid,    label: "Overview",      path: "/admin/overview" },
+  { icon: FileUser,      label: "Hồ sơ BN",     path: "/admin/patient-records" },
+  { icon: CalendarDays,  label: "Lịch hẹn",     path: "/admin/appointments" },
+  { icon: Database,      label: "Master Data",   path: "/admin/master-data" },
+  { icon: Users,         label: "Users",         path: "/admin/users" },
+  { icon: Shield,        label: "Roles",         path: "/admin/roles" },
+  { icon: ClipboardList, label: "Clinical Tasks",path: "/admin/tasks" },
+  { icon: FileText,      label: "System Logs",   path: "/admin/logs" },
+  { icon: Settings,      label: "Settings",      path: "/admin/settings" },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -90,6 +94,7 @@ const AdminLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
+  const { notifications, unreadCount, markAllAsRead, markAsRead, clearAll } = useAdminNotifications();
 
   const handleLogout = () => {
     setIsLoggingOut(true);
@@ -134,10 +139,13 @@ const AdminLayout = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button type="button" className="relative p-2 rounded-lg hover:bg-muted">
-              <Bell className="h-5 w-5 text-muted-foreground" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-            </button>
+            <NotificationPanel
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onMarkAllAsRead={markAllAsRead}
+              onMarkAsRead={markAsRead}
+              onClearAll={clearAll}
+            />
             <button type="button" className="p-2 rounded-lg hover:bg-muted">
               <HelpCircle className="h-5 w-5 text-muted-foreground" />
             </button>

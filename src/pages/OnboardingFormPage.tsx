@@ -9,8 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useOnboardingForm } from "@/hooks/useOnboardingForm";
 import { useDuplicateCheck } from "@/hooks/useDuplicateCheck";
 import {
-  fetchBhytOcr,
-  fetchCccdOcr,
+  fetchOcrSingle,
   mapBhytParsedToInsuranceUpdates,
   mapCccdParsedToFormUpdates,
 } from "@/lib/cccd-ocr";
@@ -22,6 +21,9 @@ const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 const fieldClass =
   "min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
+const fieldErrorClass = "border-destructive ring-1 ring-destructive/30";
+const FieldErr = ({ msg }: { msg?: string }) =>
+  msg ? <p className="mt-1 text-xs text-destructive">{msg}</p> : null;
 
 const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 
@@ -51,9 +53,14 @@ const OnboardingFormPage = () => {
   } = useDuplicateCheck(userId, "onboarding");
 
   const [errorMessage, setErrorMessage] = useState("");
-  const [isCccdOcrRunning, setIsCccdOcrRunning] = useState(false);
-  const [isBhytOcrRunning, setIsBhytOcrRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (key: string) =>
+    setFieldErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
+  const [isOcrFrontRunning, setIsOcrFrontRunning] = useState(false);
+  const [isOcrBackRunning, setIsOcrBackRunning] = useState(false);
+  const [isOcrBhytRunning, setIsOcrBhytRunning] = useState(false);
 
   const pickFile = (
     file: File | null,
@@ -70,43 +77,53 @@ const OnboardingFormPage = () => {
     onStore(file);
   };
 
-  const handleRunCccdOcr = async () => {
-    if (!uploadFiles.idFile || !uploadFiles.idBackFile) {
-      setErrorMessage("Vui lòng tải CCCD mặt trước và mặt sau trước khi chạy OCR.");
-      return;
-    }
+  const handleOcrFront = async () => {
+    if (!uploadFiles.idFile) return;
+    setIsOcrFrontRunning(true);
     setErrorMessage("");
-    setIsCccdOcrRunning(true);
     try {
-      const json = await fetchCccdOcr(uploadFiles.idFile, uploadFiles.idBackFile);
-      if (!json.parsed || typeof json.parsed !== "object") {
-        throw new Error("OCR không trả về dữ liệu parsed.");
-      }
+      const json = await fetchOcrSingle(uploadFiles.idFile, "cccd", "front");
+      if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
       const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
       updateIdentity(identity);
       updatePersonal(personal);
-      toast.success("OCR CCCD hoàn tất", { description: "Kiểm tra và chỉnh sửa các trường bên dưới." });
+      toast.success("OCR CCCD mặt trước hoàn tất");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "OCR CCCD thất bại.";
+      const msg = e instanceof Error ? e.message : "OCR thất bại.";
       setErrorMessage(msg);
-      toast.error("OCR CCCD thất bại", { description: msg });
+      toast.error("OCR thất bại", { description: msg });
     } finally {
-      setIsCccdOcrRunning(false);
+      setIsOcrFrontRunning(false);
     }
   };
 
-  const handleRunBhytOcr = async () => {
-    if (!uploadFiles.cardFrontFile) {
-      setErrorMessage("Vui lòng tải ảnh thẻ BHYT trước khi chạy OCR.");
-      return;
-    }
+  const handleOcrBack = async () => {
+    if (!uploadFiles.idBackFile) return;
+    setIsOcrBackRunning(true);
     setErrorMessage("");
-    setIsBhytOcrRunning(true);
     try {
-      const json = await fetchBhytOcr(uploadFiles.cardFrontFile);
-      if (!json.parsed || typeof json.parsed !== "object") {
-        throw new Error("OCR BHYT không trả về dữ liệu parsed.");
-      }
+      const json = await fetchOcrSingle(uploadFiles.idBackFile, "cccd", "front");
+      if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
+      const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
+      updateIdentity(identity);
+      updatePersonal(personal);
+      toast.success("OCR CCCD mặt sau hoàn tất");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "OCR thất bại.";
+      setErrorMessage(msg);
+      toast.error("OCR thất bại", { description: msg });
+    } finally {
+      setIsOcrBackRunning(false);
+    }
+  };
+
+  const handleOcrBhyt = async () => {
+    if (!uploadFiles.cardFrontFile) return;
+    setIsOcrBhytRunning(true);
+    setErrorMessage("");
+    try {
+      const json = await fetchOcrSingle(uploadFiles.cardFrontFile, "bhyt", "front");
+      if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
       updateInsurance(mapBhytParsedToInsuranceUpdates(json.parsed));
       toast.success("OCR BHYT hoàn tất");
     } catch (e) {
@@ -114,48 +131,45 @@ const OnboardingFormPage = () => {
       setErrorMessage(msg);
       toast.error("OCR BHYT thất bại", { description: msg });
     } finally {
-      setIsBhytOcrRunning(false);
+      setIsOcrBhytRunning(false);
     }
   };
 
   const validateForm = (): boolean => {
     const { legalFirstName, legalLastName, dateOfBirth, phoneNumber, email } = data.personal;
-    const {
-      idNumber,
-      expirationDate,
-      residentialAddress,
-      issuedDate,
-      issuer,
-      idFileName,
-      idBackFileName,
-    } = data.identity;
+    const { idNumber, expirationDate, residentialAddress, issuedDate, issuer, idFileName, idBackFileName } = data.identity;
     const { provider, memberId, groupNumber, cardFrontFileName } = data.insurance;
+    const R = "Trường này là bắt buộc.";
 
-    if (!idFileName || !idBackFileName || !cardFrontFileName) {
-      setErrorMessage("Vui lòng tải đủ 3 ảnh: CCCD mặt trước, mặt sau và BHYT.");
+    const errs: Record<string, string> = {};
+    if (!idFileName) errs.idFile = "Vui lòng tải ảnh CCCD mặt trước.";
+    if (!idBackFileName) errs.idBackFile = "Vui lòng tải ảnh CCCD mặt sau.";
+    if (!cardFrontFileName) errs.cardFrontFile = "Vui lòng tải ảnh thẻ BHYT.";
+    if (!idNumber) errs.idNumber = R;
+    if (!expirationDate) errs.expirationDate = R;
+    if (!residentialAddress) errs.residentialAddress = R;
+    if (!issuedDate) errs.issuedDate = R;
+    if (!issuer) errs.issuer = R;
+    if (!legalFirstName) errs.legalFirstName = R;
+    if (!legalLastName) errs.legalLastName = R;
+    if (!dateOfBirth) errs.dateOfBirth = R;
+    if (!phoneNumber) errs.phoneNumber = R;
+    if (!email) errs.email = R;
+    if (!provider) errs.provider = R;
+    if (!memberId) errs.memberId = R;
+    if (!groupNumber) errs.groupNumber = R;
+    if (!data.acceptedPrivacy) errs.privacy = "Vui lòng xác nhận đồng ý trước khi gửi.";
+
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setErrorMessage("Vui lòng điền đầy đủ các trường bắt buộc được đánh dấu bên dưới.");
       return false;
     }
-    if (!idNumber || !expirationDate || !residentialAddress || !issuedDate || !issuer) {
-      setErrorMessage("Vui lòng điền đầy đủ thông tin giấy tờ tùy thân.");
-      return false;
-    }
-    if (!legalFirstName || !legalLastName || !dateOfBirth || !phoneNumber || !email) {
-      setErrorMessage("Vui lòng điền đầy đủ thông tin cá nhân.");
-      return false;
-    }
-    if (!provider || !memberId || !groupNumber) {
-      setErrorMessage("Vui lòng điền đầy đủ thông tin bảo hiểm.");
-      return false;
-    }
-    if (!data.acceptedPrivacy) {
-      setErrorMessage("Vui lòng xác nhận đồng ý xử lý dữ liệu trước khi gửi.");
-      return false;
-    }
+    setErrorMessage("");
     return true;
   };
 
   const handleSubmit = async () => {
-    setErrorMessage("");
     if (!validateForm()) return;
 
     if (!userId) {
@@ -220,9 +234,10 @@ const OnboardingFormPage = () => {
             hint="CCCD — mặt trước"
             fileName={data.identity.idFileName}
             file={uploadFiles.idFile}
-            onFileSelect={(f) =>
-              pickFile(f, (n) => updateIdentity({ idFileName: n }), setIdFile)
-            }
+            onFileSelect={(f) => { clearFieldError("idFile"); pickFile(f, (n) => updateIdentity({ idFileName: n }), setIdFile); }}
+            onOcr={handleOcrFront}
+            isOcrRunning={isOcrFrontRunning}
+            error={fieldErrors.idFile}
           />
           <UploadCard
             id="identityUploadBack"
@@ -230,9 +245,10 @@ const OnboardingFormPage = () => {
             hint="CCCD — mặt sau"
             fileName={data.identity.idBackFileName}
             file={uploadFiles.idBackFile}
-            onFileSelect={(f) =>
-              pickFile(f, (n) => updateIdentity({ idBackFileName: n }), setIdBackFile)
-            }
+            onFileSelect={(f) => { clearFieldError("idBackFile"); pickFile(f, (n) => updateIdentity({ idBackFileName: n }), setIdBackFile); }}
+            onOcr={handleOcrBack}
+            isOcrRunning={isOcrBackRunning}
+            error={fieldErrors.idBackFile}
           />
           <UploadCard
             id="insuranceFrontUpload"
@@ -240,29 +256,28 @@ const OnboardingFormPage = () => {
             hint="Bảo hiểm y tế (BHYT)"
             fileName={data.insurance.cardFrontFileName}
             file={uploadFiles.cardFrontFile}
-            onFileSelect={(f) =>
-              pickFile(f, (n) => updateInsurance({ cardFrontFileName: n }), setCardFrontFile)
-            }
+            onFileSelect={(f) => { clearFieldError("cardFrontFile"); pickFile(f, (n) => updateInsurance({ cardFrontFileName: n }), setCardFrontFile); }}
+            onOcr={handleOcrBhyt}
+            isOcrRunning={isOcrBhytRunning}
+            error={fieldErrors.cardFrontFile}
           />
         </div>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
-            onClick={() => void handleRunCccdOcr()}
-            disabled={isCccdOcrRunning || !uploadFiles.idFile || !uploadFiles.idBackFile}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-5 text-sm font-semibold text-primary transition-opacity hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
-          >
-            <ScanLine className="h-4 w-4" aria-hidden="true" />
-            {isCccdOcrRunning ? "Đang đọc CCCD…" : "Đọc OCR CCCD"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleRunBhytOcr()}
-            disabled={isBhytOcrRunning || !uploadFiles.cardFrontFile}
+            onClick={() => void (async () => {
+              await handleOcrFront();
+              await handleOcrBack();
+              await handleOcrBhyt();
+            })()}
+            disabled={
+              isOcrFrontRunning || isOcrBackRunning || isOcrBhytRunning ||
+              (!uploadFiles.idFile && !uploadFiles.idBackFile && !uploadFiles.cardFrontFile)
+            }
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />
-            {isBhytOcrRunning ? "Đang đọc BHYT…" : "Đọc OCR BHYT"}
+            {isOcrFrontRunning || isOcrBackRunning || isOcrBhytRunning ? "Đang đọc OCR…" : "OCR tất cả"}
           </button>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
@@ -284,9 +299,9 @@ const OnboardingFormPage = () => {
             <input
               id="idNumber" type="text"
               value={data.identity.idNumber}
-              onChange={(e) => updateIdentity({ idNumber: e.target.value })}
+              onChange={(e) => { clearFieldError("idNumber"); updateIdentity({ idNumber: e.target.value }); }}
               onBlur={() => void checkCccd(data.identity.idNumber)}
-              className={`${fieldClass} ${dupState.cccdMatchId ? "border-destructive ring-1 ring-destructive/30" : ""}`}
+              className={`${fieldClass} ${dupState.cccdMatchId || fieldErrors.idNumber ? fieldErrorClass : ""}`}
               placeholder="G-123-5678-9012"
             />
             {dupState.cccdMatchId ? (
@@ -294,23 +309,37 @@ const OnboardingFormPage = () => {
                 <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span><strong>Trùng CCCD.</strong> Số CCCD này đã có hồ sơ trong hệ thống. Không thể tạo mới.</span>
               </div>
-            ) : null}
+            ) : <FieldErr msg={fieldErrors.idNumber} />}
           </div>
           <div>
             <label htmlFor="expirationDate" className={labelClass}>Ngày hết hạn</label>
-            <input id="expirationDate" type="date" value={data.identity.expirationDate} onChange={(e) => updateIdentity({ expirationDate: e.target.value })} className={fieldClass} />
+            <input id="expirationDate" type="date" value={data.identity.expirationDate}
+              onChange={(e) => { clearFieldError("expirationDate"); updateIdentity({ expirationDate: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.expirationDate ? fieldErrorClass : ""}`} />
+            <FieldErr msg={fieldErrors.expirationDate} />
           </div>
           <div className="md:col-span-2">
             <label htmlFor="residentialAddress" className={labelClass}>Địa chỉ thường trú</label>
-            <input id="residentialAddress" type="text" value={data.identity.residentialAddress} onChange={(e) => updateIdentity({ residentialAddress: e.target.value })} className={fieldClass} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+            <input id="residentialAddress" type="text" value={data.identity.residentialAddress}
+              onChange={(e) => { clearFieldError("residentialAddress"); updateIdentity({ residentialAddress: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.residentialAddress ? fieldErrorClass : ""}`}
+              placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+            <FieldErr msg={fieldErrors.residentialAddress} />
           </div>
           <div>
             <label htmlFor="issuedDate" className={labelClass}>Ngày cấp</label>
-            <input id="issuedDate" type="date" value={data.identity.issuedDate} onChange={(e) => updateIdentity({ issuedDate: e.target.value })} className={fieldClass} />
+            <input id="issuedDate" type="date" value={data.identity.issuedDate}
+              onChange={(e) => { clearFieldError("issuedDate"); updateIdentity({ issuedDate: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.issuedDate ? fieldErrorClass : ""}`} />
+            <FieldErr msg={fieldErrors.issuedDate} />
           </div>
           <div>
             <label htmlFor="issuer" className={labelClass}>Nơi cấp</label>
-            <input id="issuer" type="text" value={data.identity.issuer} onChange={(e) => updateIdentity({ issuer: e.target.value })} className={fieldClass} placeholder="Cục cảnh sát QLHC về TTXH" />
+            <input id="issuer" type="text" value={data.identity.issuer}
+              onChange={(e) => { clearFieldError("issuer"); updateIdentity({ issuer: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.issuer ? fieldErrorClass : ""}`}
+              placeholder="Cục cảnh sát QLHC về TTXH" />
+            <FieldErr msg={fieldErrors.issuer} />
           </div>
         </div>
       </section>
@@ -321,50 +350,55 @@ const OnboardingFormPage = () => {
           <div>
             <label htmlFor="legalFirstName" className={labelClass}>Họ (theo giấy tờ)</label>
             <input
-              id="legalFirstName" type="text" required
+              id="legalFirstName" type="text"
               value={data.personal.legalFirstName}
-              onChange={(e) => updatePersonal({ legalFirstName: e.target.value })}
+              onChange={(e) => { clearFieldError("legalFirstName"); updatePersonal({ legalFirstName: e.target.value }); }}
               onBlur={() => {
                 const name = [data.personal.legalFirstName, data.personal.legalLastName].filter(Boolean).join(" ");
                 void checkNameDob(name, data.personal.dateOfBirth);
               }}
-              className={fieldClass} placeholder="Nhập đúng như trên giấy tờ"
+              className={`${fieldClass} ${fieldErrors.legalFirstName ? fieldErrorClass : ""}`}
+              placeholder="Nhập đúng như trên giấy tờ"
             />
+            <FieldErr msg={fieldErrors.legalFirstName} />
           </div>
           <div>
             <label htmlFor="legalLastName" className={labelClass}>Tên (theo giấy tờ)</label>
             <input
-              id="legalLastName" type="text" required
+              id="legalLastName" type="text"
               value={data.personal.legalLastName}
-              onChange={(e) => updatePersonal({ legalLastName: e.target.value })}
+              onChange={(e) => { clearFieldError("legalLastName"); updatePersonal({ legalLastName: e.target.value }); }}
               onBlur={() => {
                 const name = [data.personal.legalFirstName, data.personal.legalLastName].filter(Boolean).join(" ");
                 void checkNameDob(name, data.personal.dateOfBirth);
               }}
-              className={fieldClass} placeholder="Nhập đúng như trên giấy tờ"
+              className={`${fieldClass} ${fieldErrors.legalLastName ? fieldErrorClass : ""}`}
+              placeholder="Nhập đúng như trên giấy tờ"
             />
+            <FieldErr msg={fieldErrors.legalLastName} />
           </div>
           <div>
             <label htmlFor="dateOfBirth" className={labelClass}>Ngày sinh</label>
             <input
-              id="dateOfBirth" type="date" required
+              id="dateOfBirth" type="date"
               value={data.personal.dateOfBirth}
-              onChange={(e) => updatePersonal({ dateOfBirth: e.target.value })}
+              onChange={(e) => { clearFieldError("dateOfBirth"); updatePersonal({ dateOfBirth: e.target.value }); }}
               onBlur={() => {
                 const name = [data.personal.legalFirstName, data.personal.legalLastName].filter(Boolean).join(" ");
                 void checkNameDob(name, data.personal.dateOfBirth);
               }}
-              className={`${fieldClass} ${dupState.nameDobMatchId && !bypassed.nameDob ? "border-warning ring-1 ring-warning/30" : ""}`}
+              className={`${fieldClass} ${dupState.nameDobMatchId && !bypassed.nameDob ? "border-warning ring-1 ring-warning/30" : fieldErrors.dateOfBirth ? fieldErrorClass : ""}`}
             />
+            <FieldErr msg={fieldErrors.dateOfBirth} />
           </div>
           <div>
             <label htmlFor="phoneNumber" className={labelClass}>Số điện thoại</label>
             <input
-              id="phoneNumber" type="tel" required
+              id="phoneNumber" type="tel"
               value={data.personal.phoneNumber}
-              onChange={(e) => updatePersonal({ phoneNumber: e.target.value })}
+              onChange={(e) => { clearFieldError("phoneNumber"); updatePersonal({ phoneNumber: e.target.value }); }}
               onBlur={() => void checkPhone(data.personal.phoneNumber)}
-              className={`${fieldClass} ${dupState.phoneMatchId && !bypassed.phone ? "border-warning ring-1 ring-warning/30" : ""}`}
+              className={`${fieldClass} ${dupState.phoneMatchId && !bypassed.phone ? "border-warning ring-1 ring-warning/30" : fieldErrors.phoneNumber ? fieldErrorClass : ""}`}
               placeholder="0912 345 678"
             />
             {dupState.phoneMatchId && !bypassed.phone ? (
@@ -377,7 +411,7 @@ const OnboardingFormPage = () => {
                   </button>
                 </span>
               </div>
-            ) : null}
+            ) : <FieldErr msg={fieldErrors.phoneNumber} />}
           </div>
           {dupState.nameDobMatchId && !bypassed.nameDob ? (
             <div className="md:col-span-2 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
@@ -392,7 +426,11 @@ const OnboardingFormPage = () => {
           ) : null}
           <div className="md:col-span-2">
             <label htmlFor="emailAddress" className={labelClass}>Địa chỉ Email</label>
-            <input id="emailAddress" type="email" required value={data.personal.email} onChange={(e) => updatePersonal({ email: e.target.value })} className={fieldClass} placeholder="ten@example.com" />
+            <input id="emailAddress" type="email" value={data.personal.email}
+              onChange={(e) => { clearFieldError("email"); updatePersonal({ email: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.email ? fieldErrorClass : ""}`}
+              placeholder="ten@example.com" />
+            <FieldErr msg={fieldErrors.email} />
           </div>
         </div>
         <div className="mt-6">
@@ -421,15 +459,27 @@ const OnboardingFormPage = () => {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <label htmlFor="insuranceProvider" className={labelClass}>Đơn vị bảo hiểm</label>
-            <input id="insuranceProvider" type="text" value={data.insurance.provider} onChange={(e) => updateInsurance({ provider: e.target.value })} className={fieldClass} placeholder="Tìm hoặc chọn đơn vị bảo hiểm" />
+            <input id="insuranceProvider" type="text" value={data.insurance.provider}
+              onChange={(e) => { clearFieldError("provider"); updateInsurance({ provider: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.provider ? fieldErrorClass : ""}`}
+              placeholder="Tìm hoặc chọn đơn vị bảo hiểm" />
+            <FieldErr msg={fieldErrors.provider} />
           </div>
           <div>
             <label htmlFor="memberId" className={labelClass}>Số thẻ BHYT</label>
-            <input id="memberId" type="text" value={data.insurance.memberId} onChange={(e) => updateInsurance({ memberId: e.target.value })} className={fieldClass} placeholder="HS4012345678901" />
+            <input id="memberId" type="text" value={data.insurance.memberId}
+              onChange={(e) => { clearFieldError("memberId"); updateInsurance({ memberId: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.memberId ? fieldErrorClass : ""}`}
+              placeholder="HS4012345678901" />
+            <FieldErr msg={fieldErrors.memberId} />
           </div>
           <div>
             <label htmlFor="groupNumber" className={labelClass}>Mã nhóm</label>
-            <input id="groupNumber" type="text" value={data.insurance.groupNumber} onChange={(e) => updateInsurance({ groupNumber: e.target.value })} className={fieldClass} placeholder="GRP98765" />
+            <input id="groupNumber" type="text" value={data.insurance.groupNumber}
+              onChange={(e) => { clearFieldError("groupNumber"); updateInsurance({ groupNumber: e.target.value }); }}
+              className={`${fieldClass} ${fieldErrors.groupNumber ? fieldErrorClass : ""}`}
+              placeholder="GRP98765" />
+            <FieldErr msg={fieldErrors.groupNumber} />
           </div>
           <div>
             <label htmlFor="bhytName" className={labelClass}>Họ tên (BHYT)</label>
@@ -473,16 +523,19 @@ const OnboardingFormPage = () => {
         </p>
       </div>
 
-      <div className="mt-5 flex items-start gap-2 rounded-xl border border-dashed bg-card p-4">
+      <div className={`mt-5 flex items-start gap-2 rounded-xl border border-dashed bg-card p-4 ${fieldErrors.privacy ? "border-destructive/50 ring-1 ring-destructive/30" : ""}`}>
         <Checkbox
           id="privacyConsent"
           checked={data.acceptedPrivacy}
-          onCheckedChange={(checked) => setAcceptedPrivacy(checked === true)}
+          onCheckedChange={(checked) => { clearFieldError("privacy"); setAcceptedPrivacy(checked === true); }}
           className="mt-0.5"
         />
-        <label htmlFor="privacyConsent" className="cursor-pointer text-sm text-muted-foreground">
-          Tôi xác nhận tất cả thông tin đã cung cấp là chính xác và đồng ý cho phép xử lý dữ liệu an toàn để phục vụ công tác chăm sóc sức khỏe.
-        </label>
+        <div>
+          <label htmlFor="privacyConsent" className="cursor-pointer text-sm text-muted-foreground">
+            Tôi xác nhận tất cả thông tin đã cung cấp là chính xác và đồng ý cho phép xử lý dữ liệu an toàn để phục vụ công tác chăm sóc sức khỏe.
+          </label>
+          <FieldErr msg={fieldErrors.privacy} />
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-2 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
