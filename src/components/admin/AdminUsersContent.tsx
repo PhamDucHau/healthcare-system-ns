@@ -17,6 +17,7 @@ import {
   resetAdminUserPassword,
   updateAdminUser,
 } from "@/lib/admin-api";
+import { fetchSpecialties, type Specialty } from "@/lib/appointment-api";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -67,6 +68,7 @@ const AdminUsersContent = () => {
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [roles, setRoles] = useState<AdminRoleRow[]>([]);
   const [facilities, setFacilities] = useState<FacilityRow[]>([]);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -89,15 +91,17 @@ const AdminUsersContent = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, rolesRes, facRes] = await Promise.all([
+      const [usersRes, rolesRes, facRes, specsRes] = await Promise.all([
         listAdminUsers({ search: search || undefined, page, limit: 20 }),
         listAdminRoles(),
         listFacilities(),
+        fetchSpecialties(),
       ]);
       setUsers(usersRes.users);
       setTotal(usersRes.total);
       setRoles(rolesRes.roles);
       setFacilities(facRes.facilities);
+      setSpecialties(specsRes);
     } catch (err) {
       const msg = err instanceof AdminApiError ? err.message : "Không tải được dữ liệu";
       toast.error(msg);
@@ -352,8 +356,21 @@ const AdminUsersContent = () => {
             </div>
             {isDoctor && (
               <div>
-                <Label htmlFor="specialty">Chuyên khoa (Doctor)</Label>
-                <Input id="specialty" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
+                <Label>Chuyên khoa (Doctor)</Label>
+                <Select
+                  value={form.specialty || "__none__"}
+                  onValueChange={(v) => setForm({ ...form, specialty: v === "__none__" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn chuyên khoa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Không —</SelectItem>
+                    {specialties.map((s) => (
+                      <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div>
