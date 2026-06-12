@@ -48,7 +48,7 @@ function getOcrBaseUrl(): string {
 
 function getOcrServiceUrl(): string {
   const raw = import.meta.env.VITE_OCR_SERVICE_URL;
-  return (typeof raw === "string" && raw.trim() ? raw.trim() : "http://187.127.103.1:5000").replace(/\/$/, "");
+  return (typeof raw === "string" && raw.trim() ? raw.trim() : "https://ocr.187-127-103-1.nip.io").replace(/\/$/, "");
 }
 
 /** Call the OCR service for a single image slot. */

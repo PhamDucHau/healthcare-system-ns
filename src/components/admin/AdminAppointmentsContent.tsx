@@ -3,7 +3,7 @@ import { format, subDays, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMo
 import { vi } from "date-fns/locale";
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Loader2,
-  Search, MoreHorizontal, CheckCircle2, CalendarClock, XCircle, Trash2,
+  Search, MoreHorizontal, CheckCircle2, CalendarClock, XCircle, Trash2, Activity,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -32,6 +32,7 @@ import BulkCancelDialog from "./appointments/BulkCancelDialog";
 import AppointmentDetailSheet from "./appointments/AppointmentDetailSheet";
 import CancelDialog from "./appointments/CancelDialog";
 import RescheduleDialog from "./appointments/RescheduleDialog";
+import VitalSignsSheet from "./appointments/VitalSignsSheet";
 
 const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string }[] = [
   { value: "__all__",    label: "Tất cả trạng thái" },
@@ -80,6 +81,7 @@ export default function AdminAppointmentsContent() {
 
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
+  const [vitalSignsAppt, setVitalSignsAppt] = useState<AdminAppointment | null>(null);
 
   const dateStr   = format(currentDate, "yyyy-MM-dd");
   const weekStart = format(startOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -313,6 +315,7 @@ export default function AdminAppointmentsContent() {
                     }}
                     onCancel={() => setCancelAppt(appt)}
                     onReschedule={() => setRescheduleAppt(appt)}
+                    onVitalSigns={() => setVitalSignsAppt(appt)}
                   />
                 ))}
               </div>
@@ -363,6 +366,12 @@ export default function AdminAppointmentsContent() {
           onSuccess={() => { setRescheduleAppt(null); refresh(); }}
         />
       )}
+
+      {/* ── Nhập sinh hiệu sheet ─────────────────────────────────────────────── */}
+      <VitalSignsSheet
+        appointment={vitalSignsAppt}
+        onClose={() => setVitalSignsAppt(null)}
+      />
     </div>
   );
 }
@@ -377,9 +386,10 @@ interface RowProps {
   onCheckin: () => void;
   onCancel: () => void;
   onReschedule: () => void;
+  onVitalSigns: () => void;
 }
 
-function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel, onReschedule }: RowProps) {
+function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel, onReschedule, onVitalSigns }: RowProps) {
   const initials = avatarInitial(appt.patient_name);
   const color    = avatarColor(appt.id);
 
@@ -388,9 +398,10 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
     : appt.start_time?.slice(0, 5) ?? "—";
 
   const isSelectable = !["CANCELLED", "COMPLETED"].includes(appt.status);
-  const canCheckin    = appt.status === "CONFIRMED";
-  const canCancel     = !["CANCELLED", "COMPLETED"].includes(appt.status);
-  const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(appt.status) && !appt.walk_in;
+  const canCheckin     = appt.status === "CONFIRMED";
+  const canCancel      = !["CANCELLED", "COMPLETED"].includes(appt.status);
+  const canReschedule  = ["CONFIRMED", "CHECKED_IN"].includes(appt.status) && !appt.walk_in;
+  const canVitalSigns  = ["CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
 
   return (
     <div
@@ -460,6 +471,12 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {canVitalSigns && (
+              <DropdownMenuItem onClick={onVitalSigns}>
+                <Activity className="mr-2 h-4 w-4 text-teal-600" />
+                Nhập sinh hiệu
+              </DropdownMenuItem>
+            )}
             {canCheckin && (
               <DropdownMenuItem onClick={onCheckin}>
                 <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
@@ -481,7 +498,7 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
                 Hủy lịch
               </DropdownMenuItem>
             )}
-            {!canCheckin && !canReschedule && !canCancel && (
+            {!canVitalSigns && !canCheckin && !canReschedule && !canCancel && (
               <DropdownMenuItem disabled>
                 Không có thao tác
               </DropdownMenuItem>

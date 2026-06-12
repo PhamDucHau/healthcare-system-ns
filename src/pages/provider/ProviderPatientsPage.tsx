@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
   NotebookPen,
@@ -9,6 +9,8 @@ import {
   Microscope,
   Pill,
   Siren,
+  Activity,
+  Plus,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -19,6 +21,9 @@ import {
   type PatientListItem,
   type PatientPortalDetail,
 } from "@/types/patient-portal";
+import { getLatestVitalSignsForPatient } from "@/lib/vital-signs-api";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import VitalSignsForm from "@/components/provider/VitalSignsForm";
 
 const OVERVIEW_TABS = [
   { id: "overview", icon: SquareChartGantt, label: "Overview" },
@@ -168,6 +173,8 @@ const ProviderPatientsPage = () => {
   const [activeTab, setActiveTab] = useState<OverviewTabId>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [vitalSheetOpen, setVitalSheetOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: patientSummaries = [], isLoading: isListLoading, isError, error } = useQuery({
     queryKey: PATIENT_LIST_QUERY_KEY,
@@ -256,6 +263,34 @@ const ProviderPatientsPage = () => {
     return demo ? demoToDetail(demo) : null;
   }, [selectedId, demoPatients]);
 
+  // Real vitals for selected real patient
+  const realPatientUserId = (!isDemoPatientId(selectedId ?? "") && patientDetailFromDb?.user_id)
+    ? patientDetailFromDb.user_id
+    : null;
+
+  const { data: latestVitals } = useQuery({
+    queryKey: ["vital_signs", "patient", realPatientUserId],
+    queryFn: () => getLatestVitalSignsForPatient(supabase, realPatientUserId!).then((r) => r.vitals),
+    enabled: Boolean(realPatientUserId),
+  });
+
+  // Fetch latest CHECKED_IN/IN_PROGRESS appointment for this patient (for doctor vitals entry)
+  const { data: activeAppointmentId } = useQuery({
+    queryKey: ["active_appointment", patientDetailFromDb?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("profile_id", patientDetailFromDb!.id)
+        .in("status", ["CHECKED_IN", "IN_PROGRESS"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return (data?.id as string) ?? null;
+    },
+    enabled: Boolean(patientDetailFromDb?.id) && !isDemoPatientId(selectedId ?? ""),
+  });
+
   const patientDetail = patientDetailFromDb ?? demoDetail;
 
   const selectedDemo = useMemo(() => {
@@ -279,11 +314,32 @@ const ProviderPatientsPage = () => {
   const medications = ["Metformin 500mg", "Lisinopril 10mg"];
   const allergies = ["Penicillin", "Peanuts"];
 
-  const vitals = [
-    { label: "Heart Rate", value: "72 bpm" },
-    { label: "Temp", value: "98.6 F" },
-    { label: "BP", value: "118/76 mmHg" },
-  ];
+  const vitals = latestVitals
+    ? [
+        latestVitals.bp_systolic != null && latestVitals.bp_diastolic != null
+          ? { label: "Huyết áp", value: `${latestVitals.bp_systolic}/${latestVitals.bp_diastolic} mmHg` }
+          : null,
+        latestVitals.heart_rate != null
+          ? { label: "Nhịp tim", value: `${latestVitals.heart_rate} bpm` }
+          : null,
+        latestVitals.temperature_c != null
+          ? { label: "Nhiệt độ", value: `${latestVitals.temperature_c} °C` }
+          : null,
+        latestVitals.spo2 != null
+          ? { label: "SpO2", value: `${latestVitals.spo2}%` }
+          : null,
+        latestVitals.respiratory_rate != null
+          ? { label: "Nhịp thở", value: `${latestVitals.respiratory_rate} l/ph` }
+          : null,
+        latestVitals.bmi != null
+          ? { label: "BMI", value: `${latestVitals.bmi}` }
+          : null,
+      ].filter(Boolean) as { label: string; value: string }[]
+    : [
+        { label: "Huyết áp", value: "—" },
+        { label: "Nhịp tim", value: "—" },
+        { label: "Nhiệt độ", value: "—" },
+      ];
 
   const recentLabs = [
     { name: "Blood Panel", date: "2024-01-12" },
@@ -530,15 +586,43 @@ const ProviderPatientsPage = () => {
 
             <aside className="space-y-4">
               <div className="rounded-xl border bg-card p-4">
-                <h3 className="mb-3 text-sm font-semibold">Latest Vitals</h3>
-                <ul className="space-y-2">
-                  {vitals.map((vital) => (
-                    <li key={vital.label} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{vital.label}</span>
-                      <span className="font-semibold">{vital.value}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Sinh hiệu gần nhất</h3>
+                  <button
+                    type="button"
+                    onClick={() => setVitalSheetOpen(true)}
+                    className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Nhập
+                  </button>
+                </div>
+                {latestVitals?.is_critical && (
+                  <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-destructive/10 px-2 py-1.5 text-xs font-semibold text-destructive">
+                    <Activity className="h-3.5 w-3.5" />
+                    CRITICAL
+                  </div>
+                )}
+                {vitals.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Chưa có sinh hiệu</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {vitals.map((vital) => (
+                      <li key={vital.label} className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{vital.label}</span>
+                        <span className="font-semibold">{vital.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {latestVitals?.recorded_at && (
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    Ghi lúc:{" "}
+                    {new Date(latestVitals.recorded_at).toLocaleString("vi-VN", {
+                      dateStyle: "short", timeStyle: "short",
+                    })}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-xl border bg-card p-4">
@@ -574,6 +658,37 @@ const ProviderPatientsPage = () => {
           Update from Onboarding Data
         </Link>
       </div>
+
+      {/* ── Vital signs sheet (doctor enters vitals directly) ─────────────────── */}
+      <Sheet open={vitalSheetOpen} onOpenChange={(o) => { if (!o) setVitalSheetOpen(false); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
+          <SheetHeader className="flex flex-row items-center gap-2 border-b px-5 py-4 shrink-0">
+            <Activity className="h-5 w-5 text-primary" />
+            <SheetTitle className="text-base font-bold text-primary">
+              SINH HIỆU — {displayName}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {activeAppointmentId ? (
+              <VitalSignsForm
+                appointmentId={activeAppointmentId}
+                patient={{ name: displayName, patientCode: displayId.replace(/^QC-/, "") }}
+                onSuccess={() => {
+                  setVitalSheetOpen(false);
+                  void queryClient.invalidateQueries({ queryKey: ["vital_signs", "patient", realPatientUserId] });
+                }}
+                onCancel={() => setVitalSheetOpen(false)}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Bệnh nhân chưa có lịch CHECKED_IN hoặc IN_PROGRESS để nhập sinh hiệu.
+                </p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 };
