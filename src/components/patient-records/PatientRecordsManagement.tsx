@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { FileUser, Loader2, RefreshCw, Search, UserRoundPlus } from "lucide-react";
+import { FileUser, Loader2, Pencil, RefreshCw, Search, Trash2, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
 import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
 import AdminNewPatientDialog from "@/components/admin/patients/AdminNewPatientDialog";
@@ -16,6 +16,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { listPatientRecords } from "@/lib/patient-records";
 import { supabase } from "@/lib/supabase";
 import type { PatientRecordListRow } from "@/types/patient-portal";
@@ -71,6 +81,8 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [newPatientOpen, setNewPatientOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PatientRecordListRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const {
     data: rows = [],
@@ -98,12 +110,26 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
     setEditOpen(true);
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { error } = await supabase.from("patient").delete().eq("id", deleteTarget.id);
+    setDeleting(false);
+    if (error) {
+      toast.error("Xóa thất bại", { description: error.message });
+    } else {
+      toast.success(`Đã xóa hồ sơ ${deleteTarget.full_name}`);
+      setDeleteTarget(null);
+      void refetch();
+    }
+  };
+
   const title =
     portal === "admin" ? "Quản lý hồ sơ bệnh nhân" : "Hồ sơ bệnh nhân";
-  const subtitle =
-    portal === "admin"
-      ? "Dữ liệu từ bảng public.patient trên Supabase (onboarding bệnh nhân)."
-      : "Dữ liệu từ bảng public.patient — tra cứu phục vụ khám và điều trị.";
+  // const subtitle =
+  //   portal === "admin"
+  //     ? "Dữ liệu từ bảng public.patient trên Supabase (onboarding bệnh nhân)."
+  //     : "Dữ liệu từ bảng public.patient — tra cứu phục vụ khám và điều trị.";
 
   return (
     <div className="space-y-6">
@@ -113,7 +139,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
             <FileUser className="h-7 w-7 text-primary" aria-hidden="true" />
             {title}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>
+          {/* <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p> */}
         </div>
         <div className="flex gap-2">
           <Button
@@ -201,24 +227,12 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                   <TableHead>Mã BHYT</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead>Cập nhật</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openDetail(row.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openDetail(row.id);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={`Chỉnh sửa hồ sơ ${row.full_name}`}
-                  >
+                  <TableRow key={row.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{row.full_name}</TableCell>
                     <TableCell>{formatDob(row.date_of_birth)}</TableCell>
                     <TableCell>{row.phone_number ?? "—"}</TableCell>
@@ -228,14 +242,32 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                     <TableCell>{row.id_number ?? "—"}</TableCell>
                     <TableCell>{row.member_id ?? "—"}</TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(row.status)}`}
-                      >
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(row.status)}`}>
                         {row.status}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                       {formatDateTime(row.updated_at)}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openDetail(row.id)}
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Sửa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(row)}
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Xóa
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -258,6 +290,29 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
         onSuccess={() => void refetch()}
         portal={portal === "doctor" ? "provider" : "admin"}
       />
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa hồ sơ</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn sắp xóa hồ sơ của <strong>{deleteTarget?.full_name}</strong>.
+              Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

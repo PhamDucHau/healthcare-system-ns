@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  LayoutGrid, Users, ClipboardList, FileText, Settings, Search, HelpCircle,
-  User, Shield, LogOut, FileBarChart, Menu, Loader2, FileUser, Database, CalendarDays,
+  LayoutGrid, Users, Search, HelpCircle,
+  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -11,15 +11,12 @@ import NotificationPanel from "@/components/admin/NotificationPanel";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
 const sidebarItems = [
-  { icon: LayoutGrid,    label: "Overview",      path: "/admin/overview" },
-  { icon: FileUser,      label: "Hồ sơ BN",     path: "/admin/patient-records" },
+  { icon: LayoutGrid,    label: "Bảng tổng quan",      path: "/admin/overview" },
+  { icon: FileUser,      label: "Hồ sơ bệnh nhân",     path: "/admin/patient-records" },
   { icon: CalendarDays,  label: "Lịch hẹn",     path: "/admin/appointments" },
-  { icon: Database,      label: "Master Data",   path: "/admin/master-data" },
-  { icon: Users,         label: "Users",         path: "/admin/users" },
-  { icon: Shield,        label: "Roles",         path: "/admin/roles" },
-  { icon: ClipboardList, label: "Clinical Tasks",path: "/admin/tasks" },
-  { icon: FileText,      label: "System Logs",   path: "/admin/logs" },
-  { icon: Settings,      label: "Settings",      path: "/admin/settings" },
+  { icon: Database,      label: "Danh mục",      path: "/admin/master-data" },
+  { icon: Users,         label: "Người dùng",    path: "/admin/users" },
+  { icon: Shield,        label: "Phân quyền",    path: "/admin/roles" },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -61,18 +58,6 @@ const AdminSidebarContent = ({
         ))}
       </nav>
       <div className="p-3 mt-auto border-t space-y-1">
-        <button
-          type="button"
-          className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity mb-2"
-        >
-          Support Ticket
-        </button>
-        <button
-          type="button"
-          className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg w-full"
-        >
-          <FileBarChart className="h-4 w-4" /> DOCS
-        </button>
         <button
           type="button"
           disabled={isLoggingOut}

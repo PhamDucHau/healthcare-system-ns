@@ -65,7 +65,7 @@ const AdminRolesContent = () => {
       setRoles(rolesRes.roles);
       setPermissions(permsRes.permissions);
     } catch (err) {
-      toast.error(err instanceof AdminApiError ? err.message : "Không tải được roles");
+      toast.error(err instanceof AdminApiError ? err.message : "Không tải được vai trò");
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ const AdminRolesContent = () => {
 
   const openEdit = (role: AdminRoleRow) => {
     if (role.is_system) {
-      toast.info("System role không thể sửa permissions");
+      toast.info("Vai trò hệ thống không thể sửa quyền hạn");
       return;
     }
     setEditing(role);
@@ -120,7 +120,7 @@ const AdminRolesContent = () => {
           description: form.description,
           permissionIds,
         });
-        toast.success("Đã cập nhật role");
+        toast.success("Đã cập nhật vai trò");
       } else {
         if (!form.slug.trim()) {
           toast.error("Vui lòng nhập slug");
@@ -132,7 +132,7 @@ const AdminRolesContent = () => {
           description: form.description,
           permissionIds,
         });
-        toast.success("Đã tạo role");
+        toast.success("Đã tạo vai trò");
       }
       setFormOpen(false);
       await load();
@@ -147,7 +147,7 @@ const AdminRolesContent = () => {
     if (!deleteTarget) return;
     try {
       await deleteAdminRole(deleteTarget.id);
-      toast.success("Đã xóa role");
+      toast.success("Đã xóa vai trò");
       setDeleteTarget(null);
       await load();
     } catch (err) {
@@ -162,21 +162,21 @@ const AdminRolesContent = () => {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2">
-        <span className="text-muted-foreground">Security</span>
+        <span className="text-muted-foreground">Bảo mật</span>
         <span className="text-muted-foreground">›</span>
-        <span className="text-primary">Dynamic RBAC</span>
+        <span className="text-primary">Phân quyền động</span>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quản lý Role</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quản lý Vai trò</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Tạo role custom với permissions tùy chọn. System roles (Patient, Doctor, Admin) không thể xóa.
+            Tạo vai trò tùy chỉnh với quyền hạn tự chọn. Vai trò hệ thống (Bệnh nhân, Bác sĩ, Admin) không thể xóa.
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2">
           <Plus className="h-4 w-4" />
-          Role mới
+          Vai trò mới
         </Button>
       </div>
 
@@ -197,8 +197,8 @@ const AdminRolesContent = () => {
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-foreground">{role.name}</h3>
-                      {role.is_system && <Badge variant="secondary">System</Badge>}
-                      <Badge variant="outline">{role.userCount} user</Badge>
+                      {role.is_system && <Badge variant="secondary">Hệ thống</Badge>}
+                      <Badge variant="outline">{role.userCount} người dùng</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">{role.slug}</p>
                     {role.description && (
@@ -206,7 +206,7 @@ const AdminRolesContent = () => {
                     )}
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {role.permissions.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">Không có permission</span>
+                        <span className="text-xs text-muted-foreground">Không có quyền hạn</span>
                       ) : (
                         role.permissions.map((p) => (
                           <Badge key={p.id} variant="outline" className="text-[10px]">{p.slug}</Badge>
@@ -236,7 +236,7 @@ const AdminRolesContent = () => {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Sửa role" : "Role custom mới"}</DialogTitle>
+            <DialogTitle>{editing ? "Sửa vai trò" : "Vai trò tùy chỉnh mới"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -254,7 +254,7 @@ const AdminRolesContent = () => {
               <Input id="roleDesc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
             <div>
-              <Label className="mb-2 block">Permissions</Label>
+              <Label className="mb-2 block">Quyền hạn</Label>
               {[...permissionsByCategory.entries()].map(([category, perms]) => (
                 <div key={category} className="mb-4">
                   <p className="text-xs font-bold uppercase text-muted-foreground mb-2">{category}</p>
@@ -287,10 +287,10 @@ const AdminRolesContent = () => {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa role &quot;{deleteTarget?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogTitle>Xóa vai trò &quot;{deleteTarget?.name}&quot;?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget && deleteTarget.userCount > 0
-                ? `Role đang có ${deleteTarget.userCount} user. Chuyển role trước khi xóa.`
+                ? `Vai trò đang có ${deleteTarget.userCount} người dùng. Chuyển vai trò trước khi xóa.`
                 : "Hành động không thể hoàn tác."}
             </AlertDialogDescription>
           </AlertDialogHeader>

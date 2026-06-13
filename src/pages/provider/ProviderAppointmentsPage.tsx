@@ -7,7 +7,7 @@ import {
 import { vi } from "date-fns/locale";
 import {
   Activity, CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight,
-  Loader2, MoreHorizontal, RefreshCw, Search,
+  Loader2, MoreHorizontal, RefreshCw, Search, Stethoscope,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -304,19 +304,28 @@ export default function ProviderAppointmentsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {row.status === "CONFIRMED" && (
+                            {row.status === "CONFIRMED" && (<>
                               <DropdownMenuItem
                                 disabled={checkingInId === row.id}
-                                onClick={() => void handleCheckin(row.id).then(() =>
-                                  navigate(`/provider-portal/patients?select=${row.profile_id}`)
-                                )}
+                                onClick={() => void handleCheckin(row.id)}
                               >
                                 {checkingInId === row.id
                                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   : <CalendarCheck className="mr-2 h-4 w-4 text-green-600" />}
                                 Check-in
                               </DropdownMenuItem>
-                            )}
+                              <DropdownMenuItem
+                                disabled={checkingInId === row.id}
+                                onClick={() => void handleCheckin(row.id).then((ok) =>
+                                  ok && navigate(`/provider-portal/patients?select=${row.profile_id}`)
+                                )}
+                              >
+                                {checkingInId === row.id
+                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  : <Stethoscope className="mr-2 h-4 w-4 text-primary" />}
+                                Khám
+                              </DropdownMenuItem>
+                            </>)}
                             {(row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") && (
                               <DropdownMenuItem
                                 onClick={() => navigate(`/provider-portal/patients?select=${row.profile_id}`)}

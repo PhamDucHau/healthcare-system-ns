@@ -27,7 +27,7 @@ export default function MasterDataContent() {
           <Database className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Master Data</h1>
+          <h1 className="text-2xl font-bold text-foreground">Danh mục hệ thống</h1>
           <p className="text-sm text-muted-foreground">
             Quản lý danh mục hệ thống — Chuyên khoa, Dịch vụ, Cơ sở, Phòng khám, Lịch bác sĩ
           </p>

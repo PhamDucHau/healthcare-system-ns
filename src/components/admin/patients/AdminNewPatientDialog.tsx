@@ -168,13 +168,34 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
       let userId: string | null = null;
 
       if (portal === "provider") {
+        // Check for existing patient by phone or CCCD before inserting
+        const idNumber = form.idNumber.trim();
+        const orFilters: string[] = [];
+        if (phone) orFilters.push(`phone_number.eq.${phone}`);
+        if (idNumber) orFilters.push(`id_number.eq.${idNumber}`);
+
+        if (orFilters.length > 0) {
+          const { data: existing } = await supabase
+            .from("patient")
+            .select("id, legal_last_name, legal_first_name, phone_number, id_number")
+            .or(orFilters.join(","))
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            const name = `${existing.legal_last_name ?? ""} ${existing.legal_first_name ?? ""}`.trim();
+            const conflict = existing.phone_number === phone ? `SĐT ${phone}` : `CCCD ${existing.id_number}`;
+            throw new Error(`Đã tồn tại hồ sơ bệnh nhân "${name}" với ${conflict}.`);
+          }
+        }
+
         // Doctors: create profile directly, no auth user required
         profileId = await staffCreatePatientProfile(
           form.legalFirstName.trim(),
           form.legalLastName.trim(),
           phone || null,
           form.dateOfBirth || null,
-          form.idNumber.trim() || null,
+          idNumber || null,
         );
       } else {
         // Admin: create auth user first

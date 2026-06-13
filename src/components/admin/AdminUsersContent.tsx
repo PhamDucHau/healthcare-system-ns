@@ -17,7 +17,8 @@ import {
   resetAdminUserPassword,
   updateAdminUser,
 } from "@/lib/admin-api";
-import { fetchSpecialties, type Specialty } from "@/lib/appointment-api";
+import { fetchSpecialties } from "@/lib/appointment-api";
+import type { Specialty } from "@/types/appointment";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -136,7 +137,7 @@ const AdminUsersContent = () => {
 
   const handleSave = async () => {
     if (!form.fullName.trim() || !form.roleId) {
-      toast.error("Vui lòng nhập tên và chọn role");
+      toast.error("Vui lòng nhập tên và chọn vai trò");
       return;
     }
     if (!editing && !form.email.trim()) {
@@ -156,7 +157,7 @@ const AdminUsersContent = () => {
           specialty: isDoctor ? form.specialty : null,
           status: form.status,
         });
-        toast.success("Đã cập nhật user");
+        toast.success("Đã cập nhật người dùng");
       } else {
         const res = await createAdminUser({
           fullName: form.fullName,
@@ -193,7 +194,7 @@ const AdminUsersContent = () => {
     if (!deleteTarget) return;
     try {
       await deleteAdminUser(deleteTarget.user_id);
-      toast.success("Đã xóa user");
+      toast.success("Đã xóa người dùng");
       setDeleteTarget(null);
       await load();
     } catch (err) {
@@ -206,21 +207,21 @@ const AdminUsersContent = () => {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2">
-        <span className="text-muted-foreground">Organization</span>
+        <span className="text-muted-foreground">Tổ chức</span>
         <span className="text-muted-foreground">›</span>
-        <span className="text-primary">User Management</span>
+        <span className="text-primary">Quản lý người dùng</span>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quản lý User</h1>
-          <p className="text-sm text-muted-foreground mt-1 max-w-lg">
-            CRUD user, gán role &amp; facility. Reset mật khẩu tạm gửi qua email.
-          </p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quản lý Người dùng</h1>
+          {/* <p className="text-sm text-muted-foreground mt-1 max-w-lg">
+            Thêm, sửa, xóa người dùng, gán vai trò &amp; cơ sở. Đặt lại mật khẩu tạm gửi qua email.
+          </p> */}
         </div>
         <Button onClick={openCreate} className="gap-2">
           <UserPlus className="h-4 w-4" />
-          Thêm user
+          Thêm người dùng
         </Button>
       </div>
 
@@ -245,16 +246,16 @@ const AdminUsersContent = () => {
         ) : users.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Users className="h-10 w-10 mb-2 opacity-40" />
-            <p>Chưa có user</p>
+            <p>Chưa có người dùng</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">User</th>
-                  <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Role</th>
-                  <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Facility</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Người dùng</th>
+                  <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vai trò</th>
+                  <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cơ sở</th>
                   <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trạng thái</th>
                   <th className="px-4 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Thao tác</th>
                 </tr>
@@ -297,7 +298,7 @@ const AdminUsersContent = () => {
 
         <div className="flex items-center justify-between px-6 py-4 border-t">
           <p className="text-sm text-muted-foreground">
-            Tổng <span className="font-semibold text-foreground">{total}</span> user
+            Tổng <span className="font-semibold text-foreground">{total}</span> người dùng
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
@@ -314,7 +315,7 @@ const AdminUsersContent = () => {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? "Sửa user" : "Thêm user mới"}</DialogTitle>
+            <DialogTitle>{editing ? "Sửa người dùng" : "Thêm người dùng mới"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -332,18 +333,18 @@ const AdminUsersContent = () => {
               <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
             <div>
-              <Label>Role</Label>
+              <Label>Vai trò</Label>
               <Select value={form.roleId} onValueChange={(v) => setForm({ ...form, roleId: v })}>
-                <SelectTrigger><SelectValue placeholder="Chọn role" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Chọn vai trò" /></SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}{r.is_system ? " (system)" : ""}</SelectItem>
+                    <SelectItem key={r.id} value={r.id}>{r.name}{r.is_system ? " (hệ thống)" : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Facility</Label>
+              <Label>Cơ sở</Label>
               <Select value={form.facilityId || "__none__"} onValueChange={(v) => setForm({ ...form, facilityId: v === "__none__" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Chọn cơ sở" /></SelectTrigger>
                 <SelectContent>
@@ -415,7 +416,7 @@ const AdminUsersContent = () => {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa user?</AlertDialogTitle>
+            <AlertDialogTitle>Xóa người dùng?</AlertDialogTitle>
             <AlertDialogDescription>
               Xóa vĩnh viễn {deleteTarget?.email}. Không thể hoàn tác.
             </AlertDialogDescription>
