@@ -6,8 +6,8 @@ import {
   SquareChartGantt,
   Stethoscope,
   UserRound,
-  Microscope,
-  Pill,
+  // Microscope,
+  // Pill,
   Siren,
   Activity,
   Plus,
@@ -32,8 +32,8 @@ import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatient
 const OVERVIEW_TABS = [
   { id: "overview", icon: SquareChartGantt, label: "Tổng quan" },
   { id: "records", icon: NotebookPen, label: "Hồ sơ sức khỏe" },
-  { id: "labs", icon: Microscope, label: "Xét nghiệm" },
-  { id: "prescriptions", icon: Pill, label: "Đơn thuốc" },
+  // { id: "labs", icon: Microscope, label: "Xét nghiệm" },
+  // { id: "prescriptions", icon: Pill, label: "Đơn thuốc" },
 ] as const;
 
 type OverviewTabId = (typeof OVERVIEW_TABS)[number]["id"];
