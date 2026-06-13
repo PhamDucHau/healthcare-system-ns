@@ -1,0 +1,318 @@
+import { useState } from "react";
+import { Loader2, ScanLine, UserRoundPlus } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import UploadCard from "@/components/onboarding/UploadCard";
+import { supabase } from "@/lib/supabase";
+import {
+  fetchOcrSingle,
+  mapBhytParsedToInsuranceUpdates,
+  mapCccdParsedToFormUpdates,
+} from "@/lib/cccd-ocr";
+
+const MAX_SIZE = 10 * 1024 * 1024;
+
+function sanitize(name: string) {
+  return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "file";
+}
+
+type FormData = {
+  idNumber: string; expirationDate: string; residentialAddress: string;
+  issuedDate: string; issuer: string;
+  legalFirstName: string; legalLastName: string; dateOfBirth: string;
+  phoneNumber: string; email: string; pronouns: string;
+  provider: string; memberId: string; groupNumber: string;
+  bhytName: string; bhytDob: string; bhytGender: string;
+  bhytAddress: string; bhytKcb: string; bhytKcbCode: string;
+  bhytValidFrom: string; bhytFiveYear: string;
+};
+
+const empty: FormData = {
+  idNumber: "", expirationDate: "", residentialAddress: "",
+  issuedDate: "", issuer: "",
+  legalFirstName: "", legalLastName: "", dateOfBirth: "",
+  phoneNumber: "", email: "", pronouns: "",
+  provider: "", memberId: "", groupNumber: "",
+  bhytName: "", bhytDob: "", bhytGender: "",
+  bhytAddress: "", bhytKcb: "", bhytKcbCode: "",
+  bhytValidFrom: "", bhytFiveYear: "",
+};
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  profileId: string;
+  patientUserId: string;
+  patientName?: string | null;
+}
+
+const lc = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
+
+function F({ label, value, onChange, type = "text", placeholder, col2 }: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; col2?: boolean;
+}) {
+  return (
+    <div className={col2 ? "sm:col-span-2" : ""}>
+      <label className={lc}>{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder} className={fc} />
+    </div>
+  );
+}
+
+export default function AdminCreateProfileDialog({
+  open, onClose, onSuccess, profileId, patientUserId, patientName,
+}: Props) {
+  const [form, setForm] = useState<FormData>(empty);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [idBackFile, setIdBackFile] = useState<File | null>(null);
+  const [cardFile, setCardFile] = useState<File | null>(null);
+  const [ocrFront, setOcrFront] = useState(false);
+  const [ocrBack, setOcrBack] = useState(false);
+  const [ocrBhyt, setOcrBhyt] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: keyof FormData) => (v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  const pickFile = (file: File | null, setter: (f: File | null) => void) => {
+    if (!file) return;
+    if (file.size > MAX_SIZE) { toast.error("File quá lớn (tối đa 10MB)"); return; }
+    setter(file);
+  };
+
+  const handleClose = () => {
+    setForm(empty);
+    setIdFile(null); setIdBackFile(null); setCardFile(null);
+    onClose();
+  };
+
+  const runOcr = async (type: "front" | "back" | "bhyt") => {
+    const file = type === "front" ? idFile : type === "back" ? idBackFile : cardFile;
+    if (!file) return;
+    const setter = type === "front" ? setOcrFront : type === "back" ? setOcrBack : setOcrBhyt;
+    setter(true);
+    try {
+      if (type === "bhyt") {
+        const json = await fetchOcrSingle(file, "bhyt", "front");
+        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
+        const ins = mapBhytParsedToInsuranceUpdates(json.parsed);
+        setForm(p => ({
+          ...p,
+          provider: ins.provider ?? p.provider,
+          memberId: ins.memberId ?? p.memberId,
+          groupNumber: ins.groupNumber ?? p.groupNumber,
+          bhytName: ins.bhytName ?? p.bhytName,
+          bhytDob: ins.bhytDob ?? p.bhytDob,
+          bhytGender: ins.bhytGender ?? p.bhytGender,
+          bhytAddress: ins.bhytAddress ?? p.bhytAddress,
+          bhytKcb: ins.bhytKcb ?? p.bhytKcb,
+          bhytKcbCode: ins.bhytKcbCode ?? p.bhytKcbCode,
+          bhytValidFrom: ins.bhytValidFrom ?? p.bhytValidFrom,
+          bhytFiveYear: ins.bhytFiveYear ?? p.bhytFiveYear,
+        }));
+        toast.success("OCR BHYT hoàn tất");
+      } else {
+        const json = await fetchOcrSingle(file, "cccd", "front");
+        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
+        const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
+        setForm(p => ({
+          ...p,
+          idNumber: identity.idNumber ?? p.idNumber,
+          expirationDate: identity.expirationDate ?? p.expirationDate,
+          residentialAddress: identity.residentialAddress ?? p.residentialAddress,
+          issuedDate: identity.issuedDate ?? p.issuedDate,
+          issuer: identity.issuer ?? p.issuer,
+          legalFirstName: personal.legalFirstName ?? p.legalFirstName,
+          legalLastName: personal.legalLastName ?? p.legalLastName,
+          dateOfBirth: personal.dateOfBirth ?? p.dateOfBirth,
+        }));
+        toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+      }
+    } catch (e) {
+      toast.error("OCR thất bại", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setter(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const ts = Date.now();
+      const paths: { id_document_storage_path?: string; id_document_back_storage_path?: string; card_front_storage_path?: string } = {};
+
+      if (idFile) {
+        const path = `${patientUserId}/id_front_${ts}_${sanitize(idFile.name)}`;
+        const { error } = await supabase.storage.from("identity-documents").upload(path, idFile, { upsert: true, cacheControl: "3600" });
+        if (error) throw new Error(error.message);
+        paths.id_document_storage_path = path;
+      }
+      if (idBackFile) {
+        const path = `${patientUserId}/id_back_${ts}_${sanitize(idBackFile.name)}`;
+        const { error } = await supabase.storage.from("identity-documents").upload(path, idBackFile, { upsert: true, cacheControl: "3600" });
+        if (error) throw new Error(error.message);
+        paths.id_document_back_storage_path = path;
+      }
+      if (cardFile) {
+        const path = `${patientUserId}/card_front_${ts}_${sanitize(cardFile.name)}`;
+        const { error } = await supabase.storage.from("insurance-cards").upload(path, cardFile, { upsert: true, cacheControl: "3600" });
+        if (error) throw new Error(error.message);
+        paths.card_front_storage_path = path;
+      }
+
+      const e2n = (v: string) => v.trim() || null;
+
+      const { error } = await supabase.from("patient").upsert({
+        id: profileId,
+        user_id: patientUserId,
+        id_number: e2n(form.idNumber),
+        id_expiration_date: e2n(form.expirationDate),
+        residential_address: e2n(form.residentialAddress),
+        id_issued_date: e2n(form.issuedDate),
+        id_issuer: e2n(form.issuer),
+        legal_first_name: e2n(form.legalFirstName),
+        legal_last_name: e2n(form.legalLastName),
+        date_of_birth: e2n(form.dateOfBirth),
+        phone_number: e2n(form.phoneNumber),
+        email_address: e2n(form.email),
+        preferred_pronouns: e2n(form.pronouns),
+        insurance_provider: e2n(form.provider),
+        member_id: e2n(form.memberId),
+        group_number: e2n(form.groupNumber),
+        bhyt_name: e2n(form.bhytName),
+        bhyt_dob: e2n(form.bhytDob),
+        bhyt_gender: e2n(form.bhytGender),
+        bhyt_address: e2n(form.bhytAddress),
+        bhyt_kcb: e2n(form.bhytKcb),
+        bhyt_kcb_code: e2n(form.bhytKcbCode),
+        bhyt_valid_from: e2n(form.bhytValidFrom),
+        bhyt_five_year: e2n(form.bhytFiveYear),
+        submitted_at: new Date().toISOString(),
+        consent_accepted: true,
+        ...paths,
+      }, { onConflict: "id" });
+
+      if (error) throw new Error(error.message);
+
+      toast.success("Đã lưu hồ sơ bệnh nhân");
+      handleClose();
+      onSuccess();
+    } catch (e) {
+      toast.error("Lưu thất bại", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ocrAllRunning = ocrFront || ocrBack || ocrBhyt;
+  const hasAnyFile = Boolean(idFile || idBackFile || cardFile);
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v && !saving) handleClose(); }}>
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserRoundPlus className="h-5 w-5 text-primary" />
+            Tạo hồ sơ bệnh nhân{patientName ? ` — ${patientName}` : ""}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-5 pb-2">
+          {/* Upload section */}
+          <section className="rounded-2xl border bg-card p-4">
+            <h3 className="mb-1 text-sm font-semibold">Tải ảnh giấy tờ</h3>
+            <p className="mb-4 text-xs text-muted-foreground">CCCD mặt trước, mặt sau và thẻ BHYT.</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <UploadCard id="adm-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước"
+                file={idFile} onFileSelect={f => pickFile(f, setIdFile)}
+                onOcr={() => runOcr("front")} isOcrRunning={ocrFront} />
+              <UploadCard id="adm-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau"
+                file={idBackFile} onFileSelect={f => pickFile(f, setIdBackFile)}
+                onOcr={() => runOcr("back")} isOcrRunning={ocrBack} />
+              <UploadCard id="adm-card" title="Nhấn để tải lên" hint="Bảo hiểm y tế (BHYT)"
+                file={cardFile} onFileSelect={f => pickFile(f, setCardFile)}
+                onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} />
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button type="button" size="sm"
+                disabled={ocrAllRunning || !hasAnyFile}
+                onClick={() => void Promise.all([runOcr("front"), runOcr("back"), runOcr("bhyt")])}
+              >
+                <ScanLine className="mr-1.5 h-3.5 w-3.5" />
+                {ocrAllRunning ? "Đang đọc OCR…" : "OCR tất cả"}
+              </Button>
+            </div>
+          </section>
+
+          {/* Identity */}
+          <section className="rounded-2xl border bg-muted/30 p-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Thông tin từ CCCD
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <F label="Số CCCD" value={form.idNumber} onChange={set("idNumber")} placeholder="G-123-5678-9012" />
+              <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
+              <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
+              <F label="Nơi cấp" value={form.issuer} onChange={set("issuer")} placeholder="Cục cảnh sát QLHC về TTXH" />
+              <F label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")}
+                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2 />
+            </div>
+          </section>
+
+          {/* Personal */}
+          <section className="rounded-2xl border bg-muted/30 p-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Thông tin cá nhân
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <F label="Họ" value={form.legalLastName} onChange={set("legalLastName")} />
+              <F label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")} />
+              <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
+              <F label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")} type="tel" placeholder="0912 345 678" />
+              <F label="Email" value={form.email} onChange={set("email")} type="email" placeholder="example@email.com" />
+              <F label="Đại từ" value={form.pronouns} onChange={set("pronouns")} placeholder="Anh/Nam, Chị/Nữ…" />
+            </div>
+          </section>
+
+          {/* Insurance */}
+          <section className="rounded-2xl border bg-muted/30 p-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Bảo hiểm (BHYT)
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <F label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
+              <F label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")} placeholder="DN 4 79 791 101 31" />
+              <F label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
+              <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
+              <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
+              <F label="Giới tính" value={form.bhytGender} onChange={set("bhytGender")} placeholder="Nam / Nữ" />
+              <F label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
+              <F label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
+              <F label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />
+              <F label="Hiệu lực từ" value={form.bhytValidFrom} onChange={set("bhytValidFrom")} type="date" />
+              <F label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
+            </div>
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t pt-3">
+          <Button variant="outline" onClick={handleClose} disabled={saving}>Hủy</Button>
+          <Button onClick={() => void handleSave()} disabled={saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Lưu hồ sơ
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -34,6 +34,8 @@ import ProviderPortal from "./pages/ProviderPortal";
 import ProviderDashboard from "./components/provider/ProviderDashboard";
 import ProviderPatientsPage from "./pages/provider/ProviderPatientsPage";
 import ProviderSectionPlaceholder from "./pages/provider/ProviderSectionPlaceholder";
+import ProviderAppointmentsPage from "./pages/provider/ProviderAppointmentsPage";
+import { DoctorNotificationsProvider } from "./hooks/DoctorNotificationsContext";
 
 const queryClient = new QueryClient();
 
@@ -115,7 +117,9 @@ const App = () => (
               path="/provider-portal"
               element={
                 <ProtectedRoute requiredPortal="doctor">
-                  <ProviderPortal />
+                  <DoctorNotificationsProvider>
+                    <ProviderPortal />
+                  </DoctorNotificationsProvider>
                 </ProtectedRoute>
               }
             >
@@ -126,7 +130,7 @@ const App = () => (
                 element={<PatientRecordsManagement portal="doctor" />}
               />
               <Route path="patients" element={<ProviderPatientsPage />} />
-              <Route path="appointments" element={<ProviderSectionPlaceholder title="Appointments" />} />
+              <Route path="appointments" element={<ProviderAppointmentsPage />} />
               <Route path="tasks" element={<ProviderSectionPlaceholder title="Clinical Tasks" />} />
               <Route path="analytics" element={<ProviderSectionPlaceholder title="Analytics" />} />
             </Route>

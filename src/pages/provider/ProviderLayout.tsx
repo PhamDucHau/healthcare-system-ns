@@ -11,9 +11,10 @@ import {
   SquareChartGantt,
   Users,
 } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
+import { useDoctorNotifications } from "@/hooks/DoctorNotificationsContext";
 
 const NAV_ITEMS = [
   { path: "/provider-portal/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -31,6 +32,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 const ProviderLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const navigate = useNavigate();
+  const { unreadCount, markAllAsRead } = useDoctorNotifications();
 
   const handleLogout = () => {
     setIsLoggingOut(true);
@@ -110,11 +113,16 @@ const ProviderLayout = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                aria-label="Notifications"
-                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border hover:bg-muted"
-                onClick={() => toast.info("Không có thông báo mới")}
+                aria-label={`Thông báo${unreadCount > 0 ? ` (${unreadCount} chưa đọc)` : ""}`}
+                className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border hover:bg-muted"
+                onClick={() => { void markAllAsRead(); void navigate("/provider-portal/appointments"); }}
               >
                 <Bell className="h-4 w-4" aria-hidden="true" />
+                {unreadCount > 0 && (
+                  <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
               </button>
               <button
                 type="button"

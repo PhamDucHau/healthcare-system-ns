@@ -172,6 +172,24 @@ export async function adminInsertPatientProfile(
   return data as string;
 }
 
+export async function staffCreatePatientProfile(
+  firstName: string,
+  lastName:  string,
+  phone:     string | null,
+  dob:       string | null,
+  idNumber:  string | null,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("staff_create_patient_profile", {
+    p_legal_first_name: firstName,
+    p_legal_last_name:  lastName,
+    p_phone_number:     phone,
+    p_date_of_birth:    dob,
+    p_id_number:        idNumber,
+  });
+  if (error) throw new Error(mapAdminError(error.message));
+  return data as string;
+}
+
 // ─── Check-in ─────────────────────────────────────────────────────────────────
 
 export async function adminCheckinAppointment(appointmentId: string): Promise<void> {

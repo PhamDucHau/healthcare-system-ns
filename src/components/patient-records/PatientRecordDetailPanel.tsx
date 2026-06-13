@@ -1,4 +1,4 @@
-import { Loader2, UserRound } from "lucide-react";
+import { FileText, Loader2, UserRound } from "lucide-react";
 import type { PatientPortalDetail } from "@/types/patient-portal";
 
 function formatDob(iso: string | null | undefined): string {
@@ -17,16 +17,43 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DocImage({ url, label, storagePath }: { url: string; label: string; storagePath?: string | null }) {
+  const isPdf = (storagePath ?? "").toLowerCase().endsWith(".pdf");
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <p className="bg-muted/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+      {isPdf ? (
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="flex h-32 items-center justify-center gap-2 bg-muted/20 text-sm font-medium text-primary hover:underline">
+          <FileText className="h-5 w-5" />Xem PDF
+        </a>
+      ) : (
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          <img src={url} alt={label} className="h-32 w-full object-cover transition-opacity hover:opacity-90" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+export type PatientDocImageUrls = {
+  idFront?: string | null;
+  idBack?: string | null;
+  card?: string | null;
+};
+
 type PatientRecordDetailPanelProps = {
   profile: PatientPortalDetail | null;
   isLoading?: boolean;
   isError?: boolean;
+  imageUrls?: PatientDocImageUrls;
 };
 
 const PatientRecordDetailPanel = ({
   profile,
   isLoading = false,
   isError = false,
+  imageUrls,
 }: PatientRecordDetailPanelProps) => {
   if (isLoading) {
     return (
@@ -115,6 +142,23 @@ const PatientRecordDetailPanel = ({
           <Field label="Ngày 5 năm" value={formatDob(profile.bhyt_five_year)} />
         </div>
       </section>
+
+      {(imageUrls?.idFront || imageUrls?.idBack || imageUrls?.card) && (
+        <section>
+          <h3 className="mb-2 text-sm font-semibold text-foreground">Ảnh giấy tờ</h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {imageUrls.idFront && (
+              <DocImage url={imageUrls.idFront} label="CCCD mặt trước" storagePath={profile.id_document_storage_path} />
+            )}
+            {imageUrls.idBack && (
+              <DocImage url={imageUrls.idBack} label="CCCD mặt sau" storagePath={profile.id_document_back_storage_path} />
+            )}
+            {imageUrls.card && (
+              <DocImage url={imageUrls.card} label="Thẻ BHYT" storagePath={profile.card_front_storage_path} />
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

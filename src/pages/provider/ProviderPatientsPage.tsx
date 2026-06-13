@@ -12,7 +12,7 @@ import {
   Activity,
   Plus,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import {
@@ -21,9 +21,13 @@ import {
   type PatientListItem,
   type PatientPortalDetail,
 } from "@/types/patient-portal";
-import { getLatestVitalSignsForPatient } from "@/lib/vital-signs-api";
+import { getLatestVitalSignsForPatient, listAllVitalSignsForPatient, updateVitalSigns } from "@/lib/vital-signs-api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { VitalSignsRow } from "@/types/vital-signs";
+import { computeBmi } from "@/types/vital-signs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import VitalSignsForm from "@/components/provider/VitalSignsForm";
+import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
 
 const OVERVIEW_TABS = [
   { id: "overview", icon: SquareChartGantt, label: "Overview" },
@@ -124,12 +128,137 @@ function demoToDetail(demo: DemoPatient): PatientPortalDetail {
     insurance_provider: null,
     member_id: null,
     group_number: null,
+    id_document_storage_path: null,
+    id_document_back_storage_path: null,
+    card_front_storage_path: null,
+    bhyt_name: null,
+    bhyt_dob: null,
+    bhyt_gender: null,
+    bhyt_address: null,
+    bhyt_kcb: null,
+    bhyt_kcb_code: null,
+    bhyt_valid_from: null,
+    bhyt_five_year: null,
     submitted_at: null,
+    updated_at: null,
     consent_accepted: true,
   };
 }
 
 const PATIENT_LIST_QUERY_KEY = ["patient", "list"] as const;
+
+// ── VitalEditDialog ────────────────────────────────────────────────────────────
+function VitalEditDialog({
+  vital, patientName, onClose, onSaved,
+}: {
+  vital: VitalSignsRow;
+  patientName: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  type F = { bp_systolic: string; bp_diastolic: string; heart_rate: string; temperature_c: string; respiratory_rate: string; spo2: string; weight_kg: string; height_cm: string; clinical_note: string; };
+  const toStr = (v: number | null) => (v != null ? String(v) : "");
+  const [form, setForm] = useState<F>({
+    bp_systolic:      toStr(vital.bp_systolic),
+    bp_diastolic:     toStr(vital.bp_diastolic),
+    heart_rate:       toStr(vital.heart_rate),
+    temperature_c:    toStr(vital.temperature_c),
+    respiratory_rate: toStr(vital.respiratory_rate),
+    spo2:             toStr(vital.spo2),
+    weight_kg:        toStr(vital.weight_kg),
+    height_cm:        toStr(vital.height_cm),
+    clinical_note:    vital.clinical_note ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const parseN = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+
+  const bmi = (() => {
+    const w = parseN(form.weight_kg), h = parseN(form.height_cm);
+    return w && h && w > 0 && h > 0 ? computeBmi(w, h) : null;
+  })();
+
+  const set = (k: keyof F) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await updateVitalSigns(supabase, vital.id, {
+      bp_systolic:      parseN(form.bp_systolic),
+      bp_diastolic:     parseN(form.bp_diastolic),
+      heart_rate:       parseN(form.heart_rate),
+      temperature_c:    parseN(form.temperature_c),
+      respiratory_rate: parseN(form.respiratory_rate),
+      spo2:             parseN(form.spo2),
+      weight_kg:        parseN(form.weight_kg),
+      height_cm:        parseN(form.height_cm),
+      clinical_note:    form.clinical_note.trim() || null,
+    });
+    setSaving(false);
+    if (error) { toast.error("Lưu thất bại: " + error.message); return; }
+    toast.success("Đã cập nhật sinh hiệu");
+    onSaved();
+  };
+
+  const field = (label: string, k: keyof F, placeholder = "—") => (
+    <div className="space-y-1">
+      <label className="text-xs text-muted-foreground font-medium">{label}</label>
+      <input
+        type="number" step="any" value={form[k] as string} placeholder={placeholder}
+        onChange={set(k)}
+        className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+      />
+    </div>
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Activity className="h-4 w-4 text-primary" />
+            Sửa sinh hiệu — {patientName}
+            <span className="ml-auto text-xs font-normal text-muted-foreground">
+              {new Date(vital.recorded_at).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            {field("Tâm thu (mmHg)", "bp_systolic", "120")}
+            {field("Tâm trương (mmHg)", "bp_diastolic", "80")}
+            {field("Nhịp tim (bpm)", "heart_rate", "70")}
+            {field("Nhiệt độ (°C)", "temperature_c", "37")}
+            {field("SpO2 (%)", "spo2", "98")}
+            {field("Nhịp thở (l/ph)", "respiratory_rate", "16")}
+            {field("Chiều cao (cm)", "height_cm", "170")}
+            {field("Cân nặng (kg)", "weight_kg", "65")}
+          </div>
+          {bmi != null && (
+            <p className="text-xs text-muted-foreground">BMI tính toán: <strong>{bmi}</strong></p>
+          )}
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">Ghi chú lâm sàng</label>
+            <textarea
+              value={form.clinical_note} onChange={set("clinical_note")} rows={3}
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              placeholder="Nhập ghi chú..."
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button type="button" onClick={onClose} disabled={saving}
+            className="flex-1 rounded-lg border py-2 text-sm font-medium hover:bg-muted transition-colors">
+            Hủy
+          </button>
+          <button type="button" onClick={() => void handleSave()} disabled={saving}
+            className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60">
+            {saving ? "Đang lưu…" : "Lưu thay đổi"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const ProviderPatientsPage = () => {
   const draftPersonal = useMemo(() => readOnboardingPersonalDraft(), []);
@@ -170,10 +299,24 @@ const ProviderPatientsPage = () => {
     [draftDob, draftFullName, draftPersonal.email, draftPersonal.pronouns],
   );
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<OverviewTabId>("overview");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => searchParams.get("select"),
+  );
+
+  // Clear ?select= from URL after initial auto-select
+  useEffect(() => {
+    if (searchParams.get("select")) {
+      setSearchParams({}, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [noteDraft, setNoteDraft] = useState("");
   const [vitalSheetOpen, setVitalSheetOpen] = useState(false);
+  const [vitalHistoryOpen, setVitalHistoryOpen] = useState(false);
+  const [editingVital, setEditingVital] = useState<VitalSignsRow | null>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: patientSummaries = [], isLoading: isListLoading, isError, error } = useQuery({
@@ -272,6 +415,12 @@ const ProviderPatientsPage = () => {
     queryKey: ["vital_signs", "patient", realPatientUserId],
     queryFn: () => getLatestVitalSignsForPatient(supabase, realPatientUserId!).then((r) => r.vitals),
     enabled: Boolean(realPatientUserId),
+  });
+
+  const { data: vitalHistory = [] } = useQuery({
+    queryKey: ["vital_signs_history", "patient", realPatientUserId],
+    queryFn: () => listAllVitalSignsForPatient(supabase, realPatientUserId!).then((r) => r.vitals),
+    enabled: vitalHistoryOpen && Boolean(realPatientUserId),
   });
 
   // Fetch latest CHECKED_IN/IN_PROGRESS appointment for this patient (for doctor vitals entry)
@@ -476,15 +625,19 @@ const ProviderPatientsPage = () => {
               <button
                 type="button"
                 className="min-h-11 rounded-lg bg-card px-5 text-sm font-semibold text-primary hover:bg-card/90"
-                onClick={() => toast.info("Chỉnh sửa hồ sơ — tích hợp form sau")}
+                onClick={() => setEditProfileOpen(true)}
               >
                 Edit Profile
               </button>
             </div>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-card/20 px-3 py-1">Blood: O+</span>
-              <span className="rounded-full bg-card/20 px-3 py-1">Height: 182cm</span>
-              <span className="rounded-full bg-card/20 px-3 py-1">Weight: 78kg</span>
+              {latestVitals?.height_cm != null && (
+                <span className="rounded-full bg-card/20 px-3 py-1">Height: {latestVitals.height_cm}cm</span>
+              )}
+              {latestVitals?.weight_kg != null && (
+                <span className="rounded-full bg-card/20 px-3 py-1">Weight: {latestVitals.weight_kg}kg</span>
+              )}
               {(patientDetail?.email_address ?? draftPersonal.email) ? (
                 <span className="rounded-full bg-card/20 px-3 py-1">
                   {patientDetail?.email_address ?? draftPersonal.email}
@@ -588,14 +741,23 @@ const ProviderPatientsPage = () => {
               <div className="rounded-xl border bg-card p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Sinh hiệu gần nhất</h3>
-                  <button
-                    type="button"
-                    onClick={() => setVitalSheetOpen(true)}
-                    className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Nhập
-                  </button>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setVitalSheetOpen(true)}
+                      className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Nhập
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVitalHistoryOpen(true)}
+                      className="rounded-lg bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/80 transition-colors"
+                    >
+                      Lịch sử
+                    </button>
+                  </div>
                 </div>
                 {latestVitals?.is_critical && (
                   <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-destructive/10 px-2 py-1.5 text-xs font-semibold text-destructive">
@@ -689,6 +851,92 @@ const ProviderPatientsPage = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Vital signs history dialog ─────────────────────────────────────── */}
+      <Dialog open={vitalHistoryOpen} onOpenChange={(o) => { setVitalHistoryOpen(o); if (!o) setEditingVital(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Lịch sử sinh hiệu — {displayName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {vitalHistory.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Chưa có dữ liệu sinh hiệu.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="py-2 text-left font-medium">Thời gian</th>
+                    <th className="py-2 text-right font-medium">HA</th>
+                    <th className="py-2 text-right font-medium">Nhịp tim</th>
+                    <th className="py-2 text-right font-medium">Nhiệt độ</th>
+                    <th className="py-2 text-right font-medium">SpO2</th>
+                    <th className="py-2 text-right font-medium">Nhịp thở</th>
+                    <th className="py-2 text-right font-medium">Cao (cm)</th>
+                    <th className="py-2 text-right font-medium">Nặng (kg)</th>
+                    <th className="py-2 text-right font-medium">BMI</th>
+                    <th className="py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {vitalHistory.map((v) => (
+                    <tr key={v.id} className={`border-b last:border-0 ${v.is_critical ? "bg-destructive/5" : ""}`}>
+                      <td className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(v.recorded_at).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                        {v.is_critical && <span className="ml-1 text-[10px] font-bold text-destructive">CRITICAL</span>}
+                      </td>
+                      <td className="py-2 text-right font-mono">
+                        {v.bp_systolic != null && v.bp_diastolic != null ? `${v.bp_systolic}/${v.bp_diastolic}` : "—"}
+                      </td>
+                      <td className="py-2 text-right font-mono">{v.heart_rate ?? "—"}</td>
+                      <td className="py-2 text-right font-mono">{v.temperature_c != null ? `${v.temperature_c}°C` : "—"}</td>
+                      <td className="py-2 text-right font-mono">{v.spo2 != null ? `${v.spo2}%` : "—"}</td>
+                      <td className="py-2 text-right font-mono">{v.respiratory_rate ?? "—"}</td>
+                      <td className="py-2 text-right font-mono">{v.height_cm ?? "—"}</td>
+                      <td className="py-2 text-right font-mono">{v.weight_kg ?? "—"}</td>
+                      <td className="py-2 text-right font-mono">{v.bmi ?? "—"}</td>
+                      <td className="py-2 pl-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingVital(v)}
+                          className="rounded px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          Sửa
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit vital signs dialog ────────────────────────────────────────── */}
+      {editingVital && (
+        <VitalEditDialog
+          vital={editingVital}
+          patientName={displayName}
+          onClose={() => setEditingVital(null)}
+          onSaved={() => {
+            setEditingVital(null);
+            void queryClient.invalidateQueries({ queryKey: ["vital_signs", "patient", realPatientUserId] });
+            void queryClient.invalidateQueries({ queryKey: ["vital_signs_history", "patient", realPatientUserId] });
+          }}
+        />
+      )}
+
+      <AdminEditPatientDialog
+        profileId={patientDetailFromDb?.id ?? null}
+        open={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: PATIENT_LIST_QUERY_KEY });
+        }}
+      />
     </>
   );
 };

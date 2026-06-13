@@ -2,18 +2,12 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { FileUser, Loader2, RefreshCw, Search } from "lucide-react";
+import { FileUser, Loader2, RefreshCw, Search, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
-import PatientRecordDetailPanel from "@/components/patient-records/PatientRecordDetailPanel";
+import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
+import AdminNewPatientDialog from "@/components/admin/patients/AdminNewPatientDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -22,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPatientRecordById, listPatientRecords } from "@/lib/patient-records";
+import { listPatientRecords } from "@/lib/patient-records";
 import { supabase } from "@/lib/supabase";
 import type { PatientRecordListRow } from "@/types/patient-portal";
 
@@ -75,7 +69,8 @@ type PatientRecordsManagementProps = {
 const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [newPatientOpen, setNewPatientOpen] = useState(false);
 
   const {
     data: rows = [],
@@ -98,26 +93,9 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
     [rows, search],
   );
 
-  const {
-    data: detail,
-    isLoading: detailLoading,
-    isError: detailError,
-  } = useQuery({
-    queryKey: ["patient-records", "detail", selectedId],
-    queryFn: async () => {
-      const { record, error: detailErr } = await getPatientRecordById(
-        supabase,
-        selectedId as string,
-      );
-      if (detailErr) throw detailErr;
-      return record;
-    },
-    enabled: Boolean(selectedId) && sheetOpen,
-  });
-
   const openDetail = (id: string) => {
     setSelectedId(id);
-    setSheetOpen(true);
+    setEditOpen(true);
   };
 
   const title =
@@ -137,22 +115,32 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-10 shrink-0"
-          disabled={isFetching}
-          onClick={() => {
-            void refetch().then(() => toast.success("Đã làm mới danh sách"));
-          }}
-        >
-          {isFetching ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          )}
-          Làm mới
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            className="min-h-10 shrink-0"
+            onClick={() => setNewPatientOpen(true)}
+          >
+            <UserRoundPlus className="h-4 w-4" aria-hidden="true" />
+            Tạo hồ sơ mới
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-10 shrink-0"
+            disabled={isFetching}
+            onClick={() => {
+              void refetch().then(() => toast.success("Đã làm mới danh sách"));
+            }}
+          >
+            {isFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            )}
+            Làm mới
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -229,7 +217,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                     }}
                     tabIndex={0}
                     role="button"
-                    aria-label={`Xem hồ sơ ${row.full_name}`}
+                    aria-label={`Chỉnh sửa hồ sơ ${row.full_name}`}
                   >
                     <TableCell className="font-medium">{row.full_name}</TableCell>
                     <TableCell>{formatDob(row.date_of_birth)}</TableCell>
@@ -257,23 +245,19 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
         )}
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Chi tiết hồ sơ</SheetTitle>
-            <SheetDescription>
-              Thông tin cá nhân, giấy tờ và bảo hiểm từ onboarding.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="mt-6">
-            <PatientRecordDetailPanel
-              profile={detail ?? null}
-              isLoading={detailLoading}
-              isError={detailError}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <AdminEditPatientDialog
+        profileId={selectedId}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() => void refetch()}
+      />
+
+      <AdminNewPatientDialog
+        open={newPatientOpen}
+        onClose={() => setNewPatientOpen(false)}
+        onSuccess={() => void refetch()}
+        portal={portal === "doctor" ? "provider" : "admin"}
+      />
     </div>
   );
 };

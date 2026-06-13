@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format, differenceInYears, parseISO } from "date-fns";
-import { vi } from "date-fns/locale";
-import { Clock, Stethoscope, Phone, CalendarCheck, X } from "lucide-react";
+import { Clock, Stethoscope, Phone, CalendarCheck, X, FileUser, UserRoundPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import CancelDialog from "./CancelDialog";
 import RescheduleDialog from "./RescheduleDialog";
+import PatientRecordDialog from "./PatientRecordDialog";
+import AdminCreateProfileDialog from "./AdminCreateProfileDialog";
 import type { AdminAppointment } from "@/types/admin-appointment";
 import {
-  ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR, ADMIN_STATUS_DOT,
+  ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT,
 } from "@/types/admin-appointment";
 import { adminCheckinAppointment } from "@/lib/admin-appointment-api";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -26,6 +28,21 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [createProfileOpen, setCreateProfileOpen] = useState(false);
+  // null = still checking, true/false = has uploaded ID documents
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!open || !appointment?.profile_id) { setHasProfile(null); return; }
+    setHasProfile(null);
+    supabase
+      .from("patient")
+      .select("id, id_document_storage_path")
+      .eq("id", appointment.profile_id)
+      .maybeSingle()
+      .then(({ data }) => setHasProfile(Boolean(data?.id_document_storage_path)));
+  }, [open, appointment?.profile_id]);
 
   if (!appointment) return null;
 
@@ -36,10 +53,6 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
   const age = appointment.patient_dob
     ? differenceInYears(new Date(), parseISO(appointment.patient_dob))
     : null;
-
-  const appointmentTime = appointment.slot_date && appointment.start_time
-    ? `${appointment.start_time.slice(0, 5)} · ${format(parseISO(appointment.slot_date), "dd/MM/yyyy", { locale: vi })}`
-    : `Walk-in · ${format(parseISO(appointment.created_at), "dd/MM/yyyy", { locale: vi })}`;
 
   const shortId = appointment.id.slice(0, 6).toUpperCase();
 
@@ -161,13 +174,31 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
 
           {/* Actions */}
           <div className="space-y-2">
+            {hasProfile === false ? (
+              <Button variant="outline" className="w-full" onClick={() => setCreateProfileOpen(true)}>
+                <UserRoundPlus className="mr-2 h-4 w-4" />
+                Tạo hồ sơ bệnh nhân
+              </Button>
+            ) : (
+              <Button variant="outline" className="w-full" onClick={() => setProfileOpen(true)}>
+                <FileUser className="mr-2 h-4 w-4" />
+                Xem hồ sơ bệnh nhân
+              </Button>
+            )}
+
             {canCheckin && (
-              <Button className="w-full" onClick={handleCheckin} disabled={checkingIn}>
+              <Button
+                className="w-full"
+                onClick={handleCheckin}
+                disabled={checkingIn || hasProfile === false || hasProfile === null}
+                title={hasProfile === false ? "Bệnh nhân chưa có hồ sơ" : undefined}
+              >
                 {checkingIn
                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   : <CalendarCheck className="mr-2 h-4 w-4" />
                 }
                 Check-in ngay
+                {hasProfile === null && <Loader2 className="ml-2 h-3 w-3 animate-spin opacity-60" />}
               </Button>
             )}
 
@@ -202,6 +233,27 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
           onSuccess={() => { setRescheduleOpen(false); onRefresh(); onClose(); }}
         />
       )}
+
+      <PatientRecordDialog
+        profileId={appointment.profile_id}
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onProfileResolved={setHasProfile}
+        onCreateProfile={() => { setProfileOpen(false); setCreateProfileOpen(true); }}
+      />
+
+      <AdminCreateProfileDialog
+        open={createProfileOpen}
+        onClose={() => setCreateProfileOpen(false)}
+        onSuccess={() => {
+          setCreateProfileOpen(false);
+          setHasProfile(true);
+          onRefresh();
+        }}
+        profileId={appointment.profile_id}
+        patientUserId={appointment.patient_id}
+        patientName={appointment.patient_name}
+      />
     </>
   );
 }
