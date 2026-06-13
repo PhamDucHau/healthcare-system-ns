@@ -30,10 +30,10 @@ import VitalSignsForm from "@/components/provider/VitalSignsForm";
 import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
 
 const OVERVIEW_TABS = [
-  { id: "overview", icon: SquareChartGantt, label: "Overview" },
-  { id: "records", icon: NotebookPen, label: "Health Records" },
-  { id: "labs", icon: Microscope, label: "Labs" },
-  { id: "prescriptions", icon: Pill, label: "Prescriptions" },
+  { id: "overview", icon: SquareChartGantt, label: "Tổng quan" },
+  { id: "records", icon: NotebookPen, label: "Hồ sơ sức khỏe" },
+  { id: "labs", icon: Microscope, label: "Xét nghiệm" },
+  { id: "prescriptions", icon: Pill, label: "Đơn thuốc" },
 ] as const;
 
 type OverviewTabId = (typeof OVERVIEW_TABS)[number]["id"];
@@ -104,6 +104,15 @@ function statusBadgeClass(status: string | null | undefined) {
   if (status === "Review Needed") return "bg-amber-100 text-amber-700";
   if (status === "Draft") return "bg-slate-100 text-slate-700";
   return "bg-slate-100 text-slate-700";
+}
+
+function translateStatus(status: string | null | undefined): string {
+  if (status === "Active") return "Đang hoạt động";
+  if (status === "Stable") return "Ổn định";
+  if (status === "Review Needed") return "Cần xem xét";
+  if (status === "Draft") return "Nháp";
+  if (status === "Routine") return "Thường quy";
+  return status ?? "—";
 }
 
 function demoToDetail(demo: DemoPatient): PatientPortalDetail {
@@ -274,7 +283,7 @@ const ProviderPatientsPage = () => {
         key: "demo1",
         name: draftFullName,
         dob: draftDob,
-        last: "2 days ago",
+        last: "2 ngày trước",
         status: "Stable",
         pronouns: draftPersonal.pronouns,
         email: draftPersonal.email,
@@ -283,7 +292,7 @@ const ProviderPatientsPage = () => {
         key: "demo2",
         name: "Jordan Smith",
         dob: "11/24/1988",
-        last: "1 week ago",
+        last: "1 tuần trước",
         status: "Review Needed",
         email: "jordan.smith@example.com",
       },
@@ -291,7 +300,7 @@ const ProviderPatientsPage = () => {
         key: "demo3",
         name: "Marcus Chen",
         dob: "02/03/1972",
-        last: "3 weeks ago",
+        last: "3 tuần trước",
         status: "Routine",
         phone: "(555) 010-2030",
       },
@@ -480,9 +489,6 @@ const ProviderPatientsPage = () => {
         latestVitals.respiratory_rate != null
           ? { label: "Nhịp thở", value: `${latestVitals.respiratory_rate} l/ph` }
           : null,
-        latestVitals.bmi != null
-          ? { label: "BMI", value: `${latestVitals.bmi}` }
-          : null,
       ].filter(Boolean) as { label: string; value: string }[]
     : [
         { label: "Huyết áp", value: "—" },
@@ -514,7 +520,7 @@ const ProviderPatientsPage = () => {
   return (
     <>
       {isListBusy ? (
-        <p className="text-sm text-muted-foreground">Loading patient profiles…</p>
+        <p className="text-sm text-muted-foreground">Đang tải danh sách bệnh nhân…</p>
       ) : null}
       {isError ? (
         <div
@@ -523,7 +529,7 @@ const ProviderPatientsPage = () => {
         >
           <p className="font-medium">
             {(error as { message?: string })?.message ??
-              "Could not load patient data. Check Supabase table and RLS."}
+              "Không thể tải dữ liệu bệnh nhân. Kiểm tra bảng Supabase và RLS."}
           </p>
           <p className="mt-2 text-xs font-normal leading-relaxed text-destructive/90">
             Bác sĩ cần policy <code className="rounded bg-destructive/15 px-1 py-0.5 font-mono text-[11px]">patient_select_doctor</code>.
@@ -535,9 +541,9 @@ const ProviderPatientsPage = () => {
       <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
         <section className="rounded-xl border bg-card p-4">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Patient Panel</h2>
+            <h2 className="text-xl font-semibold">Danh sách bệnh nhân</h2>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {(patientSummaries.length || demoPatients.length)} Active
+              {(patientSummaries.length || demoPatients.length)} đang hoạt động
             </span>
           </div>
           <div className="space-y-3">
@@ -555,16 +561,16 @@ const ProviderPatientsPage = () => {
                       <div>
                         <p className="text-sm font-semibold">{row.full_name ?? "Patient"}</p>
                         <p className="text-xs text-muted-foreground">
-                          DOB: {formatDob(row.date_of_birth, "—")}
+                          Ngày sinh: {formatDob(row.date_of_birth, "—")}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Last visit: {row.last_visit_label ?? "—"}
+                          Lần khám: {row.last_visit_label ?? "—"}
                         </p>
                       </div>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(row.status)}`}
                       >
-                        {row.status ?? "Active"}
+                        {translateStatus(row.status ?? "Active")}
                       </span>
                     </div>
                   </button>
@@ -583,13 +589,13 @@ const ProviderPatientsPage = () => {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold">{patient.name}</p>
-                          <p className="text-xs text-muted-foreground">DOB: {patient.dob}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Last visit: {patient.last}</p>
+                          <p className="text-xs text-muted-foreground">Ngày sinh: {patient.dob}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Lần khám: {patient.last}</p>
                         </div>
                         <span
                           className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(patient.status)}`}
                         >
-                          {patient.status}
+                          {translateStatus(patient.status)}
                         </span>
                       </div>
                     </button>
@@ -606,7 +612,7 @@ const ProviderPatientsPage = () => {
 
         <section className="space-y-6">
           {isDetailBusy ? (
-            <p className="text-sm text-muted-foreground">Loading patient detail…</p>
+            <p className="text-sm text-muted-foreground">Đang tải hồ sơ bệnh nhân…</p>
           ) : null}
 
           <div className="rounded-2xl bg-gradient-to-r from-primary to-pink-400 p-5 text-primary-foreground">
@@ -627,16 +633,16 @@ const ProviderPatientsPage = () => {
                 className="min-h-11 rounded-lg bg-card px-5 text-sm font-semibold text-primary hover:bg-card/90"
                 onClick={() => setEditProfileOpen(true)}
               >
-                Edit Profile
+                Chỉnh sửa hồ sơ
               </button>
             </div>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-card/20 px-3 py-1">Blood: O+</span>
+              <span className="rounded-full bg-card/20 px-3 py-1">Nhóm máu: O+</span>
               {latestVitals?.height_cm != null && (
-                <span className="rounded-full bg-card/20 px-3 py-1">Height: {latestVitals.height_cm}cm</span>
+                <span className="rounded-full bg-card/20 px-3 py-1">Chiều cao: {latestVitals.height_cm}cm</span>
               )}
               {latestVitals?.weight_kg != null && (
-                <span className="rounded-full bg-card/20 px-3 py-1">Weight: {latestVitals.weight_kg}kg</span>
+                <span className="rounded-full bg-card/20 px-3 py-1">Cân nặng: {latestVitals.weight_kg}kg</span>
               )}
               {(patientDetail?.email_address ?? draftPersonal.email) ? (
                 <span className="rounded-full bg-card/20 px-3 py-1">
@@ -673,7 +679,7 @@ const ProviderPatientsPage = () => {
                 <>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <article className="rounded-lg border bg-background p-3">
-                      <h3 className="text-sm font-semibold">Past Diagnoses</h3>
+                      <h3 className="text-sm font-semibold">Chẩn đoán trước đây</h3>
                       <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                         {diagnoses.map((item) => (
                           <li key={item}>• {item}</li>
@@ -681,7 +687,7 @@ const ProviderPatientsPage = () => {
                       </ul>
                     </article>
                     <article className="rounded-lg border bg-background p-3">
-                      <h3 className="text-sm font-semibold">Medication</h3>
+                      <h3 className="text-sm font-semibold">Thuốc đang dùng</h3>
                       <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                         {medications.map((item) => (
                           <li key={item}>• {item}</li>
@@ -689,7 +695,7 @@ const ProviderPatientsPage = () => {
                       </ul>
                     </article>
                     <article className="rounded-lg border bg-background p-3">
-                      <h3 className="text-sm font-semibold">Allergies</h3>
+                      <h3 className="text-sm font-semibold">Dị ứng</h3>
                       <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                         {allergies.map((item) => (
                           <li key={item}>• {item}</li>
@@ -699,7 +705,7 @@ const ProviderPatientsPage = () => {
                   </div>
 
                   <div className="mt-4 rounded-lg border bg-background p-4">
-                    <h3 className="mb-2 text-lg font-semibold">Clinical Note</h3>
+                    <h3 className="mb-2 text-lg font-semibold">Ghi chú lâm sàng</h3>
                     <p className="mb-2 text-xs text-muted-foreground">
                       Ghi chú lưu trong phiên trình duyệt (sessionStorage), không ghi vào bảng patient.
                     </p>
@@ -707,7 +713,7 @@ const ProviderPatientsPage = () => {
                       value={noteDraft}
                       onChange={(e) => setNoteDraft(e.target.value)}
                       className="min-h-28 w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                      placeholder="Document patient reported symptoms and observations..."
+                      placeholder="Ghi lại triệu chứng và quan sát của bệnh nhân..."
                     />
                     <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                       <button
@@ -718,14 +724,14 @@ const ProviderPatientsPage = () => {
                           writeNote(activeNoteKey, "");
                         }}
                       >
-                        Discard
+                        Hủy
                       </button>
                       <button
                         type="button"
                         className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
                         onClick={handleSaveNote}
                       >
-                        Save Record
+                        Lưu ghi chú
                       </button>
                     </div>
                   </div>
@@ -762,7 +768,7 @@ const ProviderPatientsPage = () => {
                 {latestVitals?.is_critical && (
                   <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-destructive/10 px-2 py-1.5 text-xs font-semibold text-destructive">
                     <Activity className="h-3.5 w-3.5" />
-                    CRITICAL
+                    NGHIÊM TRỌNG
                   </div>
                 )}
                 {vitals.length === 0 ? (
@@ -788,7 +794,7 @@ const ProviderPatientsPage = () => {
               </div>
 
               <div className="rounded-xl border bg-card p-4">
-                <h3 className="mb-3 text-sm font-semibold">Recent Labs</h3>
+                <h3 className="mb-3 text-sm font-semibold">Xét nghiệm gần đây</h3>
                 <div className="space-y-2 text-sm">
                   {recentLabs.map((lab) => (
                     <p key={`${lab.name}-${lab.date}`} className="rounded-lg bg-muted px-3 py-2">
@@ -799,7 +805,7 @@ const ProviderPatientsPage = () => {
               </div>
 
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Emergency Contact</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">Liên hệ khẩn cấp</h3>
                 <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
                   <Siren className="h-4 w-4 text-primary" aria-hidden="true" />
                   {emergencyName}
@@ -817,7 +823,7 @@ const ProviderPatientsPage = () => {
           className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm hover:bg-muted"
         >
           <Stethoscope className="mr-2 h-4 w-4" aria-hidden="true" />
-          Update from Onboarding Data
+          Cập nhật từ dữ liệu đăng ký
         </Link>
       </div>
 
@@ -876,7 +882,6 @@ const ProviderPatientsPage = () => {
                     <th className="py-2 text-right font-medium">Nhịp thở</th>
                     <th className="py-2 text-right font-medium">Cao (cm)</th>
                     <th className="py-2 text-right font-medium">Nặng (kg)</th>
-                    <th className="py-2 text-right font-medium">BMI</th>
                     <th className="py-2" />
                   </tr>
                 </thead>
@@ -885,7 +890,7 @@ const ProviderPatientsPage = () => {
                     <tr key={v.id} className={`border-b last:border-0 ${v.is_critical ? "bg-destructive/5" : ""}`}>
                       <td className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(v.recorded_at).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
-                        {v.is_critical && <span className="ml-1 text-[10px] font-bold text-destructive">CRITICAL</span>}
+                        {v.is_critical && <span className="ml-1 text-[10px] font-bold text-destructive">NGHIÊM TRỌNG</span>}
                       </td>
                       <td className="py-2 text-right font-mono">
                         {v.bp_systolic != null && v.bp_diastolic != null ? `${v.bp_systolic}/${v.bp_diastolic}` : "—"}
@@ -896,7 +901,6 @@ const ProviderPatientsPage = () => {
                       <td className="py-2 text-right font-mono">{v.respiratory_rate ?? "—"}</td>
                       <td className="py-2 text-right font-mono">{v.height_cm ?? "—"}</td>
                       <td className="py-2 text-right font-mono">{v.weight_kg ?? "—"}</td>
-                      <td className="py-2 text-right font-mono">{v.bmi ?? "—"}</td>
                       <td className="py-2 pl-2">
                         <button
                           type="button"

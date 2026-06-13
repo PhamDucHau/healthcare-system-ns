@@ -1,13 +1,10 @@
-import { Home, User, MessageSquare, FlaskConical, Calendar, HelpCircle } from "lucide-react";
+import { Home, User, Calendar } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 const menuItems = [
-  { icon: Home, label: "Home", path: "/home" },
-  { icon: User, label: "Account", path: "/account" },
-  { icon: MessageSquare, label: "Messages", path: "/messages" },
-  { icon: FlaskConical, label: "Labs", path: "/labs" },
-  { icon: Calendar, label: "Appointments", path: "/appointments" },
-  { icon: HelpCircle, label: "Support", path: "/support" },
+  { icon: Home, label: "Trang chủ", path: "/home" },
+  { icon: User, label: "Tài khoản", path: "/account" },
+  { icon: Calendar, label: "Lịch hẹn", path: "/appointments" },
 ];
 
 const Sidebar = () => {
@@ -20,17 +17,10 @@ const Sidebar = () => {
           <User className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-foreground">Welcome back</p>
-          <p className="text-xs text-muted-foreground">Secure Health Portal</p>
+          <p className="text-sm font-semibold text-foreground">Chào mừng trở lại</p>
+          <p className="text-xs text-muted-foreground">Cổng thông tin sức khỏe</p>
         </div>
       </div>
-
-      <Link
-        to="/onboarding/personal"
-        className="mb-4 flex min-h-11 w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-      >
-        Complete Onboarding
-      </Link>
 
       <nav className="flex flex-col gap-1">
         {menuItems.map(({ icon: Icon, label, path }) => {

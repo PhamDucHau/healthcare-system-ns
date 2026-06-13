@@ -63,6 +63,7 @@ type ContextValue = {
   unreadCount: number;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  clearAll: () => void;
 };
 
 const Ctx = createContext<ContextValue | null>(null);
@@ -120,10 +121,12 @@ export function DoctorNotificationsProvider({ children }: { children: React.Reac
     await supabase.from("notifications").update({ read: true }).in("id", ids);
   }, [notifications]);
 
+  const clearAll = useCallback(() => setNotifications([]), []);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <Ctx.Provider value={{ notifications, loading, unreadCount, markAsRead, markAllAsRead }}>
+    <Ctx.Provider value={{ notifications, loading, unreadCount, markAsRead, markAllAsRead, clearAll }}>
       {children}
     </Ctx.Provider>
   );

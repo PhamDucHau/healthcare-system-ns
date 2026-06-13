@@ -9,6 +9,7 @@ type Props = {
   onMarkAllAsRead: () => void;
   onMarkAsRead: (id: string) => void;
   onClearAll: () => void;
+  appointmentsPath?: string;
 };
 
 function formatTime(n: AppointmentNotification): string {
@@ -36,6 +37,7 @@ export default function NotificationPanel({
   onMarkAllAsRead,
   onMarkAsRead,
   onClearAll,
+  appointmentsPath = "/admin/appointments",
 }: Props) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -59,7 +61,7 @@ export default function NotificationPanel({
   const handleClickNotification = (n: AppointmentNotification) => {
     onMarkAsRead(n.id);
     setOpen(false);
-    navigate("/admin/appointments");
+    navigate(appointmentsPath);
   };
 
   return (
@@ -160,7 +162,7 @@ export default function NotificationPanel({
             <div className="border-t px-4 py-2">
               <button
                 type="button"
-                onClick={() => { setOpen(false); navigate("/admin/appointments"); }}
+                onClick={() => { setOpen(false); navigate(appointmentsPath); }}
                 className="w-full text-center text-xs font-medium text-primary hover:underline py-1"
               >
                 Xem tất cả lịch hẹn →

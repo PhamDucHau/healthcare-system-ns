@@ -131,13 +131,13 @@ const AdminLayout = () => {
               onMarkAsRead={markAsRead}
               onClearAll={clearAll}
             />
-            <button type="button" className="p-2 rounded-lg hover:bg-muted">
+            {/* <button type="button" className="p-2 rounded-lg hover:bg-muted">
               <HelpCircle className="h-5 w-5 text-muted-foreground" />
-            </button>
+            </button> */}
             <div className="flex items-center gap-2">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-foreground">Admin User</p>
-                <p className="text-xs text-muted-foreground">Security Lead</p>
+                <p className="text-sm font-semibold text-foreground">Quản trị viên</p>
+                {/* <p className="text-xs text-muted-foreground">Security Lead</p> */}
               </div>
               <div className="h-9 w-9 rounded-full bg-foreground flex items-center justify-center">
                 <User className="h-4 w-4 text-background" />

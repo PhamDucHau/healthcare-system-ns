@@ -68,7 +68,7 @@ export default function AdminAppointmentsContent() {
   const today = new Date();
 
   const [currentDate, setCurrentDate] = useState<Date>(today);
-  const [viewMode, setViewMode] = useState<"today" | "week" | "month">("today");
+  const [viewMode, setViewMode] = useState<"all" | "today" | "week" | "month">("all");
   const [specialtyFilter, setSpecialtyFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
   const [doctorFilter, setDoctorFilter] = useState<string>("__all__");
@@ -153,26 +153,30 @@ export default function AdminAppointmentsContent() {
           <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-0.5">
             Staff Dashboard
           </p>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="text-3xl font-bold text-foreground">
-              {format(currentDate, "dd/MM/yyyy")}
-            </h1>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate(1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5 capitalize">
-            {format(currentDate, "EEEE", { locale: vi })}
-          </p>
+          {viewMode !== "all" && (
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate(-1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="text-3xl font-bold text-foreground">
+                {format(currentDate, "dd/MM/yyyy")}
+              </h1>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate(1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {viewMode !== "all" && (
+            <p className="text-sm text-muted-foreground mt-0.5 capitalize">
+              {format(currentDate, "EEEE", { locale: vi })}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* View mode */}
           <div className="flex rounded-lg border overflow-hidden text-sm">
-            {(["today", "week", "month"] as const).map((m) => (
+            {(["all", "today", "week", "month"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -183,7 +187,7 @@ export default function AdminAppointmentsContent() {
                     : "bg-background text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {m === "today" ? "Hôm nay" : m === "week" ? "Tuần" : "Tháng"}
+                {m === "all" ? "Tất cả" : m === "today" ? "Hôm nay" : m === "week" ? "Tuần" : "Tháng"}
               </button>
             ))}
           </div>

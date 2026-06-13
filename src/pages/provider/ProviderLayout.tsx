@@ -1,28 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  Bell,
   Calendar,
-  ClipboardList,
   FileUser,
-  Heart,
   LayoutDashboard,
   LogOut,
-  Settings,
-  SquareChartGantt,
   Users,
 } from "lucide-react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { toast } from "sonner";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { useDoctorNotifications } from "@/hooks/DoctorNotificationsContext";
+import NotificationPanel from "@/components/admin/NotificationPanel";
+import type { AppointmentNotification } from "@/hooks/useAdminNotifications";
 
 const NAV_ITEMS = [
-  { path: "/provider-portal/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/provider-portal/patient-records", icon: FileUser, label: "Hồ sơ BN" },
-  { path: "/provider-portal/patients", icon: Users, label: "Patients" },
-  { path: "/provider-portal/appointments", icon: Calendar, label: "Appointments" },
-  { path: "/provider-portal/tasks", icon: ClipboardList, label: "Clinical Tasks" },
-  { path: "/provider-portal/analytics", icon: SquareChartGantt, label: "Analytics" },
+  { path: "/provider-portal/dashboard", icon: LayoutDashboard, label: "Bảng tổng quan" },
+  { path: "/provider-portal/patient-records", icon: FileUser, label: "Hồ sơ bệnh nhân" },
+  { path: "/provider-portal/patients", icon: Users, label: "Bệnh nhân" },
+  { path: "/provider-portal/appointments", icon: Calendar, label: "Lịch hẹn" },
 ] as const;
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -32,8 +27,23 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 const ProviderLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const navigate = useNavigate();
-  const { unreadCount, markAllAsRead } = useDoctorNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useDoctorNotifications();
+
+  const mappedNotifications = useMemo<AppointmentNotification[]>(
+    () =>
+      notifications.map((n) => ({
+        id: n.id,
+        appointmentId: n.appointmentId ?? "",
+        patientName: n.patientName,
+        specialtyName: n.specialtyName,
+        slotDate: n.slotDate,
+        startTime: n.slotTime,
+        walkIn: n.walkIn,
+        createdAt: n.createdAt,
+        read: n.read,
+      })),
+    [notifications],
+  );
 
   const handleLogout = () => {
     setIsLoggingOut(true);
@@ -54,9 +64,13 @@ const ProviderLayout = () => {
 
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[250px_1fr]">
         <aside className="border-r bg-card p-4">
-          <div className="mb-8">
-            <h1 className="text-xl font-semibold text-foreground">Provider Portal</h1>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Clinical Excellence</p>
+          <div className="mb-4 flex flex-col items-center">
+            <img
+              src="/bac-si-nam-chibi.png"
+              alt="Bác sĩ"
+              className="h-40 w-auto object-contain"
+            />
+            {/* <h1 className="text-base font-semibold text-foreground mt-1">Bác sĩ</h1> */}
           </div>
 
           <nav className="space-y-1">
@@ -73,23 +87,7 @@ const ProviderLayout = () => {
             ))}
           </nav>
 
-          <button
-            type="button"
-            className="mt-8 min-h-11 w-full rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-            onClick={() => toast.warning("Emergency alert — tích hợp sau")}
-          >
-            Emergency Alert
-          </button>
-
           <div className="mt-10 space-y-2 border-t pt-4">
-            <button
-              type="button"
-              className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={() => toast.info("Support — liên hệ IT")}
-            >
-              <Heart className="h-4 w-4" aria-hidden="true" />
-              Support
-            </button>
             <button
               type="button"
               disabled={isLoggingOut}
@@ -97,7 +95,7 @@ const ProviderLayout = () => {
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
-              {isLoggingOut ? "Logging out…" : "Log out"}
+              {isLoggingOut ? "Đang đăng xuất…" : "Đăng xuất"}
             </button>
           </div>
         </aside>
@@ -106,42 +104,22 @@ const ProviderLayout = () => {
           <header className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
             <input
               type="search"
-              aria-label="Search patients, records, or labs"
-              placeholder="Search patients, records, or labs..."
+              aria-label="Tìm kiếm bệnh nhân, hồ sơ hoặc xét nghiệm"
+              placeholder="Tìm kiếm bệnh nhân, hồ sơ hoặc xét nghiệm..."
               className="h-11 min-w-[250px] flex-1 rounded-lg border bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             />
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label={`Thông báo${unreadCount > 0 ? ` (${unreadCount} chưa đọc)` : ""}`}
-                className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border hover:bg-muted"
-                onClick={() => { void markAllAsRead(); void navigate("/provider-portal/appointments"); }}
-              >
-                <Bell className="h-4 w-4" aria-hidden="true" />
-                {unreadCount > 0 && (
-                  <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                aria-label="Settings"
-                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border hover:bg-muted"
-                onClick={() => toast.info("Settings — đang phát triển")}
-              >
-                <Settings className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-                onClick={() => toast.info("New Consultation — đang phát triển")}
-              >
-                New Consultation
-              </button>
+              <NotificationPanel
+                notifications={mappedNotifications}
+                unreadCount={unreadCount}
+                onMarkAllAsRead={() => { void markAllAsRead(); }}
+                onMarkAsRead={(id) => { void markAsRead(id); }}
+                onClearAll={clearAll}
+                appointmentsPath="/provider-portal/appointments"
+              />
               <div className="rounded-lg border px-3 py-2">
                 <p className="text-sm font-semibold">Dr. Sarah Chen</p>
-                <p className="text-xs text-muted-foreground">Internal Medicine</p>
+                {/* <p className="text-xs text-muted-foreground">Internal Medicine</p> */}
               </div>
             </div>
           </header>

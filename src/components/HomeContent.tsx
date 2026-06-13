@@ -2,18 +2,18 @@ import { User, Calendar, FlaskConical, MessageSquare, Pill, ClipboardCheck, Hear
 import { Link } from "react-router-dom";
 
 const dashboardItems = [
-  { icon: User, title: "Account", subtitle: "Profile & Security", path: "/account", iconBg: "bg-accent", iconColor: "text-primary" },
-  { icon: Calendar, title: "Appointments", subtitle: "View your schedule", path: "/appointments", iconBg: "bg-accent", iconColor: "text-primary" },
-  { icon: ClipboardCheck, title: "Assessments", subtitle: "Health check-ins", path: "/", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
-  { icon: FlaskConical, title: "Labs", subtitle: "Test results & data", path: "/labs", iconBg: "bg-accent", iconColor: "text-primary" },
-  { icon: Pill, title: "Rx", subtitle: "Prescriptions & refills", path: "/", iconBg: "bg-primary/10", iconColor: "text-primary" },
-  { icon: MessageSquare, title: "Messages", subtitle: "Direct care team chat", path: "/messages", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
+  { icon: User, title: "Tài khoản", subtitle: "Hồ sơ & Bảo mật", path: "/account", iconBg: "bg-accent", iconColor: "text-primary" },
+  { icon: Calendar, title: "Lịch hẹn", subtitle: "Xem lịch khám", path: "/appointments", iconBg: "bg-accent", iconColor: "text-primary" },
+  { icon: ClipboardCheck, title: "Đánh giá", subtitle: "Kiểm tra sức khỏe", path: "/", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
+  { icon: FlaskConical, title: "Xét nghiệm", subtitle: "Kết quả & dữ liệu", path: "/labs", iconBg: "bg-accent", iconColor: "text-primary" },
+  { icon: Pill, title: "Đơn thuốc", subtitle: "Kê đơn & tái cấp", path: "/", iconBg: "bg-primary/10", iconColor: "text-primary" },
+  { icon: MessageSquare, title: "Tin nhắn", subtitle: "Chat với đội ngũ y tế", path: "/messages", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
 ];
 
 const wellnessStats = [
-  { label: "Activity", value: "12.4k", sub: "Steps today", icon: Activity },
-  { label: "Sleep", value: "7h 42m", sub: "Deep recovery", icon: Moon },
-  { label: "Focus", value: "Optimal", sub: "Vitals baseline", icon: Brain },
+  { label: "Hoạt động", value: "12.4k", sub: "Bước hôm nay", icon: Activity },
+  { label: "Giấc ngủ", value: "7g 42p", sub: "Phục hồi sâu", icon: Moon },
+  { label: "Tập trung", value: "Tốt", sub: "Chỉ số sinh hiệu", icon: Brain },
 ];
 
 const HomeContent = () => {
@@ -23,19 +23,19 @@ const HomeContent = () => {
         {/* Hero */}
         <div className="rounded-2xl bg-gradient-to-r from-accent to-accent/40 p-6 md:p-10 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
-            Good morning, <span className="text-primary">Timmy!</span>
+            Chào buổi sáng, <span className="text-primary">Timmy!</span>
           </h1>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl">
-            Your health sanctuary is updated and ready. Explore your personalized modules or schedule a consultation with our empathetic team.
+            Hồ sơ sức khỏe của bạn đã được cập nhật. Khám phá các tính năng cá nhân hóa hoặc đặt lịch tư vấn với đội ngũ chăm sóc của chúng tôi.
           </p>
         </div>
 
         {/* Health Dashboard */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold text-foreground">Health Dashboard</h2>
+            <h2 className="text-lg font-bold text-foreground">Bảng theo dõi sức khỏe</h2>
             <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-              All systems active
+              Tất cả hệ thống hoạt động
               <span className="h-2 w-2 rounded-full bg-success" />
             </span>
           </div>
@@ -63,19 +63,19 @@ const HomeContent = () => {
         {/* Journey Progress */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           <div>
-            <h2 className="text-lg font-bold text-foreground mb-1">Your Journey Progress</h2>
+            <h2 className="text-lg font-bold text-foreground mb-1">Tiến trình của bạn</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              We track your daily health goals and clinical tasks to ensure you stay on the path to peak wellness.
+              Chúng tôi theo dõi mục tiêu sức khỏe hàng ngày và các nhiệm vụ lâm sàng để giúp bạn luôn trên đà phục hồi tốt nhất.
             </p>
           </div>
           <div className="rounded-xl border bg-card p-6 text-center flex flex-col items-center justify-center">
             <div className="h-14 w-14 rounded-full bg-accent flex items-center justify-center mb-3">
               <Heart className="h-7 w-7 text-primary" />
             </div>
-            <p className="text-sm font-bold text-foreground mb-1">All caught up!</p>
-            <p className="text-xs text-muted-foreground mb-4">You don't have any tasks at the moment</p>
+            <p className="text-sm font-bold text-foreground mb-1">Bạn đã hoàn thành tất cả!</p>
+            <p className="text-xs text-muted-foreground mb-4">Hiện tại không có nhiệm vụ nào</p>
             <button className="rounded-lg border px-5 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors">
-              Review History
+              Xem lịch sử
             </button>
           </div>
         </div>
