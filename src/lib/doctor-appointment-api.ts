@@ -35,15 +35,19 @@ export async function fetchDoctorAppointments(
 
   let rows = (data ?? []) as Record<string, unknown>[];
 
-  // Date filtering on the joined slot_date
+  // Date filtering on slot_date; walk-ins use created_at date as fallback
   if (filters.date) {
     rows = rows.filter((r) => {
-      const d = (r.appointment_slots as Record<string, string> | null)?.slot_date;
-      return d === filters.date;
+      const slotDate = (r.appointment_slots as Record<string, string> | null)?.slot_date;
+      if (slotDate) return slotDate === filters.date;
+      // Walk-in: match on creation date
+      const createdDate = (r.created_at as string | null)?.slice(0, 10);
+      return createdDate === filters.date;
     });
   } else if (filters.dateFrom || filters.dateTo) {
     rows = rows.filter((r) => {
-      const d = (r.appointment_slots as Record<string, string> | null)?.slot_date;
+      const slotDate = (r.appointment_slots as Record<string, string> | null)?.slot_date;
+      const d = slotDate ?? (r.created_at as string | null)?.slice(0, 10);
       if (!d) return false;
       if (filters.dateFrom && d < filters.dateFrom) return false;
       if (filters.dateTo && d > filters.dateTo) return false;

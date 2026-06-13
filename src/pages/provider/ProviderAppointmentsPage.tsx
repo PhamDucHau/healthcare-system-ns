@@ -263,7 +263,9 @@ export default function ProviderAppointmentsPage() {
                       onClick={() => { setSelected(row); setSheetOpen(true); }}
                     >
                       <TableCell className="font-mono text-sm font-semibold">
-                        {row.start_time ? row.start_time.slice(0, 5) : "—"}
+                        {row.start_time
+                          ? row.start_time.slice(0, 5)
+                          : <span className="font-sans text-orange-500 font-bold">Walk-in</span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

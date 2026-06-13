@@ -266,7 +266,6 @@ const AdminRolesContent = () => {
                           onCheckedChange={() => togglePermission(p.id)}
                         />
                         <span>{p.name}</span>
-                        <span className="text-xs text-muted-foreground font-mono">({p.slug})</span>
                       </label>
                     ))}
                   </div>

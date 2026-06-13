@@ -1,13 +1,10 @@
-import { User, Calendar, FlaskConical, MessageSquare, Pill, ClipboardCheck, Heart, Activity, Moon, Brain } from "lucide-react";
+import { User, Calendar, ClipboardCheck, Heart, Activity, Moon, Brain } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const dashboardItems = [
   { icon: User, title: "Tài khoản", subtitle: "Hồ sơ & Bảo mật", path: "/account", iconBg: "bg-accent", iconColor: "text-primary" },
   { icon: Calendar, title: "Lịch hẹn", subtitle: "Xem lịch khám", path: "/appointments", iconBg: "bg-accent", iconColor: "text-primary" },
   { icon: ClipboardCheck, title: "Đánh giá", subtitle: "Kiểm tra sức khỏe", path: "/", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
-  { icon: FlaskConical, title: "Xét nghiệm", subtitle: "Kết quả & dữ liệu", path: "/labs", iconBg: "bg-accent", iconColor: "text-primary" },
-  { icon: Pill, title: "Đơn thuốc", subtitle: "Kê đơn & tái cấp", path: "/", iconBg: "bg-primary/10", iconColor: "text-primary" },
-  { icon: MessageSquare, title: "Tin nhắn", subtitle: "Chat với đội ngũ y tế", path: "/messages", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
 ];
 
 const wellnessStats = [

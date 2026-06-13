@@ -39,12 +39,12 @@ const HealthHistory = () => {
             Bệnh nhân mới? Hoàn thành thông tin cá nhân, giấy tờ và bảo hiểm để đẩy nhanh quá trình khám.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link
+            {/* <Link
               to="/provider-portal/patients"
               className="inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
             >
               Mở menu bác sĩ
-            </Link>
+            </Link> */}
             {hasProfile ? (
               <button
                 type="button"
@@ -59,7 +59,7 @@ const HealthHistory = () => {
                 to="/onboarding/personal"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
               >
-                Hoàn thành đăng ký
+                Tạo hồ sơ bệnh án
               </Link>
             )}
           </div>
