@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
-  Calendar, Plus, Loader2, QrCode, XCircle, ChevronRight, Stethoscope,
+  Calendar, Plus, Loader2, QrCode, XCircle, ChevronRight, Stethoscope, ClipboardList,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -153,6 +153,7 @@ function UpcomingCard({
   cancelling: boolean;
   onCancel: () => void;
 }) {
+  const navigate = useNavigate();
   const dateLabel = apt.slot_date
     ? format(parseISO(apt.slot_date), 'EEEE, dd/MM/yyyy', { locale: vi })
     : '—';
@@ -192,18 +193,30 @@ function UpcomingCard({
 
       {/* Actions */}
       {apt.status === 'CONFIRMED' && (
-        <button
-          onClick={onCancel}
-          disabled={cancelling}
-          className="flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
-        >
-          {cancelling ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <XCircle className="h-3.5 w-3.5" />
-          )}
-          Hủy lịch
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Pre-consultation button */}
+          <button
+            onClick={() => navigate(`/appointments/${apt.id}/pre-consultation`)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            Khai báo trước khám
+          </button>
+
+          {/* Cancel button */}
+          <button
+            onClick={onCancel}
+            disabled={cancelling}
+            className="flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+          >
+            {cancelling ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5" />
+            )}
+            Hủy lịch
+          </button>
+        </div>
       )}
     </div>
   );

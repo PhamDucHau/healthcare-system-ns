@@ -9,6 +9,7 @@ import Index from "./pages/Index.tsx";
 import Labs from "./pages/Labs.tsx";
 import Appointments from "./pages/Appointments.tsx";
 import BookAppointment from "./pages/BookAppointment.tsx";
+import PreConsultation from "./pages/PreConsultation.tsx";
 import Support from "./pages/Support.tsx";
 import Messages from "./pages/Messages.tsx";
 import Login, { AdminLogin, DoctorLogin, PatientLogin } from "./pages/Login.tsx";
@@ -88,6 +89,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPortal="patient">
                   <BookAppointment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/appointments/:appointmentId/pre-consultation"
+              element={
+                <ProtectedRoute requiredPortal="patient">
+                  <PreConsultation />
                 </ProtectedRoute>
               }
             />
