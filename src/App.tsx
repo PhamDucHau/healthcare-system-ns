@@ -36,6 +36,9 @@ import ProviderPatientsPage from "./pages/provider/ProviderPatientsPage";
 import ProviderSectionPlaceholder from "./pages/provider/ProviderSectionPlaceholder";
 import ProviderAppointmentsPage from "./pages/provider/ProviderAppointmentsPage";
 import { DoctorNotificationsProvider } from "./hooks/DoctorNotificationsContext";
+import ClinicalLogicLayout from "./pages/admin/clinical-logic/ClinicalLogicLayout.tsx";
+import QuestionLibraryPage from "./pages/admin/clinical-logic/QuestionLibraryPage.tsx";
+import QuestionnaireBuilderPage from "./pages/admin/clinical-logic/QuestionnaireBuilderPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -172,6 +175,23 @@ const App = () => (
               <Route path="tasks" element={<AdminSectionPlaceholder title="Clinical Tasks" />} />
               <Route path="logs" element={<AdminSectionPlaceholder title="System Logs" />} />
               <Route path="settings" element={<AdminSectionPlaceholder title="Settings" />} />
+            </Route>
+            <Route
+              path="/admin/clinical-logic"
+              element={
+                <ProtectedRoute requiredPortal="admin">
+                  <ClinicalLogicLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="question-library" replace />} />
+              <Route path="dashboard" element={<AdminSectionPlaceholder title="Dashboard" />} />
+              <Route path="decision-trees" element={<AdminSectionPlaceholder title="Decision Trees" />} />
+              <Route path="question-library" element={<QuestionLibraryPage />} />
+              <Route path="question-library/new" element={<QuestionnaireBuilderPage />} />
+              <Route path="question-library/:id" element={<QuestionnaireBuilderPage />} />
+              <Route path="analytics" element={<AdminSectionPlaceholder title="Analytics" />} />
+              <Route path="staff-access" element={<AdminSectionPlaceholder title="Staff Access" />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

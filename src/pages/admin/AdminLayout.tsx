@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   LayoutGrid, Users, Search, HelpCircle,
-  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays,
+  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays, ClipboardList,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ const sidebarItems = [
   { icon: FileUser,      label: "Hồ sơ bệnh nhân",     path: "/admin/patient-records" },
   { icon: CalendarDays,  label: "Lịch hẹn",     path: "/admin/appointments" },
   { icon: Database,      label: "Danh mục",      path: "/admin/master-data" },
+  { icon: ClipboardList, label: "Bộ câu hỏi lâm sàng", path: "/admin/clinical-logic" },
   { icon: Users,         label: "Người dùng",    path: "/admin/users" },
   { icon: Shield,        label: "Phân quyền",    path: "/admin/roles" },
 ];
