@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .codegraph/
+
+# AI agent tool folders
+.agent/
+.agents/
+.automaker/
+.claude/
+.cursor/
+.kiro/
