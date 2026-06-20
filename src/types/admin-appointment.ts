@@ -31,6 +31,10 @@ export interface AdminAppointment {
   patient_phone: string | null;
   patient_dob: string | null;
   doctor_name: string | null;
+  // FR-022: Pre-consultation indicators
+  pre_consult_status: 'none' | 'draft' | 'submitted';
+  pre_consult_drug_allergy: boolean;
+  pre_consult_severe_pain: boolean;
 }
 
 export interface PatientSearchResult {

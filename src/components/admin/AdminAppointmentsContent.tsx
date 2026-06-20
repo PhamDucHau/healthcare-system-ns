@@ -4,6 +4,7 @@ import { vi } from "date-fns/locale";
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Loader2,
   Search, MoreHorizontal, CheckCircle2, CalendarClock, XCircle, Trash2, Activity,
+  AlertTriangle, ClipboardList,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -432,7 +433,24 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
           {initials}
         </div>
         <div className="min-w-0">
-          <p className="font-medium text-sm truncate">{appt.patient_name || "—"}</p>
+          <p className="font-medium text-sm truncate flex items-center gap-1.5">
+            {appt.patient_name || "—"}
+            {appt.pre_consult_drug_allergy && (
+              <span title="Dị ứng thuốc (khai báo trước khám)">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+              </span>
+            )}
+            {appt.pre_consult_severe_pain && (
+              <span title="Đau dữ dội (khai báo trước khám)">
+                <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+              </span>
+            )}
+            {appt.pre_consult_status === "submitted" && (
+              <span title="Đã khai báo y tế trước khám">
+                <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              </span>
+            )}
+          </p>
           <p className="text-xs text-muted-foreground font-mono">
             #{appt.id.slice(0, 6).toUpperCase()}
             {appt.walk_in && (

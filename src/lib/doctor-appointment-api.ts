@@ -21,7 +21,8 @@ export async function fetchDoctorAppointments(
       appointment_slots ( slot_date, start_time, end_time, doctor_id,
         user_profiles!appointment_slots_doctor_id_fkey ( full_name )
       ),
-      patient ( legal_first_name, legal_last_name, phone_number, date_of_birth )
+      patient ( legal_first_name, legal_last_name, phone_number, date_of_birth ),
+      pre_consultations ( status, flags )
     `)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -73,6 +74,8 @@ export async function fetchDoctorAppointments(
     const pt  = r.patient           as Record<string, string> | null;
     const sp  = r.specialties       as Record<string, string> | null;
     const doc = sl?.user_profiles   as Record<string, string> | null;
+    const pcRaw = r.pre_consultations as Record<string, unknown> | Record<string, unknown>[] | null;
+    const pc = (Array.isArray(pcRaw) ? pcRaw[0] : pcRaw) ?? null;
 
     return {
       id:            r.id as string,
@@ -98,6 +101,9 @@ export async function fetchDoctorAppointments(
       patient_phone: pt?.phone_number  ?? null,
       patient_dob:   pt?.date_of_birth ?? null,
       doctor_name:   doc?.full_name ?? null,
+      pre_consult_status: !pc ? "none" : (pc.status === "SUBMITTED" ? "submitted" : "draft"),
+      pre_consult_drug_allergy: Boolean((pc?.flags as Record<string, unknown> | undefined)?.drug_allergy),
+      pre_consult_severe_pain:  Boolean((pc?.flags as Record<string, unknown> | undefined)?.severe_pain),
     } as AdminAppointment;
   });
 }

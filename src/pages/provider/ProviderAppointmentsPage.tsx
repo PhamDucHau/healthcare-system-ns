@@ -6,8 +6,8 @@ import {
 } from "date-fns";
 import { vi } from "date-fns/locale";
 import {
-  Activity, CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight,
-  Loader2, MoreHorizontal, RefreshCw, Search, Stethoscope,
+  Activity, AlertTriangle, CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight,
+  ClipboardList, Loader2, MoreHorizontal, RefreshCw, Search, Stethoscope,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -273,7 +273,24 @@ export default function ProviderAppointmentsPage() {
                             {avatarInitial(row.patient_name)}
                           </span>
                           <div>
-                            <p className="font-medium text-sm leading-tight">{row.patient_name ?? "—"}</p>
+                            <p className="font-medium text-sm leading-tight flex items-center gap-1.5">
+                              {row.patient_name ?? "—"}
+                              {row.pre_consult_drug_allergy && (
+                                <span title="Dị ứng thuốc (khai báo trước khám)">
+                                  <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                                </span>
+                              )}
+                              {row.pre_consult_severe_pain && (
+                                <span title="Đau dữ dội (khai báo trước khám)">
+                                  <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+                                </span>
+                              )}
+                              {row.pre_consult_status === "submitted" && (
+                                <span title="Đã khai báo y tế trước khám">
+                                  <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                </span>
+                              )}
+                            </p>
                             {row.patient_phone && (
                               <p className="text-xs text-muted-foreground">{row.patient_phone}</p>
                             )}

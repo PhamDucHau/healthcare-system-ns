@@ -18,7 +18,8 @@ export async function fetchAdminAppointments(
       appointment_slots ( slot_date, start_time, end_time, doctor_id,
         user_profiles!appointment_slots_doctor_id_fkey ( full_name )
       ),
-      patient ( legal_first_name, legal_last_name, phone_number, date_of_birth )
+      patient ( legal_first_name, legal_last_name, phone_number, date_of_birth ),
+      pre_consultations ( status, flags )
     `)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -70,6 +71,7 @@ export async function fetchAdminAppointments(
     const pt  = (r.patient          as any) ?? null;
     const sp  = (r.specialties      as any) ?? null;
     const doc = sl?.user_profiles ?? null;
+    const pc  = (Array.isArray(r.pre_consultations) ? r.pre_consultations[0] : r.pre_consultations) ?? null;
 
     return {
       id:            r.id,
@@ -95,6 +97,9 @@ export async function fetchAdminAppointments(
       patient_phone: pt?.phone_number  ?? null,
       patient_dob:   pt?.date_of_birth ?? null,
       doctor_name:   doc?.full_name    ?? null,
+      pre_consult_status: !pc ? "none" : pc.status === "SUBMITTED" ? "submitted" : "draft",
+      pre_consult_drug_allergy: Boolean(pc?.flags?.drug_allergy),
+      pre_consult_severe_pain:  Boolean(pc?.flags?.severe_pain),
     } as AdminAppointment;
   });
 }
