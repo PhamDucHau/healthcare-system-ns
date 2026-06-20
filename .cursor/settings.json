@@ -4,5 +4,10 @@
   "skills_dir": ".cursor/skills",
   "agents_dir": ".cursor/agents",
   "references_dir": ".cursor/references",
-  "note": "Parallels .claude/settings.json. Cursor loads .cursor/rules/*.mdc automatically; other paths are for @ mentions and docs."
+  "note": "Parallels .claude/settings.json. Cursor loads .cursor/rules/*.mdc automatically; other paths are for @ mentions and docs.",
+  "plugins": {
+    "supabase": {
+      "enabled": true
+    }
+  }
 }

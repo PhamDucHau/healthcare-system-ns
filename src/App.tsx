@@ -40,6 +40,8 @@ import { DoctorNotificationsProvider } from "./hooks/DoctorNotificationsContext"
 import ClinicalLogicLayout from "./pages/admin/clinical-logic/ClinicalLogicLayout.tsx";
 import QuestionLibraryPage from "./pages/admin/clinical-logic/QuestionLibraryPage.tsx";
 import QuestionnaireBuilderPage from "./pages/admin/clinical-logic/QuestionnaireBuilderPage.tsx";
+import ExaminationPage from "./pages/provider/ExaminationPage.tsx";
+import ClinicalTasksContent from "./components/provider/ClinicalTasksContent.tsx";
 
 const queryClient = new QueryClient();
 
@@ -143,9 +145,20 @@ const App = () => (
               />
               <Route path="patients" element={<ProviderPatientsPage />} />
               <Route path="appointments" element={<ProviderAppointmentsPage />} />
-              <Route path="tasks" element={<ProviderSectionPlaceholder title="Clinical Tasks" />} />
+              <Route path="tasks" element={<ClinicalTasksContent portal="doctor" />} />
               <Route path="analytics" element={<ProviderSectionPlaceholder title="Analytics" />} />
             </Route>
+            {/* Examination (SOAP editor) — full-screen, outside portal layout */}
+            <Route
+              path="/provider-portal/examination/:appointmentId"
+              element={
+                <ProtectedRoute requiredPortal="doctor">
+                  <DoctorNotificationsProvider>
+                    <ExaminationPage />
+                  </DoctorNotificationsProvider>
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/onboarding"
               element={
@@ -181,7 +194,7 @@ const App = () => (
               <Route path="master-data" element={<MasterDataContent />} />
               <Route path="users" element={<AdminUsersContent />} />
               <Route path="roles" element={<AdminRolesContent />} />
-              <Route path="tasks" element={<AdminSectionPlaceholder title="Clinical Tasks" />} />
+              <Route path="tasks" element={<ClinicalTasksContent portal="admin" />} />
               <Route path="logs" element={<AdminSectionPlaceholder title="System Logs" />} />
               <Route path="settings" element={<AdminSectionPlaceholder title="Settings" />} />
             </Route>

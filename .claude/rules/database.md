@@ -1,4 +1,5 @@
-doc# Database Rules
+
+# Database Rules
 
 ## General Rules
 - **Never** write raw SQL strings directly in business logic

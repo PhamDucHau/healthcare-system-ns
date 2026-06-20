@@ -20,7 +20,7 @@ When unexpected failures occur:
 3. **DIAGNOSE** — Follow the 6-step triage process
 4. **FIX** — Address root cause, not symptoms
 5. **GUARD** — Add tests to prevent recurrence
-6. **RESUME** — Only continue after verification
+6. **RESUME** — Only continue after verification; update `.agent/SESSION.md` with root cause, guard tests, and **Next**
 
 ---
 
@@ -236,6 +236,7 @@ git bisect reset                  # When done
 - Regression test added
 - All tests passing
 - Clear commit message explaining the fix
+- **`.agent/SESSION.md`** updated (Gotchas, Decisions, **Next**)
 
 ## Next Step
 

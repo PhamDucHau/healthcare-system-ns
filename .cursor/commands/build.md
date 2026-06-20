@@ -23,9 +23,10 @@ Implement tasks one at a time using Test-Driven Development. Each increment leav
 #### Step 1: Load Context
 
 ```
-1. Read the task's acceptance criteria
-2. Identify relevant existing code and patterns
-3. Understand types and interfaces involved
+1. Read `.agent/SESSION.md` if present (or run `/resume` at session start)
+2. Read the task's acceptance criteria from `tasks/todo.md`
+3. Identify relevant existing code and patterns
+4. Understand types and interfaces involved
 ```
 
 #### Step 2: RED — Write Failing Test
@@ -86,7 +87,7 @@ git commit -m "feat(tasks): add createTask function"
 
 #### Step 6: Mark Complete
 
-Update `tasks/todo.md`:
+Update `tasks/todo.md` and `.agent/SESSION.md` (**Done**, **In progress**, **Next**):
 ```markdown
 - [x] Task 1.1: Create task endpoint
 ```

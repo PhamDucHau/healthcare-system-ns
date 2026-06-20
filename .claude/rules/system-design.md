@@ -1,3 +1,4 @@
+
 # System Design Rules
 
 > Principles from "System Design Interview" (Alex Xu), "Designing Data-Intensive Applications" (Martin Kleppmann), and industry best practices.

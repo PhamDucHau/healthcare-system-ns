@@ -68,7 +68,9 @@ create trigger questionnaire_questions_set_updated_at
   before update on public.questionnaire_questions
   for each row execute function public.set_updated_at();
 
--- ─── Responses (minimal — backs the RULE-012b "has responses" guard) ─────────
+-- ─── Responses (minimal stub — backs the RULE-012b "has responses" guard) ────
+-- NOTE: Migration 20260620300000_questionnaire_assignments.sql drops this stub
+-- and recreates the table with the full FR-013 schema.
 
 create table if not exists public.questionnaire_responses (
   id               uuid primary key default gen_random_uuid(),

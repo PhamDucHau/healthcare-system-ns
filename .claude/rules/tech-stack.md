@@ -1,3 +1,4 @@
+
 # Technology Stack — Selection & Standards
 
 > This rule defines the **approved tech stack** for all projects. When starting a new project or proposing a new dependency, follow the decision criteria below.
@@ -17,8 +18,9 @@
 | **Backend Framework** | Express.js + Node | Fastify | Hapi, Koa |
 | **API Style** | REST (default) | tRPC (fullstack TS) | GraphQL (unless needed) |
 | **Language** | TypeScript (always) | — | Plain JavaScript |
-| **Database** | PostgreSQL | — | MySQL (prefer PG) |
+| **Database** | PostgreSQL | Supabase (managed Postgres + bundled `supabase` skills) | MySQL (prefer PG) |
 | **ORM** | Prisma | Drizzle | Sequelize, TypeORM |
+| **BaaS (Auth, DB, Storage, Realtime)** | — | Supabase | Firebase |
 | **Cache** | Redis (ioredis) | Upstash Redis | Memcached |
 | **Queue — Simple jobs** | BullMQ (Redis-backed) | — | — |
 | **Queue — Enterprise/Microservices** | RabbitMQ | Kafka (high-throughput streams) | — |

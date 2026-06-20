@@ -336,7 +336,7 @@ export default function ProviderAppointmentsPage() {
                               <DropdownMenuItem
                                 disabled={checkingInId === row.id}
                                 onClick={() => void handleCheckin(row.id).then((ok) =>
-                                  ok && navigate(`/provider-portal/patients?select=${row.profile_id}`)
+                                  ok && navigate(`/provider-portal/examination/${row.id}`)
                                 )}
                               >
                                 {checkingInId === row.id
@@ -347,10 +347,10 @@ export default function ProviderAppointmentsPage() {
                             </>)}
                             {(row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") && (
                               <DropdownMenuItem
-                                onClick={() => navigate(`/provider-portal/patients?select=${row.profile_id}`)}
+                                onClick={() => navigate(`/provider-portal/examination/${row.id}`)}
                               >
                                 <Activity className="mr-2 h-4 w-4 text-blue-500" />
-                                Khám bệnh
+                                Khám bệnh (SOAP)
                               </DropdownMenuItem>
                             )}
                             {canReschedule && (

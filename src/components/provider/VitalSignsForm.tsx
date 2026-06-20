@@ -190,15 +190,29 @@ export default function VitalSignsForm({
   // HA warning banner
   const bpWarnMsg = bpWarning(form.bp_systolic, form.bp_diastolic);
 
-  // Weight/height hard errors (RULE-014a)
-  const weightErr = form.weight_kg !== "" && (parseNum(form.weight_kg) ?? 0) <= 0
-    ? "Cân nặng phải > 0"
+  // Weight/height hard errors (RULE-014a) — also enforce realistic human ranges
+  const weightVal = parseNum(form.weight_kg);
+  const heightVal = parseNum(form.height_cm);
+  const weightErr = form.weight_kg !== ""
+    ? weightVal === null || weightVal <= 0
+      ? "Cân nặng phải > 0"
+      : weightVal < 1 || weightVal > 500
+      ? "Cân nặng không hợp lệ (1–500 kg)"
+      : null
     : null;
-  const heightErr = form.height_cm !== "" && (parseNum(form.height_cm) ?? 0) <= 0
-    ? "Chiều cao phải > 0"
+  const heightErr = form.height_cm !== ""
+    ? heightVal === null || heightVal <= 0
+      ? "Chiều cao phải > 0"
+      : heightVal < 30 || heightVal > 300
+      ? "Chiều cao không hợp lệ (30–300 cm)"
+      : null
     : null;
 
-  const hasBlockingError = Boolean(weightErr || heightErr);
+  // BMI overflow guard: NUMERIC(5,2) max is 999.99
+  const bmiOverflow = bmi !== null && bmi > 999.99;
+  const bmiErr = bmiOverflow ? "BMI không hợp lệ — kiểm tra lại cân nặng và chiều cao" : null;
+
+  const hasBlockingError = Boolean(weightErr || heightErr || bmiErr);
 
   const { mutate: submit, isPending } = useMutation({
     mutationFn: async () => {
@@ -234,6 +248,8 @@ export default function VitalSignsForm({
         toast.error("Cân nặng phải > 0");
       } else if (err.message.includes("INVALID_HEIGHT")) {
         toast.error("Chiều cao phải > 0");
+      } else if (err.message.includes("numeric field overflow") || err.message.includes("22003")) {
+        toast.error("Giá trị vượt quá giới hạn cho phép — kiểm tra lại cân nặng và chiều cao");
       } else {
         toast.error(`Lưu thất bại: ${err.message}`);
       }
@@ -339,7 +355,7 @@ export default function VitalSignsForm({
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium">Cân nặng (kg)</label>
               <input
-                type="number" step="any" value={form.weight_kg} placeholder="—"
+                type="number" step="any" min="1" max="500" value={form.weight_kg} placeholder="—"
                 onChange={(e) => set("weight_kg")(e.target.value)}
                 className={`w-full rounded-xl border-2 px-3 py-3 text-lg font-semibold outline-none transition-colors focus:border-primary/60 ${
                   weightErr ? "border-destructive/60 bg-destructive/5" : "border-border bg-background"
@@ -354,7 +370,7 @@ export default function VitalSignsForm({
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium">Chiều cao (cm)</label>
               <input
-                type="number" step="any" value={form.height_cm} placeholder="—"
+                type="number" step="any" min="30" max="300" value={form.height_cm} placeholder="—"
                 onChange={(e) => set("height_cm")(e.target.value)}
                 className={`w-full rounded-xl border-2 px-3 py-3 text-lg font-semibold outline-none transition-colors focus:border-primary/60 ${
                   heightErr ? "border-destructive/60 bg-destructive/5" : "border-border bg-background"
@@ -368,7 +384,7 @@ export default function VitalSignsForm({
             </div>
           </div>
 
-          {bmi !== null && (
+          {bmi !== null && !bmiOverflow && (
             <div className="flex items-center gap-3 rounded-xl bg-sky-50 border border-sky-200 px-4 py-3">
               <div className="h-9 w-9 rounded-full bg-sky-400 flex items-center justify-center shrink-0">
                 <Scale className="h-4 w-4 text-white" />
@@ -380,6 +396,12 @@ export default function VitalSignsForm({
                 </p>
               </div>
               <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            </div>
+          )}
+          {bmiErr && (
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              {bmiErr}
             </div>
           )}
         </div>

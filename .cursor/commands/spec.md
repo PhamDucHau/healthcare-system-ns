@@ -89,7 +89,8 @@ After discovery, produce `SPEC.md` with these sections:
 
 - `SPEC.md` — The specification document
 - Clear alignment on what to build
+- **`.agent/SESSION.md`** — Initialize or update: set Meta `phase` to `plan`, **Goal**, **Pointers** → spec path, **Next** → run `/plan`
 
 ## Next Step
 
-After spec is approved, run `/plan` to decompose into tasks.
+After spec is approved, run `/plan` to decompose into tasks. Run `/handoff` if ending the session before planning.

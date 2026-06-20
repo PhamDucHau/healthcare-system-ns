@@ -100,6 +100,7 @@ Save to `tasks/` directory:
 
 - `tasks/plan.md` — Full planning document with context
 - `tasks/todo.md` — Actionable task checklist
+- **`.agent/SESSION.md`** — Update Meta `phase` to `build`, **Pointers** → `tasks/todo.md` and spec path, **Next** → first `/build` task
 
 ```markdown
 # TODO: [Feature Name]
