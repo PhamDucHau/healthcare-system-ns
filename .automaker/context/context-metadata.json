@@ -1,7 +1,0 @@
-{
-  "files": {
-    "SRS_Healthcare_System_v3_md.md": {
-      "description": "Healthcare System software requirements specification document defining 25 functional requirements across 10 modules for an AI-integrated clinic management platform, including authentication, patient records, scheduling, electronic medical records, and clinical decision support features."
-    }
-  }
-}
