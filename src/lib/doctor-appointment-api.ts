@@ -22,7 +22,8 @@ export async function fetchDoctorAppointments(
         user_profiles!appointment_slots_doctor_id_fkey ( full_name )
       ),
       patient ( legal_first_name, legal_last_name, phone_number, date_of_birth ),
-      pre_consultations ( status, flags )
+      pre_consultations ( status, flags ),
+      vital_signs ( id )
     `)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -76,6 +77,7 @@ export async function fetchDoctorAppointments(
     const doc = sl?.user_profiles   as Record<string, string> | null;
     const pcRaw = r.pre_consultations as Record<string, unknown> | Record<string, unknown>[] | null;
     const pc = (Array.isArray(pcRaw) ? pcRaw[0] : pcRaw) ?? null;
+    const vitalsRaw = r.vital_signs as unknown[] | null;
 
     return {
       id:            r.id as string,
@@ -104,6 +106,33 @@ export async function fetchDoctorAppointments(
       pre_consult_status: !pc ? "none" : (pc.status === "SUBMITTED" ? "submitted" : "draft"),
       pre_consult_drug_allergy: Boolean((pc?.flags as Record<string, unknown> | undefined)?.drug_allergy),
       pre_consult_severe_pain:  Boolean((pc?.flags as Record<string, unknown> | undefined)?.severe_pain),
+      has_vital_signs: Array.isArray(vitalsRaw) && vitalsRaw.length > 0,
     } as AdminAppointment;
   });
+}
+
+export async function sendPreConsultReminder(
+  appointmentId: string,
+): Promise<{ emailSent: boolean; email?: string; emailError?: string }> {
+  const { data, error: fnErr } = await supabase.functions.invoke(
+    "notify-pre-consult-reminder",
+    { body: { appointment_id: appointmentId } },
+  );
+
+  if (fnErr) {
+    return { emailSent: false, emailError: fnErr.message };
+  }
+
+  const payload = data as Record<string, unknown> | null;
+  if (payload?.error) {
+    return { emailSent: false, emailError: String(payload.error) };
+  }
+  if (payload?.skipped === true) {
+    return { emailSent: false, emailError: "Chưa cấu hình SMTP (SMTP_USER/SMTP_PASS)" };
+  }
+
+  return {
+    emailSent: true,
+    email: payload?.email as string | undefined,
+  };
 }

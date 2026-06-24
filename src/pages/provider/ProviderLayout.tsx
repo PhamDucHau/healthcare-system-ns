@@ -6,7 +6,7 @@ import {
   LogOut,
   Users,
 } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useMatch } from "react-router-dom";
 import { toast } from "sonner";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { useDoctorNotifications } from "@/hooks/DoctorNotificationsContext";
@@ -27,6 +27,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 const ProviderLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isExamination = Boolean(useMatch("/provider-portal/examination/:appointmentId"));
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useDoctorNotifications();
 
   const mappedNotifications = useMemo<AppointmentNotification[]>(
@@ -80,6 +81,12 @@ const ProviderLayout = () => {
                 to={path}
                 className={navLinkClass}
                 end={path === "/provider-portal/dashboard"}
+                isActive={(_, { pathname }) =>
+                  path === "/provider-portal/appointments"
+                    ? pathname.startsWith("/provider-portal/appointments") ||
+                      pathname.startsWith("/provider-portal/examination")
+                    : pathname === path || pathname.startsWith(`${path}/`)
+                }
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
                 {label}
@@ -100,29 +107,38 @@ const ProviderLayout = () => {
           </div>
         </aside>
 
-        <main id="provider-main-content" className="p-4 md:p-6">
-          <header className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
-            <input
-              type="search"
-              aria-label="Tìm kiếm bệnh nhân, hồ sơ hoặc xét nghiệm"
-              placeholder="Tìm kiếm bệnh nhân, hồ sơ hoặc xét nghiệm..."
-              className="h-11 min-w-[250px] flex-1 rounded-lg border bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-            />
-            <div className="flex items-center gap-2">
-              <NotificationPanel
-                notifications={mappedNotifications}
-                unreadCount={unreadCount}
-                onMarkAllAsRead={() => { void markAllAsRead(); }}
-                onMarkAsRead={(id) => { void markAsRead(id); }}
-                onClearAll={clearAll}
-                appointmentsPath="/provider-portal/appointments"
+        <main
+          id="provider-main-content"
+          className={
+            isExamination
+              ? "flex h-screen flex-col overflow-hidden"
+              : "p-4 md:p-6"
+          }
+        >
+          {!isExamination && (
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
+              <input
+                type="search"
+                aria-label="Tìm kiếm bệnh nhân, hồ sơ hoặc xét nghiệm"
+                placeholder="Tìm kiếm bệnh nhân, hồ sơ hoặc xét nghiệm..."
+                className="h-11 min-w-[250px] flex-1 rounded-lg border bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               />
-              <div className="rounded-lg border px-3 py-2">
-                <p className="text-sm font-semibold">Dr. Sarah Chen</p>
-                {/* <p className="text-xs text-muted-foreground">Internal Medicine</p> */}
+              <div className="flex items-center gap-2">
+                <NotificationPanel
+                  notifications={mappedNotifications}
+                  unreadCount={unreadCount}
+                  onMarkAllAsRead={() => { void markAllAsRead(); }}
+                  onMarkAsRead={(id) => { void markAsRead(id); }}
+                  onClearAll={clearAll}
+                  appointmentsPath="/provider-portal/appointments"
+                />
+                <div className="rounded-lg border px-3 py-2">
+                  <p className="text-sm font-semibold">Dr. Sarah Chen</p>
+                  {/* <p className="text-xs text-muted-foreground">Internal Medicine</p> */}
+                </div>
               </div>
-            </div>
-          </header>
+            </header>
+          )}
 
           <Outlet />
         </main>

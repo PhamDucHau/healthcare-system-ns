@@ -109,11 +109,11 @@ export default function MedicalHistoryStep({
       {/* Medical History */}
       <div className="space-y-4">
         <Label className="text-base font-semibold">
-          Tien su benh ly cua ban
+          Tiền sử bệnh lý của bạn
         </Label>
         <p className="text-sm text-muted-foreground">
-          Chon cac benh ma ban da hoac dang mac. Them chi tiet neu co (vd: thoi
-          gian mac, tinh trang hien tai)
+          Chọn các bệnh mà bạn đã hoặc đang mắc. Thêm chi tiết nếu có (vd: thời
+          gian mắc, tình trạng hiện tại)
         </p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -140,7 +140,7 @@ export default function MedicalHistoryStep({
                 </div>
                 {isSelected && (
                   <Input
-                    placeholder="Chi tiet (vd: 2 nam, dang dieu tri)"
+                    placeholder="Chi tiết (vd: 2 năm, đang điều trị)"
                     value={item?.details ?? ''}
                     onChange={(e) =>
                       updateMedicalDetails(value, e.target.value)
@@ -175,7 +175,7 @@ export default function MedicalHistoryStep({
                   </Button>
                 </div>
                 <Input
-                  placeholder="Chi tiet"
+                  placeholder="Chi tiết"
                   value={item.details ?? ''}
                   onChange={(e) =>
                     updateMedicalDetails(item.condition, e.target.value)
@@ -189,7 +189,7 @@ export default function MedicalHistoryStep({
         {/* Add custom condition */}
         <div className="flex gap-2">
           <Input
-            placeholder="Benh khac..."
+            placeholder="Bệnh khác..."
             value={customCondition}
             onChange={(e) => setCustomCondition(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCustomMedicalCondition()}
@@ -206,10 +206,10 @@ export default function MedicalHistoryStep({
 
       {/* Surgical History */}
       <div className="space-y-2">
-        <Label htmlFor="surgical_history">Tien su phau thuat</Label>
+        <Label htmlFor="surgical_history">Tiền sử phẫu thuật</Label>
         <Textarea
           id="surgical_history"
-          placeholder="Vd: Cat ruot thua nam 2020, mo tim nam 2018..."
+          placeholder="Vd: Cắt ruột thừa năm 2020, mổ tim năm 2018..."
           value={formData.surgical_history}
           onChange={(e) => updateField('surgical_history', e.target.value)}
           rows={2}
@@ -220,21 +220,21 @@ export default function MedicalHistoryStep({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label className="text-base font-semibold">
-            Tien su benh ly gia dinh
+            Tiền sử bệnh lý gia đình
           </Label>
           <Button variant="outline" size="sm" onClick={addFamilyHistory}>
             <Plus className="h-4 w-4 mr-1" />
-            Them
+            Thêm
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Ghi lai cac benh ma nguoi than trong gia dinh da mac (cha, me, anh chi
-          em, ong ba)
+          Ghi lại các bệnh mà người thân trong gia đình đã mắc (cha, mẹ, anh chị
+          em, ông bà)
         </p>
 
         {formData.family_history.length === 0 && (
           <p className="text-sm text-muted-foreground italic py-4 text-center border border-dashed rounded-lg">
-            Chua co thong tin. Nhan "Them" de bat dau.
+            Chưa có thông tin. Nhấn &quot;Thêm&quot; để bắt đầu.
           </p>
         )}
 
@@ -244,14 +244,14 @@ export default function MedicalHistoryStep({
               <div className="flex gap-3 items-start">
                 <div className="flex-1 space-y-2">
                   <Input
-                    placeholder="Ten benh (vd: Tim mach, Tieu duong)"
+                    placeholder="Tên bệnh (vd: Tim mạch, Tiểu đường)"
                     value={item.condition}
                     onChange={(e) =>
                       updateFamilyHistory(index, 'condition', e.target.value)
                     }
                   />
                   <Input
-                    placeholder="Moi quan he (vd: Cha, Me, Ong noi)"
+                    placeholder="Mối quan hệ (vd: Cha, Mẹ, Ông nội)"
                     value={item.relation ?? ''}
                     onChange={(e) =>
                       updateFamilyHistory(index, 'relation', e.target.value)

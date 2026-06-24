@@ -1,5 +1,5 @@
 /**
- * FR-022: Allergies Step (Nhom 4: Di ung)
+ * FR-022: Allergies Step (Nhóm 4: Dị ứng)
  */
 
 import { Plus, X, AlertTriangle } from 'lucide-react';
@@ -13,6 +13,7 @@ import type {
   PreConsultationFormData,
   DrugAllergyItem,
   FoodAllergyItem,
+  PreConsultationValidationErrors,
 } from '@/types/pre-consultation';
 
 type Props = {
@@ -22,15 +23,14 @@ type Props = {
     value: PreConsultationFormData[K]
   ) => void;
   updateFields: (updates: Partial<PreConsultationFormData>) => void;
+  validationErrors: PreConsultationValidationErrors;
 };
 
 export default function AllergiesStep({
   formData,
   updateField,
-  updateFields,
+  validationErrors,
 }: Props) {
-  // ─── Drug Allergies ──────────────────────────────────────────────────────────
-
   const addDrugAllergy = () => {
     updateField('drug_allergies', [
       ...formData.drug_allergies,
@@ -55,8 +55,6 @@ export default function AllergiesStep({
       formData.drug_allergies.filter((_, i) => i !== index)
     );
   };
-
-  // ─── Food Allergies ──────────────────────────────────────────────────────────
 
   const addFoodAllergy = () => {
     updateField('food_allergies', [
@@ -87,29 +85,27 @@ export default function AllergiesStep({
 
   return (
     <div className="space-y-8">
-      {/* Important Notice */}
       <Alert className="bg-red-50 border-red-200">
         <AlertTriangle className="h-4 w-4 text-red-600" />
         <AlertDescription className="text-red-800">
-          <strong>Luu y quan trong:</strong> Thong tin di ung thuoc rat quan
-          trong de dam bao an toan khi ke don. Vui long khai bao day du.
+          <strong>Lưu ý quan trọng:</strong> Thông tin dị ứng thuốc rất quan
+          trọng để đảm bảo an toàn khi kê đơn. Vui lòng khai báo đầy đủ.
         </AlertDescription>
       </Alert>
 
-      {/* Drug Allergies */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <Label className="text-base font-semibold flex items-center gap-2">
-              Di ung thuoc
+              Dị ứng thuốc
               {hasDrugAllergies && (
                 <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">
-                  Co di ung
+                  Có dị ứng
                 </span>
               )}
             </Label>
             <p className="text-sm text-muted-foreground mt-1">
-              Liet ke cac loai thuoc ma ban bi di ung va phan ung da xay ra
+              Liệt kê các loại thuốc mà bạn bị dị ứng và phản ứng đã xảy ra
             </p>
           </div>
           <Button
@@ -119,17 +115,17 @@ export default function AllergiesStep({
             className="border-red-200 text-red-700 hover:bg-red-50"
           >
             <Plus className="h-4 w-4 mr-1" />
-            Them
+            Thêm
           </Button>
         </div>
 
         {formData.drug_allergies.length === 0 && (
           <div className="py-6 text-center border border-dashed border-muted-foreground/30 rounded-lg">
             <p className="text-sm text-muted-foreground">
-              Khong co di ung thuoc da biet.
+              Không có dị ứng thuốc đã biết.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Nhan "Them" neu ban co di ung voi bat ky loai thuoc nao.
+              Nhấn &quot;Thêm&quot; nếu bạn có dị ứng với bất kỳ loại thuốc nào.
             </p>
           </div>
         )}
@@ -143,7 +139,7 @@ export default function AllergiesStep({
               <div className="flex gap-3 items-start">
                 <div className="flex-1 space-y-3">
                   <Input
-                    placeholder="Ten thuoc (vd: Penicillin, Aspirin)"
+                    placeholder="Tên thuốc (vd: Penicillin, Aspirin)"
                     value={allergy.drug}
                     onChange={(e) =>
                       updateDrugAllergy(index, 'drug', e.target.value)
@@ -151,7 +147,7 @@ export default function AllergiesStep({
                     className="border-red-200 focus:border-red-400"
                   />
                   <Input
-                    placeholder="Phan ung (vd: Phat ban, Soc phan ve, Kho tho)"
+                    placeholder="Phản ứng (vd: Phát ban, Sốc phản vệ, Khó thở)"
                     value={allergy.reaction}
                     onChange={(e) =>
                       updateDrugAllergy(index, 'reaction', e.target.value)
@@ -171,27 +167,33 @@ export default function AllergiesStep({
             </CardContent>
           </Card>
         ))}
+
+        {validationErrors.drug_allergies && (
+          <p className="text-sm text-red-500 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            {validationErrors.drug_allergies}
+          </p>
+        )}
       </div>
 
-      {/* Food Allergies */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-base font-semibold">Di ung thuc an</Label>
+            <Label className="text-base font-semibold">Dị ứng thực ăn</Label>
             <p className="text-sm text-muted-foreground mt-1">
-              Liet ke cac loai thuc an ma ban bi di ung
+              Liệt kê các loại thực ăn mà bạn bị dị ứng
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={addFoodAllergy}>
             <Plus className="h-4 w-4 mr-1" />
-            Them
+            Thêm
           </Button>
         </div>
 
         {formData.food_allergies.length === 0 && (
           <div className="py-6 text-center border border-dashed border-muted-foreground/30 rounded-lg">
             <p className="text-sm text-muted-foreground">
-              Khong co di ung thuc an da biet.
+              Không có dị ứng thực ăn đã biết.
             </p>
           </div>
         )}
@@ -202,14 +204,14 @@ export default function AllergiesStep({
               <div className="flex gap-3 items-start">
                 <div className="flex-1 space-y-3">
                   <Input
-                    placeholder="Loai thuc an (vd: Hai san, Dau phong, Sua)"
+                    placeholder="Loại thực ăn (vd: Hải sản, Đậu phộng, Sữa)"
                     value={allergy.food}
                     onChange={(e) =>
                       updateFoodAllergy(index, 'food', e.target.value)
                     }
                   />
                   <Input
-                    placeholder="Phan ung (vd: Noi me day, Kho tho, Ngua)"
+                    placeholder="Phản ứng (vd: Nổi mề đay, Khó thở, Ngứa)"
                     value={allergy.reaction}
                     onChange={(e) =>
                       updateFoodAllergy(index, 'reaction', e.target.value)
@@ -227,6 +229,13 @@ export default function AllergiesStep({
             </CardContent>
           </Card>
         ))}
+
+        {validationErrors.food_allergies && (
+          <p className="text-sm text-red-500 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            {validationErrors.food_allergies}
+          </p>
+        )}
       </div>
     </div>
   );

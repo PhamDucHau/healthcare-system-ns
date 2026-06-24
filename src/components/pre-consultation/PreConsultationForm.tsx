@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   CalendarDays,
@@ -154,6 +154,7 @@ export default function PreConsultationForm() {
             formData={form.formData}
             updateField={form.updateField}
             updateFields={form.updateFields}
+            validationErrors={form.validationErrors}
           />
         );
       case 'allergies':
@@ -162,6 +163,7 @@ export default function PreConsultationForm() {
             formData={form.formData}
             updateField={form.updateField}
             updateFields={form.updateFields}
+            validationErrors={form.validationErrors}
           />
         );
       case 'lifestyle':
@@ -169,6 +171,7 @@ export default function PreConsultationForm() {
           <LifestyleStep
             formData={form.formData}
             updateField={form.updateField}
+            validationErrors={form.validationErrors}
           />
         );
       default:
@@ -181,7 +184,7 @@ export default function PreConsultationForm() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-primary mb-2">
-          KHAI BAO Y TE TRUOC KHAM
+          KHAI BÁO Y TẾ TRƯỚC KHÁM
         </h1>
 
         {/* Appointment Info Card */}
@@ -192,21 +195,21 @@ export default function PreConsultationForm() {
                 <CalendarDays className="h-5 w-5 text-primary mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-primary">
-                    Lich: {appointment?.slot_date
+                    Lịch: {appointment?.slot_date
                       ? format(parseISO(appointment.slot_date), 'dd/MM/yyyy', { locale: vi })
                       : ''}{' '}
                     {appointment?.start_time?.slice(0, 5)} - {appointment?.specialty_name}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Vui long hoan thanh to khai de bac si nam ro tinh trang cua ban
-                    truoc khi bat dau buoi kham.
+                    Vui lòng hoàn thành tờ khai để bác sĩ nắm rõ tình trạng của bạn
+                    trước khi bắt đầu buổi khám.
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5">
                 <FileText className="h-4 w-4 text-primary" />
                 <span className="text-xs font-semibold text-primary">
-                  Ho so y te
+                  Hồ sơ y tế
                 </span>
               </div>
             </div>
@@ -218,23 +221,40 @@ export default function PreConsultationForm() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm font-bold text-primary uppercase tracking-wider">
-            Phan {STEP_NUMBERS[form.currentStep]}/5:{' '}
+            Phần {STEP_NUMBERS[form.currentStep]}/5:{' '}
             {STEP_LABELS[form.currentStep]}
           </p>
           <p className="text-sm text-muted-foreground">
-            {Math.round(form.progress)}% Hoan thanh
+            {Math.round(form.progress)}% Hoàn thành
           </p>
         </div>
         <Progress value={form.progress} className="h-2" />
       </div>
 
       {/* Auto-save indicator */}
-      {form.saving && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Dang luu...
-        </div>
-      )}
+      <div className="flex items-center gap-2 text-xs mb-4 min-h-[1.25rem]">
+        {form.draftSaveStatus === 'saving' && (
+          <>
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            <span className="text-muted-foreground">Đang lưu...</span>
+          </>
+        )}
+        {form.draftSaveStatus === 'saved' && form.lastSavedAt && (
+          <>
+            <Check className="h-3 w-3 text-green-600" />
+            <span className="text-green-700 font-medium">Đã lưu thành công</span>
+            <span className="text-muted-foreground">
+              ({formatDistanceToNow(form.lastSavedAt, { locale: vi, addSuffix: true })})
+            </span>
+          </>
+        )}
+        {form.draftSaveStatus === 'error' && (
+          <>
+            <AlertCircle className="h-3 w-3 text-amber-600" />
+            <span className="text-amber-700">Không thể lưu tự động. Vui lòng thử lại.</span>
+          </>
+        )}
+      </div>
 
       {/* Step Content */}
       <Card className="mb-6">
@@ -244,36 +264,43 @@ export default function PreConsultationForm() {
       {/* Navigation Buttons - Fixed at bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={form.saveDraft}
-            disabled={form.saving || form.submitting}
-            className="flex-shrink-0"
-          >
-            {form.saving ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
+          <div className="flex flex-col gap-0.5 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => void form.saveDraft()}
+              disabled={form.saving || form.submitting}
+            >
+              {form.saving ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Lưu nháp
+            </Button>
+            {form.draftSaveStatus === 'saved' && form.lastSavedAt && !form.saving && (
+              <span className="text-[10px] text-green-600 pl-1">Đã lưu tự động</span>
             )}
-            Luu nhap
-          </Button>
+          </div>
 
           <div className="flex-1" />
 
           {form.canGoPrev && (
             <Button
               variant="outline"
-              onClick={form.goToPrevStep}
-              disabled={form.submitting}
+              onClick={() => void form.goToPrevStep()}
+              disabled={form.submitting || form.saving}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
-              Quay lai
+              Quay lại
             </Button>
           )}
 
           {form.canGoNext ? (
-            <Button onClick={form.goToNextStep} disabled={form.submitting}>
-              Tiep tuc
+            <Button
+              onClick={() => void form.goToNextStep()}
+              disabled={form.submitting || form.saving || !form.isCurrentStepValid}
+            >
+              Tiếp tục
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
@@ -284,18 +311,18 @@ export default function PreConsultationForm() {
                   // Successfully submitted, will show success state
                 }
               }}
-              disabled={form.submitting}
+              disabled={form.submitting || !form.isCurrentStepValid}
               className="bg-primary hover:bg-primary/90"
             >
               {form.submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Dang gui...
+                  Đang gửi...
                 </>
               ) : (
                 <>
                   <Check className="h-4 w-4 mr-2" />
-                  Hoan tat
+                  Hoàn tất
                 </>
               )}
             </Button>

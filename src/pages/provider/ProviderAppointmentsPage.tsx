@@ -7,7 +7,7 @@ import {
 import { vi } from "date-fns/locale";
 import {
   Activity, AlertTriangle, CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight,
-  ClipboardList, Loader2, MoreHorizontal, RefreshCw, Search, Stethoscope,
+  ClipboardList, HeartPulse, Loader2, Mail, MoreHorizontal, RefreshCw, Search, Stethoscope,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -22,14 +22,19 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { fetchDoctorAppointments } from "@/lib/doctor-appointment-api";
+import { fetchDoctorAppointments, sendPreConsultReminder } from "@/lib/doctor-appointment-api";
 import { supabase } from "@/lib/supabase";
+import {
+  getAppointmentReadiness,
+  getAppointmentReadinessMessage,
+} from "@/lib/appointment-readiness";
 import { toast } from "sonner";
 import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
 import { ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT, ADMIN_STATUS_COLOR } from "@/types/admin-appointment";
 import AppointmentDetailSheet from "@/components/admin/appointments/AppointmentDetailSheet";
 import CancelDialog from "@/components/admin/appointments/CancelDialog";
 import RescheduleDialog from "@/components/admin/appointments/RescheduleDialog";
+import VitalSignsSheet from "@/components/admin/appointments/VitalSignsSheet";
 
 type DateMode = "all" | "day" | "week" | "month";
 
@@ -98,7 +103,9 @@ export default function ProviderAppointmentsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [vitalSignsAppt, setVitalSignsAppt] = useState<AdminAppointment | null>(null);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const { dateFrom, dateTo, label } = mode === "all"
@@ -124,10 +131,18 @@ export default function ProviderAppointmentsPage() {
 
   const goToday = () => setAnchor(new Date());
 
-  const handleCheckin = async (appointmentId: string): Promise<boolean> => {
-    setCheckingInId(appointmentId);
+  const warnIfNotReady = (row: AdminAppointment): boolean => {
+    const readiness = getAppointmentReadiness(row);
+    if (readiness.isReady) return true;
+    toast.warning(getAppointmentReadinessMessage(readiness), { duration: 7000 });
+    return false;
+  };
+
+  const handleCheckin = async (row: AdminAppointment): Promise<boolean> => {
+    if (!warnIfNotReady(row)) return false;
+    setCheckingInId(row.id);
     try {
-      const { error } = await supabase.rpc("admin_checkin_appointment", { p_appointment_id: appointmentId });
+      const { error } = await supabase.rpc("admin_checkin_appointment", { p_appointment_id: row.id });
       if (error) throw error;
       void refetch();
       return true;
@@ -136,6 +151,42 @@ export default function ProviderAppointmentsPage() {
       return false;
     } finally {
       setCheckingInId(null);
+    }
+  };
+
+  const handleExamination = async (row: AdminAppointment) => {
+    if (!warnIfNotReady(row)) return;
+    if (row.status === "CONFIRMED") {
+      const ok = await handleCheckin(row);
+      if (ok) navigate(`/provider-portal/examination/${row.id}`);
+      return;
+    }
+    navigate(`/provider-portal/examination/${row.id}`);
+  };
+
+  const handleVitalSigns = (row: AdminAppointment) => {
+    if (["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status)) {
+      setVitalSignsAppt(row);
+    }
+  };
+
+  const handlePreConsultReminder = async (row: AdminAppointment) => {
+    if (row.pre_consult_status === "submitted") {
+      toast.info("Bệnh nhân đã hoàn thành khai báo trước khám.");
+      return;
+    }
+    setRemindingId(row.id);
+    try {
+      const { emailSent, email, emailError } = await sendPreConsultReminder(row.id);
+      if (emailSent) {
+        toast.success(`Đã gửi email nhắc nhở${email ? ` tới ${email}` : ""}.`);
+      } else {
+        toast.error(emailError ?? "Không gửi được email nhắc nhở.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không gửi được email nhắc nhở.");
+    } finally {
+      setRemindingId(null);
     }
   };
 
@@ -246,6 +297,7 @@ export default function ProviderAppointmentsPage() {
                 <TableRow>
                   <TableHead>Giờ</TableHead>
                   <TableHead>Bệnh nhân</TableHead>
+                  <TableHead>Bác sĩ</TableHead>
                   <TableHead>Chuyên khoa</TableHead>
                   <TableHead>Ngày khám</TableHead>
                   <TableHead>Trạng thái</TableHead>
@@ -256,6 +308,10 @@ export default function ProviderAppointmentsPage() {
                 {filtered.map((row) => {
                   const canCancel = !["CANCELLED", "COMPLETED"].includes(row.status);
                   const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(row.status) && !row.walk_in;
+                  const canVitalSigns = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
+                  const canRemindPreConsult =
+                    row.pre_consult_status !== "submitted" &&
+                    ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
                   return (
                     <TableRow
                       key={row.id}
@@ -297,6 +353,11 @@ export default function ProviderAppointmentsPage() {
                           </div>
                         </div>
                       </TableCell>
+                      <TableCell className="text-sm">
+                        {row.doctor_name
+                          ? `Bs. ${row.doctor_name}`
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell>
                         {row.specialty_name ? (
                           <Badge variant="outline" className="text-xs">
@@ -326,7 +387,7 @@ export default function ProviderAppointmentsPage() {
                             {row.status === "CONFIRMED" && (<>
                               <DropdownMenuItem
                                 disabled={checkingInId === row.id}
-                                onClick={() => void handleCheckin(row.id)}
+                                onClick={() => void handleCheckin(row)}
                               >
                                 {checkingInId === row.id
                                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -335,9 +396,7 @@ export default function ProviderAppointmentsPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={checkingInId === row.id}
-                                onClick={() => void handleCheckin(row.id).then((ok) =>
-                                  ok && navigate(`/provider-portal/examination/${row.id}`)
-                                )}
+                                onClick={() => void handleExamination(row)}
                               >
                                 {checkingInId === row.id
                                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -346,11 +405,26 @@ export default function ProviderAppointmentsPage() {
                               </DropdownMenuItem>
                             </>)}
                             {(row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") && (
-                              <DropdownMenuItem
-                                onClick={() => navigate(`/provider-portal/examination/${row.id}`)}
-                              >
-                                <Activity className="mr-2 h-4 w-4 text-blue-500" />
+                              <DropdownMenuItem onClick={() => void handleExamination(row)}>
+                                <Stethoscope className="mr-2 h-4 w-4 text-primary" />
                                 Khám bệnh (SOAP)
+                              </DropdownMenuItem>
+                            )}
+                            {canVitalSigns && (
+                              <DropdownMenuItem onClick={() => handleVitalSigns(row)}>
+                                <HeartPulse className="mr-2 h-4 w-4 text-teal-600" />
+                                Nhập sinh hiệu
+                              </DropdownMenuItem>
+                            )}
+                            {canRemindPreConsult && (
+                              <DropdownMenuItem
+                                disabled={remindingId === row.id}
+                                onClick={() => void handlePreConsultReminder(row)}
+                              >
+                                {remindingId === row.id
+                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  : <Mail className="mr-2 h-4 w-4 text-pink-600" />}
+                                Nhắc nhở khai báo
                               </DropdownMenuItem>
                             )}
                             {canReschedule && (
@@ -404,6 +478,11 @@ export default function ProviderAppointmentsPage() {
           onSuccess={() => { setRescheduleOpen(false); void refetch(); }}
         />
       )}
+
+      <VitalSignsSheet
+        appointment={vitalSignsAppt}
+        onClose={() => setVitalSignsAppt(null)}
+      />
 
     </div>
   );

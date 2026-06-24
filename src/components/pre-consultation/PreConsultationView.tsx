@@ -79,7 +79,7 @@ export default function PreConsultationView({
     return (
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Loi</AlertTitle>
+        <AlertTitle>Lỗi</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
       </Alert>
     );
@@ -89,9 +89,9 @@ export default function PreConsultationView({
     return (
       <div className="text-center py-12 text-muted-foreground">
         <FileQuestion className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p className="font-medium">Chua co khai bao</p>
+        <p className="font-medium">Chưa có khai báo</p>
         <p className="text-sm mt-1">
-          Benh nhan chua dien phieu khai bao truoc kham.
+          Bệnh nhân chưa điền phiếu khai báo trước khám.
         </p>
       </div>
     );
@@ -101,10 +101,10 @@ export default function PreConsultationView({
     return (
       <div className="text-center py-12 text-muted-foreground">
         <FileQuestion className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p className="font-medium">Dang khai bao</p>
+        <p className="font-medium">Đang khai báo</p>
         <p className="text-sm mt-1">
-          Benh nhan dang trong qua trinh dien phieu. Du lieu se hien thi khi
-          hoan tat.
+          Bệnh nhân đang trong quá trình điền phiếu. Dữ liệu sẽ hiển thị khi
+          hoàn tất.
         </p>
       </div>
     );
@@ -134,7 +134,7 @@ export default function PreConsultationView({
             <Alert className="bg-red-100 border-red-300">
               <AlertTriangle className="h-5 w-5 text-red-600" />
               <AlertTitle className="text-red-800 font-bold">
-                CANH BAO DI UNG
+                CẢNH BÁO DỊ ỨNG
               </AlertTitle>
               <AlertDescription className="text-red-700">
                 {preConsult.drug_allergies.map((a) => (
@@ -150,10 +150,10 @@ export default function PreConsultationView({
             <Alert className="bg-orange-100 border-orange-300">
               <Activity className="h-5 w-5 text-orange-600" />
               <AlertTitle className="text-orange-800 font-bold">
-                MUC DO DAU
+                MỨC ĐỘ ĐAU
               </AlertTitle>
               <AlertDescription className="text-orange-700">
-                Dau du doi ({preConsult.pain_scale}/10)
+                Đau dữ dội ({preConsult.pain_scale}/10)
               </AlertDescription>
             </Alert>
           )}
@@ -169,7 +169,7 @@ export default function PreConsultationView({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-primary">
                 <Stethoscope className="h-4 w-4" />
-                Trieu chung chinh
+                Triệu chứng chính
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -178,7 +178,7 @@ export default function PreConsultationView({
               </p>
               {preConsult.symptom_duration && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Thoi gian: {preConsult.symptom_duration}{' '}
+                  Thời gian: {preConsult.symptom_duration}{' '}
                   {preConsult.symptom_duration_unit &&
                     DURATION_UNIT_LABELS[preConsult.symptom_duration_unit].toLowerCase()}
                 </p>
@@ -186,7 +186,7 @@ export default function PreConsultationView({
 
               {preConsult.symptom_tags.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-xs text-muted-foreground mb-2">DI KEM</p>
+                  <p className="text-xs text-muted-foreground mb-2">ĐI KÈM</p>
                   <div className="flex flex-wrap gap-1.5">
                     {preConsult.symptom_tags.map((tag) => (
                       <Badge
@@ -208,7 +208,7 @@ export default function PreConsultationView({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-purple-700">
                 <Heart className="h-4 w-4" />
-                Loi song
+                Lối sống
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -216,7 +216,7 @@ export default function PreConsultationView({
                 <Cigarette className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground uppercase">
-                    Hut thuoc
+                    Hút thuốc
                   </p>
                   <p className="font-medium">
                     {preConsult.smoking && SMOKING_LABELS[preConsult.smoking]}
@@ -230,7 +230,7 @@ export default function PreConsultationView({
                 <Wine className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground uppercase">
-                    Ruou
+                    Rượu
                   </p>
                   <p className="font-medium">
                     {preConsult.alcohol && ALCOHOL_LABELS[preConsult.alcohol]}
@@ -244,7 +244,7 @@ export default function PreConsultationView({
                 <Dumbbell className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground uppercase">
-                    Van dong
+                    Vận động
                   </p>
                   <p className="font-medium">
                     {preConsult.exercise && EXERCISE_LABELS[preConsult.exercise]}
@@ -264,13 +264,13 @@ export default function PreConsultationView({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-rose-700">
                 <History className="h-4 w-4" />
-                Benh su
+                Bệnh sử
               </CardTitle>
             </CardHeader>
             <CardContent>
               {preConsult.medical_history.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
-                  Khong co tien su benh ly dang ke
+                  Không có tiền sử bệnh lý đáng kể
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -294,7 +294,7 @@ export default function PreConsultationView({
               {preConsult.surgical_history && (
                 <div className="mt-3 pt-3 border-t">
                   <p className="text-xs text-muted-foreground uppercase mb-1">
-                    Phau thuat
+                    Phẫu thuật
                   </p>
                   <p className="text-sm">{preConsult.surgical_history}</p>
                 </div>
@@ -304,7 +304,7 @@ export default function PreConsultationView({
                 <div className="mt-3 pt-3 border-t">
                   <p className="text-xs text-muted-foreground uppercase mb-1 flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    Gia dinh
+                    Gia đình
                   </p>
                   <ul className="space-y-1">
                     {preConsult.family_history.map((item, i) => (
@@ -329,13 +329,13 @@ export default function PreConsultationView({
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-cyan-700">
                 <Pill className="h-4 w-4" />
-                Thuoc dang dung
+                Thuốc đang dùng
               </CardTitle>
             </CardHeader>
             <CardContent>
               {preConsult.current_medications.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
-                  Khong dung thuoc
+                  Không dùng thuốc
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -353,7 +353,7 @@ export default function PreConsultationView({
               {preConsult.otc_supplements && (
                 <div className="mt-3 pt-3 border-t">
                   <p className="text-xs text-muted-foreground uppercase mb-1">
-                    Thuc pham chuc nang
+                    Thực phẩm chức năng
                   </p>
                   <p className="text-sm">{preConsult.otc_supplements}</p>
                 </div>
@@ -368,14 +368,14 @@ export default function PreConsultationView({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-amber-700">
                   <Apple className="h-4 w-4" />
-                  Di ung
+                  Dị ứng
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {preConsult.drug_allergies.length > 0 && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase mb-1">
-                      Thuoc
+                      Thuốc
                     </p>
                     {preConsult.drug_allergies.map((a, i) => (
                       <div key={i} className="text-sm">
@@ -394,7 +394,7 @@ export default function PreConsultationView({
                 {preConsult.food_allergies.length > 0 && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase mb-1">
-                      Thuc pham
+                      Thực phẩm
                     </p>
                     {preConsult.food_allergies.map((a, i) => (
                       <div key={i} className="text-sm">
@@ -421,7 +421,7 @@ export default function PreConsultationView({
             className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            Dung thong tin nay tao SOAP tu dong
+            Dùng thông tin này tạo SOAP tự động
           </Button>
         </div>
       )}

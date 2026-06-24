@@ -1,7 +1,6 @@
 /**
- * FR-010: Examination Page — Full-screen SOAP Note Editor
- * Standalone route: /provider-portal/examination/:appointmentId
- * (outside the ProviderLayout so it can take 100vh without the sidebar)
+ * FR-010: Examination Page — SOAP Note Editor
+ * Route: /provider-portal/examination/:appointmentId (nested in ProviderLayout)
  */
 
 import { useEffect, useState } from 'react';
@@ -10,6 +9,11 @@ import { ChevronLeft, Loader2, Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchDoctorAppointments } from '@/lib/doctor-appointment-api';
+import {
+  getAppointmentReadiness,
+  getAppointmentReadinessMessage,
+  isAppointmentReadyForExam,
+} from '@/lib/appointment-readiness';
 import type { AdminAppointment } from '@/types/admin-appointment';
 import SoapNoteEditor from '@/components/emr/SoapNoteEditor';
 import { format, parseISO } from 'date-fns';
@@ -37,6 +41,8 @@ export default function ExaminationPage() {
           setError(
             `Lịch hẹn có trạng thái "${ADMIN_STATUS_LABEL[appt.status]}" — cần check-in trước khi khám.`
           );
+        } else if (appt.status !== 'COMPLETED' && !isAppointmentReadyForExam(appt)) {
+          setError(getAppointmentReadinessMessage(getAppointmentReadiness(appt)));
         } else {
           setAppointment(appt);
         }
@@ -64,7 +70,7 @@ export default function ExaminationPage() {
     : undefined;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
       {/* ── Top nav bar ── */}
       <div className="flex items-center gap-3 border-b bg-card px-4 h-12 flex-shrink-0">
         <Button
@@ -128,7 +134,7 @@ export default function ExaminationPage() {
           </div>
         )}
 
-        {!loading && !error && appointmentId && (
+        {!loading && !error && appointment && appointmentId && (
           <SoapNoteEditor
             appointmentId={appointmentId}
             patient={patientInfo}

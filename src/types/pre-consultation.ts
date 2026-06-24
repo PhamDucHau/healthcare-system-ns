@@ -279,25 +279,92 @@ export const DEFAULT_FORM_DATA: PreConsultationFormData = {
 export type PreConsultationValidationErrors = Partial<{
   chief_complaint: string;
   symptom_duration: string;
+  smoking_frequency: string;
+  alcohol_frequency: string;
+  exercise_frequency: string;
+  current_medications: string;
+  drug_allergies: string;
+  food_allergies: string;
 }>;
 
-export function validatePreConsultation(
-  data: PreConsultationFormData
+export function validatePreConsultationStep(
+  step: PreConsultationStep,
+  data: PreConsultationFormData,
 ): PreConsultationValidationErrors {
   const errors: PreConsultationValidationErrors = {};
 
-  if (!data.chief_complaint || data.chief_complaint.trim() === '') {
-    errors.chief_complaint = 'Vui lòng nhập lý do đến khám';
-  }
+  switch (step) {
+    case 'symptoms':
+      if (!data.chief_complaint?.trim()) {
+        errors.chief_complaint = 'Vui lòng nhập lý do đến khám';
+      }
+      if (data.symptom_duration === null || data.symptom_duration <= 0) {
+        errors.symptom_duration = 'Vui lòng nhập thời gian triệu chứng';
+      }
+      break;
 
-  if (data.symptom_duration === null || data.symptom_duration <= 0) {
-    errors.symptom_duration = 'Vui lòng nhập thời gian triệu chứng';
+    case 'medications':
+      if (data.current_medications.some((med) => !med.name?.trim())) {
+        errors.current_medications =
+          'Vui lòng điền tên thuốc cho các dòng đã thêm hoặc xóa dòng trống';
+      }
+      break;
+
+    case 'allergies':
+      if (data.drug_allergies.some((a) => !a.drug?.trim() || !a.reaction?.trim())) {
+        errors.drug_allergies =
+          'Vui lòng điền đầy đủ tên thuốc và phản ứng dị ứng hoặc xóa dòng trống';
+      }
+      if (data.food_allergies.some((a) => !a.food?.trim() || !a.reaction?.trim())) {
+        errors.food_allergies =
+          'Vui lòng điền đầy đủ loại thực ăn và phản ứng dị ứng hoặc xóa dòng trống';
+      }
+      break;
+
+    case 'lifestyle':
+      if (
+        (data.smoking === 'current' || data.smoking === 'former') &&
+        !data.smoking_frequency.trim()
+      ) {
+        errors.smoking_frequency = 'Vui lòng nhập thông tin hút thuốc';
+      }
+      if (
+        (data.alcohol === 'occasionally' || data.alcohol === 'regularly') &&
+        !data.alcohol_frequency.trim()
+      ) {
+        errors.alcohol_frequency = 'Vui lòng nhập tần suất sử dụng rượu bia';
+      }
+      if (
+        (data.exercise === 'occasionally' || data.exercise === 'regularly') &&
+        !data.exercise_frequency.trim()
+      ) {
+        errors.exercise_frequency = 'Vui lòng nhập chi tiết vận động';
+      }
+      break;
+
+    default:
+      break;
   }
 
   return errors;
 }
 
+export function validatePreConsultation(
+  data: PreConsultationFormData,
+): PreConsultationValidationErrors {
+  return PRE_CONSULTATION_STEPS.reduce<PreConsultationValidationErrors>(
+    (all, step) => ({ ...all, ...validatePreConsultationStep(step, data) }),
+    {},
+  );
+}
+
 export function isFormValid(data: PreConsultationFormData): boolean {
-  const errors = validatePreConsultation(data);
-  return Object.keys(errors).length === 0;
+  return Object.keys(validatePreConsultation(data)).length === 0;
+}
+
+export function isPreConsultationStepValid(
+  step: PreConsultationStep,
+  data: PreConsultationFormData,
+): boolean {
+  return Object.keys(validatePreConsultationStep(step, data)).length === 0;
 }

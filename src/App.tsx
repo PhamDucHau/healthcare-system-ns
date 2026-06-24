@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,13 +37,17 @@ import ProviderPatientsPage from "./pages/provider/ProviderPatientsPage";
 import ProviderSectionPlaceholder from "./pages/provider/ProviderSectionPlaceholder";
 import ProviderAppointmentsPage from "./pages/provider/ProviderAppointmentsPage";
 import { DoctorNotificationsProvider } from "./hooks/DoctorNotificationsContext";
-import ClinicalLogicLayout from "./pages/admin/clinical-logic/ClinicalLogicLayout.tsx";
 import QuestionLibraryPage from "./pages/admin/clinical-logic/QuestionLibraryPage.tsx";
 import QuestionnaireBuilderPage from "./pages/admin/clinical-logic/QuestionnaireBuilderPage.tsx";
 import ExaminationPage from "./pages/provider/ExaminationPage.tsx";
 import ClinicalTasksContent from "./components/provider/ClinicalTasksContent.tsx";
 
 const queryClient = new QueryClient();
+
+function RedirectClinicalLogicQuestionnaire() {
+  const { id } = useParams();
+  return <Navigate to={`/admin/question-library/${id}`} replace />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -145,20 +149,10 @@ const App = () => (
               />
               <Route path="patients" element={<ProviderPatientsPage />} />
               <Route path="appointments" element={<ProviderAppointmentsPage />} />
+              <Route path="examination/:appointmentId" element={<ExaminationPage />} />
               <Route path="tasks" element={<ClinicalTasksContent portal="doctor" />} />
               <Route path="analytics" element={<ProviderSectionPlaceholder title="Analytics" />} />
             </Route>
-            {/* Examination (SOAP editor) — full-screen, outside portal layout */}
-            <Route
-              path="/provider-portal/examination/:appointmentId"
-              element={
-                <ProtectedRoute requiredPortal="doctor">
-                  <DoctorNotificationsProvider>
-                    <ExaminationPage />
-                  </DoctorNotificationsProvider>
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/onboarding"
               element={
@@ -197,24 +191,14 @@ const App = () => (
               <Route path="tasks" element={<ClinicalTasksContent portal="admin" />} />
               <Route path="logs" element={<AdminSectionPlaceholder title="System Logs" />} />
               <Route path="settings" element={<AdminSectionPlaceholder title="Settings" />} />
-            </Route>
-            <Route
-              path="/admin/clinical-logic"
-              element={
-                <ProtectedRoute requiredPortal="admin">
-                  <ClinicalLogicLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="question-library" replace />} />
-              <Route path="dashboard" element={<AdminSectionPlaceholder title="Dashboard" />} />
-              <Route path="decision-trees" element={<AdminSectionPlaceholder title="Decision Trees" />} />
               <Route path="question-library" element={<QuestionLibraryPage />} />
               <Route path="question-library/new" element={<QuestionnaireBuilderPage />} />
               <Route path="question-library/:id" element={<QuestionnaireBuilderPage />} />
-              <Route path="analytics" element={<AdminSectionPlaceholder title="Analytics" />} />
-              <Route path="staff-access" element={<AdminSectionPlaceholder title="Staff Access" />} />
             </Route>
+            <Route path="/admin/clinical-logic" element={<Navigate to="/admin/question-library" replace />} />
+            <Route path="/admin/clinical-logic/question-library" element={<Navigate to="/admin/question-library" replace />} />
+            <Route path="/admin/clinical-logic/question-library/new" element={<Navigate to="/admin/question-library/new" replace />} />
+            <Route path="/admin/clinical-logic/question-library/:id" element={<RedirectClinicalLogicQuestionnaire />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

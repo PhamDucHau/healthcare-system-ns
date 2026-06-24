@@ -148,6 +148,7 @@ export default function VitalSignsSheet({ appointment, onClose }: VitalSignsShee
             }}
             onSuccess={() => {
               void queryClient.invalidateQueries({ queryKey: ["admin-appointments"] });
+              void queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] });
               void queryClient.invalidateQueries({ queryKey: ["vital_signs", appointment.id] });
               onClose();
             }}

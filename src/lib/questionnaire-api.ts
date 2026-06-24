@@ -16,16 +16,31 @@ function strNull(v: unknown): string | null { return v != null ? String(v) : nul
 export function mapQuestionnaireError(msg: string): string {
   if (msg.includes('HAS_RESPONSES'))
     return 'Không thể sửa: bộ câu hỏi đã có phản hồi. Hãy Clone phiên bản mới.';
+  if (msg.includes('DELETE_HAS_RESPONSES'))
+    return 'Không thể xóa: bộ câu hỏi đã có phản hồi.';
+  if (msg.includes('HAS_ASSIGNMENTS'))
+    return 'Không thể xóa: bộ câu hỏi đã được gán cho bệnh nhân.';
+  if (msg.includes('NOT_FOUND'))
+    return 'Bộ câu hỏi không tồn tại.';
   if (msg.includes('EMPTY_QUESTIONNAIRE'))
     return 'Cần ít nhất 1 phần và 1 câu hỏi để phát hành.';
   return msg;
 }
 
 export async function hasResponses(questionnaireId: string): Promise<boolean> {
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from('questionnaire_assignments')
+    .select('id')
+    .eq('questionnaire_id', questionnaireId);
+  if (assignmentsError) throw new Error(assignmentsError.message);
+
+  const assignmentIds = (assignments ?? []).map((row) => str(row.id));
+  if (assignmentIds.length === 0) return false;
+
   const { data, error } = await supabase
     .from('questionnaire_responses')
     .select('id')
-    .eq('questionnaire_id', questionnaireId)
+    .in('assignment_id', assignmentIds)
     .limit(1);
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
@@ -272,6 +287,44 @@ export async function archiveQuestionnaire(id: string): Promise<void> {
     .update({ status: 'ARCHIVED' })
     .eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+export async function deleteQuestionnaire(id: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_questionnaire', { p_id: id });
+  if (!error) return;
+
+  const rpcMissing =
+    error.code === 'PGRST202'
+    || error.message.includes('Could not find the function')
+    || error.message.includes('delete_questionnaire');
+
+  if (!rpcMissing) {
+    throw new Error(mapQuestionnaireError(error.message));
+  }
+
+  await deleteQuestionnaireDirect(id);
+}
+
+async function deleteQuestionnaireDirect(id: string): Promise<void> {
+  if (await hasResponses(id)) {
+    throw new Error('DELETE_HAS_RESPONSES');
+  }
+
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from('questionnaire_assignments')
+    .select('id')
+    .eq('questionnaire_id', id)
+    .limit(1);
+  if (assignmentsError) throw new Error(assignmentsError.message);
+  if ((assignments ?? []).length > 0) {
+    throw new Error('HAS_ASSIGNMENTS');
+  }
+
+  const { error } = await supabase
+    .from('questionnaires')
+    .delete()
+    .eq('id', id);
+  if (error) throw new Error(mapQuestionnaireError(error.message));
 }
 
 // ─── Clone (versioning, RULE-012d) ───────────────────────────────────────────

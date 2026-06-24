@@ -15,6 +15,10 @@ import {
   ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT,
 } from "@/types/admin-appointment";
 import { adminCheckinAppointment } from "@/lib/admin-appointment-api";
+import {
+  getAppointmentReadiness,
+  getAppointmentReadinessMessage,
+} from "@/lib/appointment-readiness";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -64,6 +68,11 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
   const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(appointment.status) && !appointment.walk_in;
 
   const handleCheckin = async () => {
+    const readiness = getAppointmentReadiness(appointment);
+    if (!readiness.isReady) {
+      toast.warning(getAppointmentReadinessMessage(readiness), { duration: 7000 });
+      return;
+    }
     setCheckingIn(true);
     try {
       await adminCheckinAppointment(appointment.id);

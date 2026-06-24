@@ -1,8 +1,8 @@
 /**
- * FR-022: Medications Step (Nhom 3: Thuoc dang dung)
+ * FR-022: Medications Step (Nhóm 3: Thuốc đang dùng)
  */
 
-import { Plus, X, Pill } from 'lucide-react';
+import { Plus, X, Pill, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import type {
   PreConsultationFormData,
   MedicationItem,
+  PreConsultationValidationErrors,
 } from '@/types/pre-consultation';
 
 type Props = {
@@ -21,15 +22,14 @@ type Props = {
     value: PreConsultationFormData[K]
   ) => void;
   updateFields: (updates: Partial<PreConsultationFormData>) => void;
+  validationErrors: PreConsultationValidationErrors;
 };
 
 export default function MedicationsStep({
   formData,
   updateField,
-  updateFields,
+  validationErrors,
 }: Props) {
-  // ─── Current Medications ─────────────────────────────────────────────────────
-
   const addMedication = () => {
     updateField('current_medications', [
       ...formData.current_medications,
@@ -57,21 +57,20 @@ export default function MedicationsStep({
 
   return (
     <div className="space-y-8">
-      {/* Current Medications */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <Label className="text-base font-semibold">
-              Thuoc ban dang su dung
+              Thuốc bạn đang sử dụng
             </Label>
             <p className="text-sm text-muted-foreground mt-1">
-              Liet ke tat ca cac loai thuoc ban dang dung, bao gom thuoc ke don
-              va khong ke don
+              Liệt kê tất cả các loại thuốc bạn đang dùng, bao gồm thuốc kê đơn
+              và không kê đơn
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={addMedication}>
             <Plus className="h-4 w-4 mr-1" />
-            Them thuoc
+            Thêm thuốc
           </Button>
         </div>
 
@@ -79,21 +78,24 @@ export default function MedicationsStep({
           <div className="py-8 text-center border border-dashed rounded-lg">
             <Pill className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground">
-              Chua co thuoc nao duoc them.
+              Chưa có thuốc nào được thêm.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Nhan "Them thuoc" de bat dau liet ke.
+              Nhấn &quot;Thêm thuốc&quot; để bắt đầu liệt kê.
             </p>
           </div>
         )}
 
         {formData.current_medications.map((med, index) => (
-          <Card key={index} className="bg-muted/30">
+          <Card
+            key={index}
+            className={`bg-muted/30 ${validationErrors.current_medications && !med.name?.trim() ? 'border-red-300' : ''}`}
+          >
             <CardContent className="py-4">
               <div className="flex gap-3 items-start">
                 <div className="flex-1 space-y-3">
                   <Input
-                    placeholder="Ten thuoc (vd: Amlodipine)"
+                    placeholder="Tên thuốc (vd: Amlodipine)"
                     value={med.name}
                     onChange={(e) =>
                       updateMedication(index, 'name', e.target.value)
@@ -101,14 +103,14 @@ export default function MedicationsStep({
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <Input
-                      placeholder="Lieu luong (vd: 5mg)"
+                      placeholder="Liều lượng (vd: 5mg)"
                       value={med.dose}
                       onChange={(e) =>
                         updateMedication(index, 'dose', e.target.value)
                       }
                     />
                     <Input
-                      placeholder="Tan suat (vd: 1 vien/ngay)"
+                      placeholder="Tần suất (vd: 1 viên/ngày)"
                       value={med.frequency}
                       onChange={(e) =>
                         updateMedication(index, 'frequency', e.target.value)
@@ -128,7 +130,13 @@ export default function MedicationsStep({
           </Card>
         ))}
 
-        {/* Common medications quick add */}
+        {validationErrors.current_medications && (
+          <p className="text-sm text-red-500 flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            {validationErrors.current_medications}
+          </p>
+        )}
+
         {formData.current_medications.length > 0 && (
           <Button
             variant="ghost"
@@ -137,23 +145,22 @@ export default function MedicationsStep({
             className="w-full border border-dashed"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Them thuoc khac
+            Thêm thuốc khác
           </Button>
         )}
       </div>
 
-      {/* OTC Supplements */}
       <div className="space-y-2">
         <Label htmlFor="otc_supplements">
-          Thuc pham chuc nang va vitamin
+          Thực phẩm chức năng và vitamin
         </Label>
         <p className="text-sm text-muted-foreground">
-          Liet ke cac loai vitamin, thuc pham bo sung, thao duoc ma ban dang su
-          dung
+          Liệt kê các loại vitamin, thực phẩm bổ sung, thảo dược mà bạn đang sử
+          dụng
         </p>
         <Textarea
           id="otc_supplements"
-          placeholder="Vd: Vitamin D 1000IU/ngay, Omega-3, Canxi..."
+          placeholder="Vd: Vitamin D 1000IU/ngày, Omega-3, Canxi..."
           value={formData.otc_supplements}
           onChange={(e) => updateField('otc_supplements', e.target.value)}
           rows={3}

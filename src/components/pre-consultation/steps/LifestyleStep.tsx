@@ -1,14 +1,17 @@
 /**
- * FR-022: Lifestyle Step (Nhom 5: Loi song)
+ * FR-022: Lifestyle Step (Nhóm 5: Lối sống)
  */
 
-import { Cigarette, Wine, Dumbbell } from 'lucide-react';
+import { Cigarette, Wine, Dumbbell, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-import type { PreConsultationFormData } from '@/types/pre-consultation';
+import type {
+  PreConsultationFormData,
+  PreConsultationValidationErrors,
+} from '@/types/pre-consultation';
 import {
   SMOKING_LABELS,
   ALCOHOL_LABELS,
@@ -24,24 +27,24 @@ type Props = {
     field: K,
     value: PreConsultationFormData[K]
   ) => void;
+  validationErrors: PreConsultationValidationErrors;
 };
 
-export default function LifestyleStep({ formData, updateField }: Props) {
+export default function LifestyleStep({ formData, updateField, validationErrors }: Props) {
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">
-          Thong tin ve loi song giup bac si danh gia tong quan suc khoe cua ban
-          va dua ra loi khuyen phu hop.
+          Thông tin về lối sống giúp bác sĩ đánh giá tổng quan sức khỏe của bạn
+          và đưa ra lời khuyên phù hợp.
         </p>
       </div>
 
-      {/* Smoking */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Cigarette className="h-5 w-5 text-muted-foreground" />
-            Hut thuoc
+            Hút thuốc
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -66,35 +69,50 @@ export default function LifestyleStep({ formData, updateField }: Props) {
           </RadioGroup>
 
           {formData.smoking === 'current' && (
-            <Input
-              placeholder="Tan suat (vd: 10 dieu/ngay)"
-              value={formData.smoking_frequency}
-              onChange={(e) =>
-                updateField('smoking_frequency', e.target.value)
-              }
-              className="mt-2"
-            />
+            <div className="space-y-1">
+              <Input
+                placeholder="Tần suất (vd: 10 điếu/ngày)"
+                value={formData.smoking_frequency}
+                onChange={(e) =>
+                  updateField('smoking_frequency', e.target.value)
+                }
+                className={`mt-2 ${validationErrors.smoking_frequency ? 'border-red-500' : ''}`}
+              />
+              {validationErrors.smoking_frequency && (
+                <p className="text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.smoking_frequency}
+                </p>
+              )}
+            </div>
           )}
 
           {formData.smoking === 'former' && (
-            <Input
-              placeholder="Da bo khi nao? (vd: 2 nam truoc)"
-              value={formData.smoking_frequency}
-              onChange={(e) =>
-                updateField('smoking_frequency', e.target.value)
-              }
-              className="mt-2"
-            />
+            <div className="space-y-1">
+              <Input
+                placeholder="Đã bỏ khi nào? (vd: 2 năm trước)"
+                value={formData.smoking_frequency}
+                onChange={(e) =>
+                  updateField('smoking_frequency', e.target.value)
+                }
+                className={`mt-2 ${validationErrors.smoking_frequency ? 'border-red-500' : ''}`}
+              />
+              {validationErrors.smoking_frequency && (
+                <p className="text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.smoking_frequency}
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Alcohol */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Wine className="h-5 w-5 text-muted-foreground" />
-            Ruou bia
+            Rượu bia
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -120,24 +138,31 @@ export default function LifestyleStep({ formData, updateField }: Props) {
 
           {(formData.alcohol === 'occasionally' ||
             formData.alcohol === 'regularly') && (
-            <Input
-              placeholder="Tan suat (vd: 2-3 lan/tuan, 1 chai bia/ngay)"
-              value={formData.alcohol_frequency}
-              onChange={(e) =>
-                updateField('alcohol_frequency', e.target.value)
-              }
-              className="mt-2"
-            />
+            <div className="space-y-1">
+              <Input
+                placeholder="Tần suất (vd: 2-3 lần/tuần, 1 chai bia/ngày)"
+                value={formData.alcohol_frequency}
+                onChange={(e) =>
+                  updateField('alcohol_frequency', e.target.value)
+                }
+                className={`mt-2 ${validationErrors.alcohol_frequency ? 'border-red-500' : ''}`}
+              />
+              {validationErrors.alcohol_frequency && (
+                <p className="text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.alcohol_frequency}
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Exercise */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Dumbbell className="h-5 w-5 text-muted-foreground" />
-            Van dong/Tap the duc
+            Vận động / Tập thể dục
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -163,14 +188,22 @@ export default function LifestyleStep({ formData, updateField }: Props) {
 
           {(formData.exercise === 'occasionally' ||
             formData.exercise === 'regularly') && (
-            <Input
-              placeholder="Chi tiet (vd: 30 phut/ngay, 3 lan/tuan)"
-              value={formData.exercise_frequency}
-              onChange={(e) =>
-                updateField('exercise_frequency', e.target.value)
-              }
-              className="mt-2"
-            />
+            <div className="space-y-1">
+              <Input
+                placeholder="Chi tiết (vd: 30 phút/ngày, 3 lần/tuần)"
+                value={formData.exercise_frequency}
+                onChange={(e) =>
+                  updateField('exercise_frequency', e.target.value)
+                }
+                className={`mt-2 ${validationErrors.exercise_frequency ? 'border-red-500' : ''}`}
+              />
+              {validationErrors.exercise_frequency && (
+                <p className="text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.exercise_frequency}
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

@@ -127,7 +127,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
       } else {
         const json = await fetchOcrSingle(file, "cccd", "front");
         if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
+        const { identity, personal, gender } = mapCccdParsedToFormUpdates(json.parsed);
         setForm(p => ({
           ...p,
           idNumber: identity.idNumber ?? p.idNumber,
@@ -138,6 +138,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
           legalFirstName: personal.legalFirstName ?? p.legalFirstName,
           legalLastName: personal.legalLastName ?? p.legalLastName,
           dateOfBirth: personal.dateOfBirth ?? p.dateOfBirth,
+          gender: gender ?? p.gender,
         }));
         toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
       }

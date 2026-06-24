@@ -15,7 +15,7 @@ const sidebarItems = [
   { icon: FileUser,      label: "Hồ sơ bệnh nhân",     path: "/admin/patient-records" },
   { icon: CalendarDays,  label: "Lịch hẹn",     path: "/admin/appointments" },
   { icon: Database,      label: "Danh mục",      path: "/admin/master-data" },
-  { icon: ClipboardList, label: "Bộ câu hỏi lâm sàng", path: "/admin/clinical-logic" },
+  { icon: ClipboardList, label: "Bộ câu hỏi lâm sàng", path: "/admin/question-library" },
   { icon: Users,         label: "Người dùng",    path: "/admin/users" },
   { icon: Shield,        label: "Phân quyền",    path: "/admin/roles" },
 ];

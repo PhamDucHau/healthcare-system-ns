@@ -22,11 +22,16 @@ import {
   DEFAULT_FORM_DATA,
   PRE_CONSULTATION_STEPS,
   validatePreConsultation,
+  validatePreConsultationStep,
+  isPreConsultationStepValid,
   isFormValid,
+  type PreConsultationValidationErrors,
 } from '@/types/pre-consultation';
 
 // Auto-save debounce delay (2 seconds as per spec)
 const AUTO_SAVE_DELAY = 2000;
+
+export type DraftSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 export type UsePreConsultationFormReturn = {
   // Data
@@ -46,10 +51,11 @@ export type UsePreConsultationFormReturn = {
   totalSteps: number;
   progress: number;
   setCurrentStep: (step: PreConsultationStep) => void;
-  goToNextStep: () => void;
-  goToPrevStep: () => void;
+  goToNextStep: () => Promise<void>;
+  goToPrevStep: () => Promise<void>;
   canGoNext: boolean;
   canGoPrev: boolean;
+  isCurrentStepValid: boolean;
 
   // Form operations
   updateField: <K extends keyof PreConsultationFormData>(
@@ -65,9 +71,11 @@ export type UsePreConsultationFormReturn = {
   // Status
   loading: boolean;
   saving: boolean;
+  draftSaveStatus: DraftSaveStatus;
+  lastSavedAt: Date | null;
   submitting: boolean;
   error: string | null;
-  validationErrors: Partial<Record<keyof PreConsultationFormData, string>>;
+  validationErrors: PreConsultationValidationErrors;
 };
 
 export function usePreConsultationForm(
@@ -82,16 +90,78 @@ export function usePreConsultationForm(
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [draftSaveStatus, setDraftSaveStatus] = useState<DraftSaveStatus>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<
-    Partial<Record<keyof PreConsultationFormData, string>>
-  >({});
+  const [validationErrors, setValidationErrors] = useState<PreConsultationValidationErrors>({});
 
   // For auto-save debouncing
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingChanges = useRef<UpdatePreConsultationInput>({});
   const isInitialized = useRef(false);
+  const preConsultationIdRef = useRef<string | null>(null);
+  const isSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    preConsultationIdRef.current = preConsultationId;
+  }, [preConsultationId]);
+
+  useEffect(() => {
+    isSubmittedRef.current = isSubmitted;
+  }, [isSubmitted]);
+
+  // ─── Auto-Save Logic ─────────────────────────────────────────────────────────
+
+  const persistPendingChanges = useCallback(async () => {
+    const id = preConsultationIdRef.current;
+    if (!id || isSubmittedRef.current || !isInitialized.current) return true;
+
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+
+    if (Object.keys(pendingChanges.current).length === 0) return true;
+
+    const changesToSave = { ...pendingChanges.current };
+    pendingChanges.current = {};
+
+    setSaving(true);
+    setDraftSaveStatus('saving');
+    try {
+      await updatePreConsultation(id, changesToSave);
+      setLastSavedAt(new Date());
+      setDraftSaveStatus('saved');
+      return true;
+    } catch (e) {
+      console.error('Auto-save failed:', e);
+      pendingChanges.current = { ...changesToSave, ...pendingChanges.current };
+      setDraftSaveStatus('error');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const persistPendingChangesRef = useRef(persistPendingChanges);
+  persistPendingChangesRef.current = persistPendingChanges;
+
+  const triggerAutoSave = useCallback(() => {
+    if (!preConsultationIdRef.current || isSubmittedRef.current || !isInitialized.current) {
+      return;
+    }
+
+    setDraftSaveStatus('idle');
+
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+    }
+
+    autoSaveTimer.current = setTimeout(() => {
+      void persistPendingChangesRef.current();
+    }, AUTO_SAVE_DELAY);
+  }, []);
 
   // ─── Initialize ──────────────────────────────────────────────────────────────
 
@@ -130,41 +200,17 @@ export function usePreConsultationForm(
     }
 
     initialize();
+  }, [appointmentId]);
 
-    // Cleanup auto-save timer on unmount
+  // Flush pending draft on unmount
+  useEffect(() => {
     return () => {
       if (autoSaveTimer.current) {
         clearTimeout(autoSaveTimer.current);
       }
+      void persistPendingChangesRef.current();
     };
-  }, [appointmentId]);
-
-  // ─── Auto-Save Logic ─────────────────────────────────────────────────────────
-
-  const triggerAutoSave = useCallback(() => {
-    if (!preConsultationId || isSubmitted || !isInitialized.current) return;
-
-    // Clear existing timer
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-    }
-
-    // Set new timer
-    autoSaveTimer.current = setTimeout(async () => {
-      if (Object.keys(pendingChanges.current).length === 0) return;
-
-      setSaving(true);
-      try {
-        await updatePreConsultation(preConsultationId, pendingChanges.current);
-        pendingChanges.current = {};
-      } catch (e) {
-        console.error('Auto-save failed:', e);
-        // Don't show error toast for auto-save failures
-      } finally {
-        setSaving(false);
-      }
-    }, AUTO_SAVE_DELAY);
-  }, [preConsultationId, isSubmitted]);
+  }, []);
 
   // ─── Update Field ────────────────────────────────────────────────────────────
 
@@ -185,10 +231,10 @@ export function usePreConsultationForm(
 
       triggerAutoSave();
 
-      // Clear validation error for this field
       setValidationErrors((prev) => {
-        const { [field]: _, ...rest } = prev;
-        return rest;
+        const next = { ...prev };
+        delete next[field as keyof PreConsultationValidationErrors];
+        return next;
       });
     },
     [isSubmitted, triggerAutoSave]
@@ -216,19 +262,22 @@ export function usePreConsultationForm(
   const saveDraft = useCallback(async () => {
     if (!preConsultationId || isSubmitted) return;
 
-    // Clear auto-save timer
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
     }
 
     setSaving(true);
+    setDraftSaveStatus('saving');
     try {
-      // Save all current form data
       await updatePreConsultation(preConsultationId, formDataToInput(formData));
       pendingChanges.current = {};
+      setLastSavedAt(new Date());
+      setDraftSaveStatus('saved');
       toast.success('Đã lưu nháp');
     } catch (e) {
       const msg = (e as Error).message;
+      setDraftSaveStatus('error');
       toast.error(msg);
       throw e;
     } finally {
@@ -245,6 +294,12 @@ export function usePreConsultationForm(
     const errors = validatePreConsultation(formData);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
+      const firstInvalidStep = PRE_CONSULTATION_STEPS.find(
+        (step) => Object.keys(validatePreConsultationStep(step, formData)).length > 0,
+      );
+      if (firstInvalidStep) {
+        setCurrentStep(firstInvalidStep);
+      }
       toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
       return null;
     }
@@ -252,9 +307,10 @@ export function usePreConsultationForm(
     setSubmitting(true);
     try {
       // First save any pending changes
-      if (Object.keys(pendingChanges.current).length > 0) {
-        await updatePreConsultation(preConsultationId, pendingChanges.current);
-        pendingChanges.current = {};
+      const saved = await persistPendingChanges();
+      if (!saved) {
+        toast.error('Không thể lưu dữ liệu trước khi gửi. Vui lòng thử lại.');
+        return null;
       }
 
       // Then submit
@@ -278,7 +334,7 @@ export function usePreConsultationForm(
     } finally {
       setSubmitting(false);
     }
-  }, [preConsultationId, isSubmitted, formData]);
+  }, [preConsultationId, isSubmitted, formData, persistPendingChanges]);
 
   // ─── Step Navigation ─────────────────────────────────────────────────────────
 
@@ -288,18 +344,30 @@ export function usePreConsultationForm(
 
   const canGoNext = currentStepIndex < totalSteps - 1;
   const canGoPrev = currentStepIndex > 0;
+  const isCurrentStepValid = isPreConsultationStepValid(currentStep, formData);
 
-  const goToNextStep = useCallback(() => {
-    if (canGoNext) {
-      setCurrentStep(PRE_CONSULTATION_STEPS[currentStepIndex + 1]);
-    }
-  }, [canGoNext, currentStepIndex]);
+  const goToNextStep = useCallback(async () => {
+    if (!canGoNext) return;
 
-  const goToPrevStep = useCallback(() => {
-    if (canGoPrev) {
-      setCurrentStep(PRE_CONSULTATION_STEPS[currentStepIndex - 1]);
+    const errors = validatePreConsultationStep(currentStep, formData);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
     }
-  }, [canGoPrev, currentStepIndex]);
+
+    await persistPendingChanges();
+    setValidationErrors({});
+    setCurrentStep(PRE_CONSULTATION_STEPS[currentStepIndex + 1]);
+  }, [canGoNext, currentStep, currentStepIndex, formData, persistPendingChanges]);
+
+  const goToPrevStep = useCallback(async () => {
+    if (!canGoPrev) return;
+
+    await persistPendingChanges();
+    setValidationErrors({});
+    setCurrentStep(PRE_CONSULTATION_STEPS[currentStepIndex - 1]);
+  }, [canGoPrev, currentStepIndex, persistPendingChanges]);
 
   // ─── Return ──────────────────────────────────────────────────────────────────
 
@@ -318,6 +386,7 @@ export function usePreConsultationForm(
     goToPrevStep,
     canGoNext,
     canGoPrev,
+    isCurrentStepValid,
 
     updateField,
     updateFields,
@@ -327,6 +396,8 @@ export function usePreConsultationForm(
 
     loading,
     saving,
+    draftSaveStatus,
+    lastSavedAt,
     submitting,
     error,
     validationErrors,

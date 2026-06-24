@@ -145,10 +145,21 @@ export async function fetchBhytOcr(image: File): Promise<BhytOcrResponse> {
   return (await res.json()) as BhytOcrResponse;
 }
 
+/** Normalize OCR gender text to Nam / Nữ / Khác for admin patient forms. */
+export function normalizeOcrGender(raw: string): string {
+  const t = raw.trim().toLowerCase();
+  if (!t) return "";
+  if (t === "nam" || t === "male" || t === "m") return "Nam";
+  if (t === "nữ" || t === "nu" || t === "female" || t === "f") return "Nữ";
+  if (t === "khác" || t === "khac" || t === "other") return "Khác";
+  return raw.trim();
+}
+
 /** Maps OCR `parsed` into onboarding field updates (user can edit after). */
 export function mapCccdParsedToFormUpdates(parsed: CccdParsed): {
   identity: Partial<OnboardingFormData["identity"]>;
   personal: Partial<OnboardingFormData["personal"]>;
+  gender?: string;
 } {
   const identity: Partial<OnboardingFormData["identity"]> = {};
   const personal: Partial<OnboardingFormData["personal"]> = {};
@@ -170,7 +181,9 @@ export function mapCccdParsedToFormUpdates(parsed: CccdParsed): {
   const dobIso = parseDdMmYyyyToIso(parsed.dob ?? "");
   if (dobIso) personal.dateOfBirth = dobIso;
 
-  return { identity, personal };
+  const gender = parsed.gender?.trim() ? normalizeOcrGender(parsed.gender) : undefined;
+
+  return { identity, personal, gender };
 }
 
 export function mapBhytParsedToInsuranceUpdates(parsed: BhytParsed): Partial<OnboardingFormData["insurance"]> {

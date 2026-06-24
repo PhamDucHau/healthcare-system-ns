@@ -35,6 +35,7 @@ export interface AdminAppointment {
   pre_consult_status: 'none' | 'draft' | 'submitted';
   pre_consult_drug_allergy: boolean;
   pre_consult_severe_pain: boolean;
+  has_vital_signs: boolean;
 }
 
 export interface PatientSearchResult {
