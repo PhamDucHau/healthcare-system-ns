@@ -33,6 +33,17 @@ export function mapMasterDataError(msg: string): string {
   return msg;
 }
 
+function mapDeleteError(msg: string): string {
+  if (msg.includes('violates foreign key') || msg.includes('23503'))
+    return 'Không thể xóa: bản ghi đang được sử dụng ở nơi khác.';
+  return msg;
+}
+
+async function hardDelete(table: string, id: string): Promise<void> {
+  const { error } = await supabase.from(table).delete().eq('id', id);
+  if (error) throw new Error(mapDeleteError(error.message));
+}
+
 // ─── Specialties ─────────────────────────────────────────────────────────────
 
 export async function fetchSpecialtiesAdmin(): Promise<Specialty[]> {
@@ -52,14 +63,25 @@ export async function upsertSpecialty(
     description: strNull(payload.description),
     icon:        strNull(payload.icon),
   };
-  const { error } = payload.id
-    ? await supabase.from('specialties').update(row).eq('id', payload.id)
-    : await supabase.from('specialties').insert(row);
-  if (error) throw new Error(error.message);
+  const active = payload.is_active ?? true;
+
+  if (payload.id) {
+    if (!active) await deactivateSpecialty(payload.id);
+    const updateRow = active ? { ...row, is_active: true } : row;
+    const { error } = await supabase.from('specialties').update(updateRow).eq('id', payload.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('specialties').insert({ ...row, is_active: active });
+    if (error) throw new Error(error.message);
+  }
 }
 
 export async function deactivateSpecialty(id: string): Promise<void> {
   return softDelete('specialties', id);
+}
+
+export async function deleteSpecialty(id: string): Promise<void> {
+  return hardDelete('specialties', id);
 }
 
 // ─── Services ────────────────────────────────────────────────────────────────
@@ -93,6 +115,7 @@ export async function upsertService(
     specialty_id:     payload.specialty_id ?? null,
     price_vnd:        payload.price_vnd ?? null,
     duration_minutes: payload.duration_minutes ?? 30,
+    is_active:        payload.is_active ?? true,
   };
   const { error } = payload.id
     ? await supabase.from('services').update(row).eq('id', payload.id)
@@ -104,6 +127,10 @@ export async function deactivateService(id: string): Promise<void> {
   const { error } = await supabase
     .from('services').update({ is_active: false }).eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+export async function deleteService(id: string): Promise<void> {
+  return hardDelete('services', id);
 }
 
 // ─── Facilities ───────────────────────────────────────────────────────────────
@@ -134,14 +161,25 @@ export async function upsertFacility(
     address: strNull(payload.address),
     phone:   strNull(payload.phone),
   };
-  const { error } = payload.id
-    ? await supabase.from('facilities').update(row).eq('id', payload.id)
-    : await supabase.from('facilities').insert(row);
-  if (error) throw new Error(error.message);
+  const active = payload.is_active ?? true;
+
+  if (payload.id) {
+    if (!active) await deactivateFacility(payload.id);
+    const updateRow = active ? { ...row, is_active: true } : row;
+    const { error } = await supabase.from('facilities').update(updateRow).eq('id', payload.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('facilities').insert({ ...row, is_active: active });
+    if (error) throw new Error(error.message);
+  }
 }
 
 export async function deactivateFacility(id: string): Promise<void> {
   return softDelete('facilities', id);
+}
+
+export async function deleteFacility(id: string): Promise<void> {
+  return hardDelete('facilities', id);
 }
 
 // ─── Rooms ────────────────────────────────────────────────────────────────────
@@ -176,14 +214,25 @@ export async function upsertRoom(
     capacity:    payload.capacity ?? 1,
     equipment:   strNull(payload.equipment),
   };
-  const { error } = payload.id
-    ? await supabase.from('rooms').update(row).eq('id', payload.id)
-    : await supabase.from('rooms').insert(row);
-  if (error) throw new Error(error.message);
+  const active = payload.is_active ?? true;
+
+  if (payload.id) {
+    if (!active) await deactivateRoom(payload.id);
+    const updateRow = active ? { ...row, is_active: true } : row;
+    const { error } = await supabase.from('rooms').update(updateRow).eq('id', payload.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('rooms').insert({ ...row, is_active: active });
+    if (error) throw new Error(error.message);
+  }
 }
 
 export async function deactivateRoom(id: string): Promise<void> {
   return softDelete('rooms', id);
+}
+
+export async function deleteRoom(id: string): Promise<void> {
+  return hardDelete('rooms', id);
 }
 
 // ─── Doctor Schedules ─────────────────────────────────────────────────────────
@@ -260,6 +309,7 @@ export async function upsertDoctorSchedule(
     exceptions:           payload.exceptions,
     valid_from:           payload.valid_from,
     valid_until:          payload.valid_until ?? null,
+    is_active:            payload.is_active ?? true,
   };
   const { error } = payload.id
     ? await supabase.from('doctor_schedules').update(row).eq('id', payload.id)
@@ -271,6 +321,10 @@ export async function deactivateDoctorSchedule(id: string): Promise<void> {
   const { error } = await supabase
     .from('doctor_schedules').update({ is_active: false }).eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+export async function deleteDoctorSchedule(id: string): Promise<void> {
+  return hardDelete('doctor_schedules', id);
 }
 
 // ─── Question Categories ─────────────────────────────────────────────────────
@@ -291,6 +345,7 @@ export async function upsertQuestionCategory(
     name:        payload.name.trim(),
     description: strNull(payload.description),
     sort_order:  payload.sort_order ?? 0,
+    is_active:   payload.is_active ?? true,
   };
   const { error } = payload.id
     ? await supabase.from('question_categories').update(row).eq('id', payload.id)
@@ -302,6 +357,10 @@ export async function deactivateQuestionCategory(id: string): Promise<void> {
   const { error } = await supabase
     .from('question_categories').update({ is_active: false }).eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+export async function deleteQuestionCategory(id: string): Promise<void> {
+  return hardDelete('question_categories', id);
 }
 
 // ─── Audit Log ───────────────────────────────────────────────────────────────

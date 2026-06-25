@@ -4,9 +4,10 @@ import { vi } from "date-fns/locale";
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Loader2,
   Search, MoreHorizontal, CheckCircle2, CalendarClock, XCircle, Trash2, Activity,
-  AlertTriangle, ClipboardList,
+  AlertTriangle, ClipboardList, HeartPulse, Mail,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { fetchAdminAppointments } from "@/lib/admin-appointment-api";
+import { sendPreConsultReminder } from "@/lib/doctor-appointment-api";
 import { fetchSpecialties } from "@/lib/appointment-api";
 import { fetchDoctors } from "@/lib/master-data-api";
 
@@ -83,6 +85,7 @@ export default function AdminAppointmentsContent() {
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
   const [vitalSignsAppt, setVitalSignsAppt] = useState<AdminAppointment | null>(null);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
 
   const dateStr   = format(currentDate, "yyyy-MM-dd");
   const weekStart = format(startOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -145,6 +148,26 @@ export default function AdminAppointmentsContent() {
   const navigateDate = (dir: -1 | 1) => {
     setCurrentDate((d) => (dir === -1 ? subDays(d, 1) : addDays(d, 1)));
   };
+
+  async function handlePreConsultReminder(appt: AdminAppointment) {
+    if (appt.pre_consult_status === "submitted") {
+      toast.info("Bệnh nhân đã hoàn thành khai báo trước khám.");
+      return;
+    }
+    setRemindingId(appt.id);
+    try {
+      const { emailSent, email, emailError } = await sendPreConsultReminder(appt.id);
+      if (emailSent) {
+        toast.success(`Đã gửi email nhắc nhở${email ? ` tới ${email}` : ""}.`);
+      } else {
+        toast.error(emailError ?? "Không gửi được email nhắc nhở.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không gửi được email nhắc nhở.");
+    } finally {
+      setRemindingId(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -321,6 +344,8 @@ export default function AdminAppointmentsContent() {
                     onCancel={() => setCancelAppt(appt)}
                     onReschedule={() => setRescheduleAppt(appt)}
                     onVitalSigns={() => setVitalSignsAppt(appt)}
+                    onPreConsultReminder={() => void handlePreConsultReminder(appt)}
+                    reminding={remindingId === appt.id}
                   />
                 ))}
               </div>
@@ -392,9 +417,14 @@ interface RowProps {
   onCancel: () => void;
   onReschedule: () => void;
   onVitalSigns: () => void;
+  onPreConsultReminder: () => void;
+  reminding: boolean;
 }
 
-function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel, onReschedule, onVitalSigns }: RowProps) {
+function AppointmentRow({
+  appt, selected, onToggle, onClick, onCheckin, onCancel, onReschedule,
+  onVitalSigns, onPreConsultReminder, reminding,
+}: RowProps) {
   const initials = avatarInitial(appt.patient_name);
   const color    = avatarColor(appt.id);
 
@@ -406,7 +436,10 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
   const canCheckin     = appt.status === "CONFIRMED";
   const canCancel      = !["CANCELLED", "COMPLETED"].includes(appt.status);
   const canReschedule  = ["CONFIRMED", "CHECKED_IN"].includes(appt.status) && !appt.walk_in;
-  const canVitalSigns  = ["CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
+  const canVitalSigns  = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
+  const canRemindPreConsult =
+    appt.pre_consult_status !== "submitted" &&
+    ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
 
   return (
     <div
@@ -493,21 +526,29 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {canVitalSigns && (
-              <DropdownMenuItem onClick={onVitalSigns}>
-                <Activity className="mr-2 h-4 w-4 text-teal-600" />
-                Nhập sinh hiệu
-              </DropdownMenuItem>
-            )}
             {canCheckin && (
               <DropdownMenuItem onClick={onCheckin}>
                 <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
                 Check-in
               </DropdownMenuItem>
             )}
+            {canVitalSigns && (
+              <DropdownMenuItem onClick={onVitalSigns}>
+                <HeartPulse className="mr-2 h-4 w-4 text-teal-600" />
+                Nhập sinh hiệu
+              </DropdownMenuItem>
+            )}
+            {canRemindPreConsult && (
+              <DropdownMenuItem disabled={reminding} onClick={onPreConsultReminder}>
+                {reminding
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <Mail className="mr-2 h-4 w-4 text-pink-600" />}
+                Nhắc nhở khai báo
+              </DropdownMenuItem>
+            )}
             {canReschedule && (
               <DropdownMenuItem onClick={onReschedule}>
-                <CalendarClock className="mr-2 h-4 w-4 text-blue-600" />
+                <CalendarClock className="mr-2 h-4 w-4 text-amber-500" />
                 Đổi lịch
               </DropdownMenuItem>
             )}
@@ -520,7 +561,7 @@ function AppointmentRow({ appt, selected, onToggle, onClick, onCheckin, onCancel
                 Hủy lịch
               </DropdownMenuItem>
             )}
-            {!canVitalSigns && !canCheckin && !canReschedule && !canCancel && (
+            {!canVitalSigns && !canRemindPreConsult && !canCheckin && !canReschedule && !canCancel && (
               <DropdownMenuItem disabled>
                 Không có thao tác
               </DropdownMenuItem>

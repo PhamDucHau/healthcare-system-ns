@@ -136,3 +136,27 @@ export async function sendPreConsultReminder(
     email: payload?.email as string | undefined,
   };
 }
+
+/** Resolve the logged-in doctor's specialty to a specialties.id (by name match). */
+export async function fetchDoctorSpecialtyId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("specialty")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const specialtyName = profile?.specialty?.trim();
+  if (!specialtyName) return null;
+
+  const { data: specialty } = await supabase
+    .from("specialties")
+    .select("id")
+    .eq("name", specialtyName)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  return specialty?.id ?? null;
+}

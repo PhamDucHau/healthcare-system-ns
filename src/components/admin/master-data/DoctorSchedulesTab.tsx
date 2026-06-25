@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Pencil, PowerOff, RefreshCw, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  fetchDoctorSchedules, upsertDoctorSchedule, deactivateDoctorSchedule,
+  fetchDoctorSchedules, upsertDoctorSchedule, deleteDoctorSchedule,
   fetchDoctors, fetchSpecialtiesAdmin, fetchFacilities, fetchRooms,
   triggerSlotGeneration,
 } from '@/lib/master-data-api';
 import type { DoctorSchedule, Doctor, Facility, Room } from '@/types/master-data';
 import type { Specialty } from '@/types/master-data';
 import { formatWorkDays, formatTime, DOW_LABELS } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, Field, FormActions, inputCls, useEntityDialog } from './shared';
+import { EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog, Field, FormActions, inputCls, useEntityDialog } from './shared';
 
 export default function DoctorSchedulesTab() {
   const [rows, setRows]         = useState<DoctorSchedule[]>([]);
@@ -21,6 +21,8 @@ export default function DoctorSchedulesTab() {
   const [rooms, setRooms]       = useState<Room[]>([]);
   const [loading, setLoading]   = useState(true);
   const [generating, setGen]    = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DoctorSchedule | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<DoctorSchedule>();
 
   const reload = () => {
@@ -39,12 +41,16 @@ export default function DoctorSchedulesTab() {
 
   useEffect(reload, []);
 
-  async function handleDeactivate(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deactivateDoctorSchedule(id);
-      toast.success('Đã vô hiệu hóa lịch làm việc.');
+      await deleteDoctorSchedule(deleteTarget.id);
+      toast.success('Đã xóa lịch làm việc.');
+      setDeleteTarget(null);
       reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDeleting(false); }
   }
 
   async function handleGenerateSlots() {
@@ -93,9 +99,7 @@ export default function DoctorSchedulesTab() {
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                {r.is_active && (
-                  <ActionBtn icon={PowerOff} label="Vô hiệu" variant="destructive" onClick={() => handleDeactivate(r.id)} />
-                )}
+                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
             </td>
           </>
@@ -111,6 +115,15 @@ export default function DoctorSchedulesTab() {
         rooms={rooms}
         onClose={close}
         onSaved={reload}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        name={deleteTarget?.doctor_name}
+        entityLabel="lịch làm việc"
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
       />
     </>
   );
@@ -297,6 +310,11 @@ function ScheduleDialog({
               {form.exceptions.length === 0 && <span className="text-xs text-muted-foreground">Không có ngày nghỉ.</span>}
             </div>
           </Field>
+
+          <ActiveStatusField
+            value={form.is_active}
+            onChange={(is_active) => setForm((f) => ({ ...f, is_active }))}
+          />
 
           <FormActions saving={saving} onCancel={onClose} editMode={!!form.id} />
         </form>

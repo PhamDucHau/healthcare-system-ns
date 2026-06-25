@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Loader2, UserPlus, CheckCircle2, ChevronRight, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -17,18 +17,26 @@ import { fetchSpecialties } from "@/lib/appointment-api";
 import {
   fetchAllPatients, adminCreateWalkin, adminInsertPatientProfile,
 } from "@/lib/admin-appointment-api";
-import { createAdminUser, listAdminRoles } from "@/lib/admin-api";
+import { createAdminUser, createWalkinPatientUser, listAdminRoles } from "@/lib/admin-api";
 import type { PatientSearchResult } from "@/types/admin-appointment";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: (appointmentId: string) => void;
+  /** When set, pre-selects specialty and optionally locks the dropdown. */
+  defaultSpecialtyId?: string;
+  lockSpecialty?: boolean;
+  /** Provider portal uses staff walk-in patient creation (no admin roles permission). */
+  portal?: "admin" | "provider";
 }
 
 type Step = "search" | "quick-create" | "book";
 
-export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
+export default function WalkInDialog({
+  open, onClose, onSuccess,
+  defaultSpecialtyId, lockSpecialty = false, portal = "admin",
+}: Props) {
   const [step, setStep]                     = useState<Step>("search");
   const [searchQuery, setSearchQuery]       = useState("");
   const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
@@ -59,6 +67,12 @@ export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
     enabled:  open,
   });
 
+  useEffect(() => {
+    if (open && defaultSpecialtyId) {
+      setSpecialtyId(defaultSpecialtyId);
+    }
+  }, [open, defaultSpecialtyId]);
+
   // Client-side filter
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -72,6 +86,7 @@ export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
 
   const handleSelectPatient = (patient: PatientSearchResult) => {
     setSelectedPatient(patient);
+    if (defaultSpecialtyId) setSpecialtyId(defaultSpecialtyId);
     setStep("book");
   };
 
@@ -82,20 +97,32 @@ export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
     }
     setQcCreating(true);
     try {
-      const { roles } = await listAdminRoles();
-      const patientRole = roles.find((r) => r.slug === "patient");
-      if (!patientRole) throw new Error("Không tìm thấy role bệnh nhân.");
+      const fullName = `${qcLastName.trim()} ${qcFirstName.trim()}`;
+      let userId: string;
 
-      const tempEmail = qcPhone.trim()
-        ? `patient_${qcPhone.trim().replace(/\D/g, "")}@walkin.internal`
-        : `walkin_${Date.now()}@walkin.internal`;
+      if (portal === "provider") {
+        const created = await createWalkinPatientUser({
+          fullName,
+          phone: qcPhone.trim() || undefined,
+        });
+        userId = created.userId;
+      } else {
+        const { roles } = await listAdminRoles();
+        const patientRole = roles.find((r) => r.slug === "patient");
+        if (!patientRole) throw new Error("Không tìm thấy role bệnh nhân.");
 
-      const { userId } = await createAdminUser({
-        fullName: `${qcLastName.trim()} ${qcFirstName.trim()}`,
-        email:    tempEmail,
-        phone:    qcPhone.trim() || undefined,
-        roleId:   patientRole.id,
-      });
+        const tempEmail = qcPhone.trim()
+          ? `patient_${qcPhone.trim().replace(/\D/g, "")}@walkin.internal`
+          : `walkin_${Date.now()}@walkin.internal`;
+
+        const created = await createAdminUser({
+          fullName,
+          email: tempEmail,
+          phone: qcPhone.trim() || undefined,
+          roleId: patientRole.id,
+        });
+        userId = created.userId;
+      }
 
       const profileId = await adminInsertPatientProfile(
         userId,
@@ -109,12 +136,13 @@ export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
       setSelectedPatient({
         profile_id:    profileId,
         patient_id:    userId,
-        patient_name:  `${qcLastName.trim()} ${qcFirstName.trim()}`,
+        patient_name:  fullName,
         phone_number:  qcPhone.trim() || null,
         id_number:     qcId.trim()    || null,
         date_of_birth: qcDob          || null,
         submitted_at:  new Date().toISOString(),
       });
+      if (defaultSpecialtyId) setSpecialtyId(defaultSpecialtyId);
       setStep("book");
       toast.success("Đã tạo hồ sơ bệnh nhân.");
     } catch (err) {
@@ -148,7 +176,7 @@ export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
     setSearchQuery("");
     setSelectedPatient(null);
     setQcFirstName(""); setQcLastName(""); setQcPhone(""); setQcDob(""); setQcId("");
-    setSpecialtyId(""); setNote("");
+    setSpecialtyId(defaultSpecialtyId ?? ""); setNote("");
     onClose();
   };
 
@@ -298,16 +326,22 @@ export default function WalkInDialog({ open, onClose, onSuccess }: Props) {
 
             <div className="space-y-1.5">
               <Label>Chuyên khoa <span className="text-destructive">*</span></Label>
-              <Select value={specialtyId} onValueChange={setSpecialtyId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn chuyên khoa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {specialties.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {lockSpecialty && defaultSpecialtyId ? (
+                <p className="text-sm font-medium py-2">
+                  {specialties.find((s) => s.id === defaultSpecialtyId)?.name ?? "—"}
+                </p>
+              ) : (
+                <Select value={specialtyId} onValueChange={setSpecialtyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn chuyên khoa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {specialties.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-1.5">

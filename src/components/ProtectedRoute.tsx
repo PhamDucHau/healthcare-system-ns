@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
+import { stashAuthReturnTo } from "@/lib/portal-auth";
 import { portalLoginMessage } from "@/types/portal";
 import type { PortalType } from "@/types/portal";
 import { PORTAL_CONFIG } from "@/types/portal";
@@ -27,11 +28,13 @@ const ProtectedRoute = ({ children, requiredPortal }: ProtectedRouteProps) => {
     : PORTAL_CONFIG.patient.loginPath;
 
   if (!session) {
+    stashAuthReturnTo(`${location.pathname}${location.search}${location.hash}`);
     return <Navigate to={loginPath} replace state={{ from: location }} />;
   }
 
   if (requiredPortal) {
     if (!role) {
+      stashAuthReturnTo(`${location.pathname}${location.search}${location.hash}`);
       return <Navigate to={loginPath} replace state={{ from: location }} />;
     }
     if (role !== requiredPortal) {

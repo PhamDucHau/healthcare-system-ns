@@ -109,3 +109,41 @@ export function isAuthContext(
 ): value is AuthContext {
   return value instanceof Object && "userId" in value && "admin" in value;
 }
+
+/** Verify JWT and require portal role in user_profiles (admin or doctor). */
+export async function requireStaffPortalRole(
+  req: Request,
+  roles: ("admin" | "doctor")[],
+): Promise<AuthContext | Response> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) {
+    return jsonResponse({ error: "UNAUTHORIZED", message: "Thiếu access token" }, 401);
+  }
+
+  const admin = getAdminClient();
+  const { data: userData, error: userError } = await admin.auth.getUser(token);
+  if (userError || !userData.user?.id) {
+    return jsonResponse({ error: "UNAUTHORIZED", message: "Token không hợp lệ" }, 401);
+  }
+
+  const userId = userData.user.id;
+  const email = userData.user.email ?? "";
+
+  const { data: profile } = await admin
+    .from("user_profiles")
+    .select("role, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!profile || !roles.includes(profile.role as "admin" | "doctor")) {
+    return jsonResponse({ error: "FORBIDDEN", message: "Bạn không có quyền thực hiện thao tác này." }, 403);
+  }
+
+  if (profile.status === "locked" || profile.status === "inactive") {
+    return jsonResponse({ error: "FORBIDDEN", message: "Tài khoản bị khóa" }, 403);
+  }
+
+  const permissions = await getPermissionsForUser(admin, userId);
+  return { admin, userId, email, permissions };
+}

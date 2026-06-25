@@ -1,18 +1,24 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, Globe, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { homePathForRole } from "@/lib/portal-auth";
+import { resolvePostLoginPath } from "@/lib/portal-auth";
 import { unifiedLogin, verifyAdminMfa, PortalAuthError } from "@/lib/portal-auth-api";
-import { PORTAL_CONFIG } from "@/types/portal";
+import type { PortalType } from "@/types/portal";
 import OtpStep from "@/components/auth/OtpStep";
 
 const RESEND_COOLDOWN = 60;
 
 const UnifiedLoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, role, isLoading } = useAuth();
+
+  const redirectAfterLogin = (userRole: PortalType) => {
+    const from = (location.state as { from?: typeof location } | null)?.from ?? null;
+    navigate(resolvePostLoginPath(userRole, from), { replace: true });
+  };
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,8 +35,8 @@ const UnifiedLoginPage = () => {
 
   useEffect(() => {
     if (isLoading || !session || !role) return;
-    navigate(homePathForRole(role), { replace: true });
-  }, [isLoading, session, role, navigate]);
+    redirectAfterLogin(role);
+  }, [isLoading, session, role, location.state]);
 
   useEffect(() => {
     if (lockSeconds <= 0) return;
@@ -70,7 +76,7 @@ const UnifiedLoginPage = () => {
       }
 
       toast.success("Đăng nhập thành công");
-      navigate(PORTAL_CONFIG[result.role].homePath, { replace: true });
+      redirectAfterLogin(result.role);
     } catch (err) {
       if (err instanceof PortalAuthError) {
         if (err.retryAfterSeconds) {
@@ -96,7 +102,7 @@ const UnifiedLoginPage = () => {
     try {
       const result = await verifyAdminMfa(mfaToken, otp);
       toast.success("Đăng nhập thành công");
-      navigate(PORTAL_CONFIG[result.role].homePath, { replace: true });
+      redirectAfterLogin(result.role);
     } catch (err) {
       if (err instanceof PortalAuthError) {
         if (err.code === "MFA_LOCKED") {

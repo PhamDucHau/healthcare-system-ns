@@ -3,6 +3,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import type { QuestionnaireAnswerPayload } from '@/lib/questionnaire-scoring';
 
 export type QuestionnaireAssignment = {
   id: string;
@@ -70,7 +71,8 @@ export async function getAssignmentsByAppointment(
 
   return ((data ?? []) as Record<string, unknown>[]).map((row) => {
     const q = row.questionnaires as Record<string, unknown> | null;
-    const cat = q?.categories as Record<string, unknown> | null;
+    const cat = q?.question_categories as { name: string } | { name: string }[] | null;
+    const catRow = Array.isArray(cat) ? cat[0] : cat;
     const resp = Array.isArray(row.questionnaire_responses)
       ? (row.questionnaire_responses as Record<string, unknown>[])[0]
       : null;
@@ -88,7 +90,7 @@ export async function getAssignmentsByAppointment(
       created_at: String(row.created_at),
       updated_at: String(row.updated_at),
       questionnaire_name: q?.name ? String(q.name) : undefined,
-      questionnaire_category: cat?.name ? String(cat.name) : undefined,
+      questionnaire_category: catRow?.name ? String(catRow.name) : undefined,
       total_score: resp?.total_score != null ? Number(resp.total_score) : null,
       score_label: resp?.score_label ? String(resp.score_label) : null,
       intervention: resp?.intervention ? String(resp.intervention) : null,
@@ -135,6 +137,54 @@ export async function getMyPendingAssignments(): Promise<QuestionnaireAssignment
       submitted_at: resp?.submitted_at ? String(resp.submitted_at) : null,
     };
   });
+}
+
+export async function submitQuestionnaireResponse(
+  assignmentId: string,
+  answers: QuestionnaireAnswerPayload[],
+): Promise<string> {
+  const payload = answers.map((a) => ({
+    question_id: a.question_id,
+    answer_value: a.answer_value,
+    score_value: a.score_value,
+  }));
+
+  const { data, error } = await supabase.rpc('submit_questionnaire_response', {
+    p_assignment_id: assignmentId,
+    p_answers: payload,
+  });
+
+  if (error) throw new Error(mapError(error.message));
+  return data as string;
+}
+
+export async function getAssignmentAnswers(assignmentId: string): Promise<Record<string, string | string[] | number>> {
+  const { data: response, error: respErr } = await supabase
+    .from('questionnaire_responses')
+    .select('id')
+    .eq('assignment_id', assignmentId)
+    .maybeSingle();
+
+  if (respErr) throw new Error(respErr.message);
+  if (!response) return {};
+
+  const { data: rows, error } = await supabase
+    .from('questionnaire_answers')
+    .select('question_id, answer_value')
+    .eq('response_id', response.id);
+
+  if (error) throw new Error(error.message);
+
+  const out: Record<string, string | string[] | number> = {};
+  for (const row of rows ?? []) {
+    const qid = String(row.question_id);
+    const val = row.answer_value;
+    if (typeof val === 'number') out[qid] = val;
+    else if (Array.isArray(val)) out[qid] = val.map(String);
+    else if (typeof val === 'string') out[qid] = val;
+    else if (val != null) out[qid] = String(val);
+  }
+  return out;
 }
 
 function mapError(message: string): string {

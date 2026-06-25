@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Pencil, PowerOff } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchServices, upsertService, deactivateService, fetchSpecialtiesAdmin } from '@/lib/master-data-api';
+import { fetchServices, upsertService, deleteService, fetchSpecialtiesAdmin } from '@/lib/master-data-api';
 import type { Service, Specialty } from '@/types/master-data';
 import { formatVND } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, Field, FormActions, inputCls, useEntityDialog } from './shared';
+import {
+  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  Field, FormActions, inputCls, useEntityDialog,
+} from './shared';
 
 export default function ServicesTab() {
   const [rows, setRows] = useState<Service[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Service>();
 
   const reload = () => {
@@ -23,12 +28,16 @@ export default function ServicesTab() {
 
   useEffect(reload, []);
 
-  async function handleDeactivate(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deactivateService(id);
-      toast.success('Đã vô hiệu hóa dịch vụ.');
+      await deleteService(deleteTarget.id);
+      toast.success('Đã xóa dịch vụ.');
+      setDeleteTarget(null);
       reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDeleting(false); }
   }
 
   return (
@@ -52,9 +61,7 @@ export default function ServicesTab() {
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                {r.is_active && (
-                  <ActionBtn icon={PowerOff} label="Vô hiệu" variant="destructive" onClick={() => handleDeactivate(r.id)} />
-                )}
+                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
             </td>
           </>
@@ -62,6 +69,15 @@ export default function ServicesTab() {
       />
 
       <ServiceDialog open={open} initial={editing} specialties={specialties} onClose={close} onSaved={reload} />
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        name={deleteTarget?.name}
+        entityLabel="dịch vụ"
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }
@@ -73,7 +89,7 @@ function ServiceDialog({ open, initial, specialties, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const blank: Partial<Service> = { name: '', description: '', specialty_id: '', price_vnd: null, duration_minutes: 30 };
+  const blank: Partial<Service> = { name: '', description: '', specialty_id: '', price_vnd: null, duration_minutes: 30, is_active: true };
   const [form, setForm] = useState<Partial<Service>>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -123,6 +139,10 @@ function ServiceDialog({ open, initial, specialties, onClose, onSaved }: {
               <input type="number" min={5} max={480} value={form.duration_minutes ?? 30} onChange={setNum('duration_minutes')} className={inputCls} />
             </Field>
           </div>
+          <ActiveStatusField
+            value={form.is_active ?? true}
+            onChange={(is_active) => setForm((f) => ({ ...f, is_active }))}
+          />
           <FormActions saving={saving} onCancel={onClose} editMode={!!form.id} />
         </form>
       </DialogContent>

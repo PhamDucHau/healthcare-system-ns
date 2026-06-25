@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
-  Calendar, Plus, Loader2, QrCode, XCircle, ChevronRight, Stethoscope, ClipboardList,
+  Calendar, Plus, Loader2, QrCode, XCircle, ChevronRight, Stethoscope, ClipboardList, CheckCircle2,
 } from 'lucide-react';
 import CheckinButton from '@/components/patient/booking/CheckinButton';
 import { toast } from 'sonner';
@@ -158,6 +158,7 @@ function UpcomingCard({
   const dateLabel = apt.slot_date
     ? format(parseISO(apt.slot_date), 'EEEE, dd/MM/yyyy', { locale: vi })
     : '—';
+  const preConsultSubmitted = apt.pre_consult_status === 'submitted';
 
   return (
     <div className="rounded-xl border bg-card p-5">
@@ -205,13 +206,19 @@ function UpcomingCard({
             }}
           />
 
-          {/* Pre-consultation button */}
+          {/* Pre-consultation */}
           <button
             onClick={() => navigate(`/appointments/${apt.id}/pre-consultation`)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+            className={`flex items-center gap-1.5 text-xs font-semibold hover:underline ${
+              preConsultSubmitted ? 'text-emerald-600' : 'text-primary'
+            }`}
           >
-            <ClipboardList className="h-3.5 w-3.5" />
-            Khai báo trước khám
+            {preConsultSubmitted ? (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            ) : (
+              <ClipboardList className="h-3.5 w-3.5" />
+            )}
+            {preConsultSubmitted ? 'Đã khai báo' : 'Khai báo trước khám'}
           </button>
 
           {/* Cancel button */}

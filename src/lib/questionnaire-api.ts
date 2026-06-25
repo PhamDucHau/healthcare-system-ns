@@ -54,14 +54,11 @@ async function assertNoResponses(questionnaireId: string): Promise<void> {
 
 // ─── List / fetch ──────────────────────────────────────────────────────────
 
-export async function fetchQuestionnaires(): Promise<Questionnaire[]> {
-  const { data, error } = await supabase
-    .from('questionnaires')
-    .select('id, name, category_id, description, status, version, parent_id, intervention_matrix, scoring_config, created_at, updated_at, question_categories(name)')
-    .order('updated_at', { ascending: false });
-  if (error) throw new Error(error.message);
+const QUESTIONNAIRE_LIST_SELECT =
+  'id, name, category_id, description, status, version, parent_id, intervention_matrix, scoring_config, created_at, updated_at, question_categories(name)';
 
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+function mapQuestionnaireRow(r: Record<string, unknown>): Questionnaire {
+  return {
     id:                  str(r.id),
     name:                str(r.name),
     category_id:         strNull(r.category_id),
@@ -74,7 +71,29 @@ export async function fetchQuestionnaires(): Promise<Questionnaire[]> {
     scoring_config:      (r.scoring_config ?? {}) as ScoringConfig,
     created_at:          str(r.created_at),
     updated_at:          str(r.updated_at),
-  }));
+  };
+}
+
+export async function fetchQuestionnaires(): Promise<Questionnaire[]> {
+  const { data, error } = await supabase
+    .from('questionnaires')
+    .select(QUESTIONNAIRE_LIST_SELECT)
+    .order('updated_at', { ascending: false });
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Record<string, unknown>[]).map(mapQuestionnaireRow);
+}
+
+/** Published (ACTIVE) questionnaires for doctor examination assignment. */
+export async function fetchActiveQuestionnaires(): Promise<Questionnaire[]> {
+  const { data, error } = await supabase
+    .from('questionnaires')
+    .select(QUESTIONNAIRE_LIST_SELECT)
+    .eq('status', 'ACTIVE')
+    .order('name');
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Record<string, unknown>[]).map(mapQuestionnaireRow);
 }
 
 export async function fetchQuestionnaireById(id: string): Promise<QuestionnaireWithSections> {

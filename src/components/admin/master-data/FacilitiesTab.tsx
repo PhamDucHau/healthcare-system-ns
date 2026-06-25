@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Pencil, PowerOff } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchFacilities, upsertFacility, deactivateFacility } from '@/lib/master-data-api';
+import { fetchFacilities, upsertFacility, deleteFacility } from '@/lib/master-data-api';
 import type { Facility } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, Field, FormActions, inputCls, useEntityDialog } from './shared';
+import {
+  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  Field, FormActions, inputCls, useEntityDialog,
+} from './shared';
 
 export default function FacilitiesTab() {
   const [rows, setRows] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Facility | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Facility>();
 
   const reload = () => {
@@ -21,12 +26,16 @@ export default function FacilitiesTab() {
 
   useEffect(reload, []);
 
-  async function handleDeactivate(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deactivateFacility(id);
-      toast.success('Đã vô hiệu hóa cơ sở.');
+      await deleteFacility(deleteTarget.id);
+      toast.success('Đã xóa cơ sở.');
+      setDeleteTarget(null);
       reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDeleting(false); }
   }
 
   return (
@@ -47,9 +56,7 @@ export default function FacilitiesTab() {
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                {r.is_active && (
-                  <ActionBtn icon={PowerOff} label="Vô hiệu" variant="destructive" onClick={() => handleDeactivate(r.id)} />
-                )}
+                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
             </td>
           </>
@@ -57,6 +64,15 @@ export default function FacilitiesTab() {
       />
 
       <FacilityDialog open={open} initial={editing} onClose={close} onSaved={reload} />
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        name={deleteTarget?.name}
+        entityLabel="cơ sở"
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }
@@ -64,7 +80,7 @@ export default function FacilitiesTab() {
 function FacilityDialog({ open, initial, onClose, onSaved }: {
   open: boolean; initial: Facility | null; onClose: () => void; onSaved: () => void;
 }) {
-  const blank: Partial<Facility> = { name: '', code: '', address: '', phone: '' };
+  const blank: Partial<Facility> = { name: '', code: '', address: '', phone: '', is_active: true };
   const [form, setForm] = useState<Partial<Facility>>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -102,6 +118,10 @@ function FacilityDialog({ open, initial, onClose, onSaved }: {
           <Field label="Số điện thoại">
             <input value={form.phone ?? ''} onChange={set('phone')} className={inputCls} placeholder="028 1234 5678" />
           </Field>
+          <ActiveStatusField
+            value={form.is_active ?? true}
+            onChange={(is_active) => setForm((f) => ({ ...f, is_active }))}
+          />
           <FormActions saving={saving} onCancel={onClose} editMode={!!form.id} />
         </form>
       </DialogContent>

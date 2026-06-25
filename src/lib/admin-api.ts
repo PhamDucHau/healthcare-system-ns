@@ -126,6 +126,18 @@ export async function createAdminUser(input: {
   });
 }
 
+/** Staff (admin/doctor) quick-create patient auth account for walk-in flow. */
+export async function createWalkinPatientUser(input: {
+  fullName: string;
+  email?: string;
+  phone?: string;
+}) {
+  return postAdmin<{ message: string; userId: string }>("admin-users", {
+    action: "create_walkin_patient",
+    ...input,
+  });
+}
+
 export async function updateAdminUser(input: {
   userId: string;
   fullName?: string;

@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import nodemailer from "npm:nodemailer@6.9.13";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
+import { getSiteUrl } from "../_shared/site-url.ts";
 
 interface RequestBody {
   appointment_id: string;
@@ -72,7 +73,7 @@ Deno.serve(async (req) => {
       : `Walk-in, ${formatDate(appt.created_at?.slice(0, 10))}`;
 
     const specialtyName = sp?.name ?? "—";
-    const siteUrl       = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
+    const siteUrl       = getSiteUrl();
     const fromName      = Deno.env.get("EMAIL_FROM_NAME") ?? "QcarePlus";
 
     // ── 4. Send via Gmail SMTP ────────────────────────────────────────────────

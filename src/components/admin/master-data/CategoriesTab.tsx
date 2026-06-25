@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Pencil, PowerOff } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchQuestionCategories, upsertQuestionCategory, deactivateQuestionCategory } from '@/lib/master-data-api';
+import { fetchQuestionCategories, upsertQuestionCategory, deleteQuestionCategory } from '@/lib/master-data-api';
 import type { QuestionCategory } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, Field, FormActions, inputCls, useEntityDialog } from './shared';
+import {
+  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  Field, FormActions, inputCls, useEntityDialog,
+} from './shared';
 
 export default function CategoriesTab() {
   const [rows, setRows] = useState<QuestionCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<QuestionCategory | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<QuestionCategory>();
 
   const reload = () => {
@@ -21,12 +26,16 @@ export default function CategoriesTab() {
 
   useEffect(reload, []);
 
-  async function handleDeactivate(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deactivateQuestionCategory(id);
-      toast.success('Đã vô hiệu hóa danh mục.');
+      await deleteQuestionCategory(deleteTarget.id);
+      toast.success('Đã xóa danh mục.');
+      setDeleteTarget(null);
       reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDeleting(false); }
   }
 
   return (
@@ -46,9 +55,7 @@ export default function CategoriesTab() {
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                {r.is_active && (
-                  <ActionBtn icon={PowerOff} label="Vô hiệu" variant="destructive" onClick={() => handleDeactivate(r.id)} />
-                )}
+                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
             </td>
           </>
@@ -56,6 +63,15 @@ export default function CategoriesTab() {
       />
 
       <CategoryDialog open={open} initial={editing} onClose={close} onSaved={reload} />
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        name={deleteTarget?.name}
+        entityLabel="danh mục"
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }
@@ -63,7 +79,7 @@ export default function CategoriesTab() {
 function CategoryDialog({ open, initial, onClose, onSaved }: {
   open: boolean; initial: QuestionCategory | null; onClose: () => void; onSaved: () => void;
 }) {
-  const blank: Partial<QuestionCategory> = { name: '', description: '', sort_order: 0 };
+  const blank: Partial<QuestionCategory> = { name: '', description: '', sort_order: 0, is_active: true };
   const [form, setForm] = useState<Partial<QuestionCategory>>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -100,6 +116,10 @@ function CategoryDialog({ open, initial, onClose, onSaved }: {
               onChange={(e) => setForm((f) => ({ ...f, sort_order: Number(e.target.value) }))}
               className={inputCls} />
           </Field>
+          <ActiveStatusField
+            value={form.is_active ?? true}
+            onChange={(is_active) => setForm((f) => ({ ...f, is_active }))}
+          />
           <FormActions saving={saving} onCancel={onClose} editMode={!!form.id} />
         </form>
       </DialogContent>

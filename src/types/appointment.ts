@@ -22,6 +22,8 @@ export type AppointmentSlot = {
   is_available: boolean;
 };
 
+export type PreConsultStatus = 'none' | 'draft' | 'submitted';
+
 export type Appointment = {
   id: string;
   patient_id: string;
@@ -40,6 +42,7 @@ export type Appointment = {
   slot_date: string;
   start_time: string;
   end_time: string;
+  pre_consult_status: PreConsultStatus;
 };
 
 export type BookAppointmentParams = {

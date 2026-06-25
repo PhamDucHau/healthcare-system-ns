@@ -40,3 +40,57 @@ export function loginPathForRole(role: PortalType | null): string {
   if (role && PORTAL_CONFIG[role]) return PORTAL_CONFIG[role].loginPath;
   return PORTAL_CONFIG.patient.loginPath;
 }
+
+const AUTH_RETURN_KEY = "auth_return_to";
+
+/** Persist intended destination when redirecting unauthenticated users to login. */
+export function stashAuthReturnTo(path: string): void {
+  if (!path || path.startsWith("/login")) return;
+  try {
+    sessionStorage.setItem(AUTH_RETURN_KEY, path);
+  } catch {
+    /* ignore */
+  }
+}
+
+function isSafeReturnPath(path: string): boolean {
+  return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/login");
+}
+
+function isPathAllowedForRole(path: string, role: PortalType): boolean {
+  if (role === "admin") return path.startsWith("/admin");
+  if (role === "doctor") return path.startsWith("/provider-portal");
+  return !path.startsWith("/admin") && !path.startsWith("/provider-portal");
+}
+
+/** After login, return to the page the user originally requested when safe. */
+export function resolvePostLoginPath(
+  role: PortalType,
+  from?: { pathname: string; search?: string; hash?: string } | null,
+): string {
+  const fallback = PORTAL_CONFIG[role].homePath;
+
+  const fromPath = from?.pathname
+    ? `${from.pathname}${from.search ?? ""}${from.hash ?? ""}`
+    : null;
+
+  let stashed: string | null = null;
+  try {
+    stashed = sessionStorage.getItem(AUTH_RETURN_KEY);
+  } catch {
+    /* ignore */
+  }
+
+  const target = fromPath ?? stashed;
+  if (!target || !isSafeReturnPath(target) || !isPathAllowedForRole(target, role)) {
+    return fallback;
+  }
+
+  try {
+    sessionStorage.removeItem(AUTH_RETURN_KEY);
+  } catch {
+    /* ignore */
+  }
+
+  return target;
+}

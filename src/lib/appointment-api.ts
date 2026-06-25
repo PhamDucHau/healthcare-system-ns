@@ -70,7 +70,8 @@ export async function fetchMyAppointments(): Promise<Appointment[]> {
       id, patient_id, profile_id, specialty_id, slot_id, status,
       note, qr_token, qr_expires_at, reminder_at, cancelled_at, created_at,
       specialties (name),
-      appointment_slots (slot_date, start_time, end_time)
+      appointment_slots (slot_date, start_time, end_time),
+      pre_consultations ( status )
     `)
     .order('created_at', { ascending: false });
 
@@ -83,6 +84,8 @@ export async function fetchMyAppointments(): Promise<Appointment[]> {
       start_time: string;
       end_time: string;
     } | null;
+    const pcRaw = row.pre_consultations as { status: string } | { status: string }[] | null;
+    const pc = Array.isArray(pcRaw) ? pcRaw[0] : pcRaw;
 
     return {
       id:            String(row.id),
@@ -101,6 +104,11 @@ export async function fetchMyAppointments(): Promise<Appointment[]> {
       slot_date:     slot?.slot_date ?? '',
       start_time:    slot?.start_time ?? '',
       end_time:      slot?.end_time ?? '',
+      pre_consult_status: !pc
+        ? 'none'
+        : pc.status === 'SUBMITTED'
+          ? 'submitted'
+          : 'draft',
     } satisfies Appointment;
   });
 }

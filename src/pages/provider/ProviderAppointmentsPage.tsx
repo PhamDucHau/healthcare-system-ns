@@ -7,7 +7,7 @@ import {
 import { vi } from "date-fns/locale";
 import {
   Activity, AlertTriangle, CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight,
-  ClipboardList, HeartPulse, Loader2, Mail, MoreHorizontal, RefreshCw, Search, Stethoscope,
+  ClipboardList, HeartPulse, Loader2, Mail, MoreHorizontal, Plus, RefreshCw, Search, Stethoscope,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { fetchDoctorAppointments, sendPreConsultReminder } from "@/lib/doctor-appointment-api";
+import { fetchDoctorAppointments, fetchDoctorSpecialtyId, sendPreConsultReminder } from "@/lib/doctor-appointment-api";
 import { supabase } from "@/lib/supabase";
 import {
   getAppointmentReadiness,
@@ -35,6 +35,7 @@ import AppointmentDetailSheet from "@/components/admin/appointments/AppointmentD
 import CancelDialog from "@/components/admin/appointments/CancelDialog";
 import RescheduleDialog from "@/components/admin/appointments/RescheduleDialog";
 import VitalSignsSheet from "@/components/admin/appointments/VitalSignsSheet";
+import WalkInDialog from "@/components/admin/appointments/WalkInDialog";
 
 type DateMode = "all" | "day" | "week" | "month";
 
@@ -104,6 +105,7 @@ export default function ProviderAppointmentsPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [vitalSignsAppt, setVitalSignsAppt] = useState<AdminAppointment | null>(null);
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -111,6 +113,12 @@ export default function ProviderAppointmentsPage() {
   const { dateFrom, dateTo, label } = mode === "all"
     ? { dateFrom: undefined, dateTo: undefined, label: "Tất cả" }
     : dateRangeFor(mode, anchor);
+
+  const { data: doctorSpecialtyId } = useQuery({
+    queryKey: ["doctor-specialty-id"],
+    queryFn: fetchDoctorSpecialtyId,
+    staleTime: 60_000,
+  });
 
   const { data = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ["doctor-appointments", dateFrom ?? "all", dateTo ?? "all", status],
@@ -198,12 +206,18 @@ export default function ProviderAppointmentsPage() {
           <CalendarClock className="h-7 w-7 text-primary" />
           Lịch hẹn của tôi
         </h1>
-        <Button variant="outline" size="sm" disabled={isFetching} onClick={() => void refetch()}>
-          {isFetching
-            ? <Loader2 className="h-4 w-4 animate-spin" />
-            : <RefreshCw className="h-4 w-4" />}
-          Làm mới
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setWalkInOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Walk-in
+          </Button>
+          <Button variant="outline" size="sm" disabled={isFetching} onClick={() => void refetch()}>
+            {isFetching
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <RefreshCw className="h-4 w-4" />}
+            Làm mới
+          </Button>
+        </div>
       </div>
 
       {/* Date navigation + mode toggle */}
@@ -482,6 +496,15 @@ export default function ProviderAppointmentsPage() {
       <VitalSignsSheet
         appointment={vitalSignsAppt}
         onClose={() => setVitalSignsAppt(null)}
+      />
+
+      <WalkInDialog
+        open={walkInOpen}
+        onClose={() => setWalkInOpen(false)}
+        onSuccess={() => { setWalkInOpen(false); void refetch(); }}
+        portal="provider"
+        defaultSpecialtyId={doctorSpecialtyId ?? undefined}
+        lockSpecialty={Boolean(doctorSpecialtyId)}
       />
 
     </div>

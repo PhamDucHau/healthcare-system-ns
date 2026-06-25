@@ -4,7 +4,7 @@ import {
   clientUserAgent,
   writeAuditLog,
 } from "../_shared/audit.ts";
-import { PERMISSIONS, isAuthContext, requirePermission } from "../_shared/rbac.ts";
+import { PERMISSIONS, isAuthContext, requirePermission, requireStaffPortalRole } from "../_shared/rbac.ts";
 import { generateTempPassword } from "../_shared/temp-password.ts";
 import { syncRoleToAppMetadata } from "../_shared/user-profile.ts";
 import { emailExists, signOutAllSessions } from "../_shared/supabase-admin.ts";
@@ -37,11 +37,18 @@ type UpdateBody = {
 type DeleteBody = { action: "delete"; userId: string };
 type ResetPasswordBody = { action: "reset_password"; userId: string };
 type FacilitiesBody = { action: "facilities" };
+type CreateWalkinPatientBody = {
+  action: "create_walkin_patient";
+  fullName: string;
+  email?: string;
+  phone?: string;
+};
 
 type RequestBody =
   | ListBody
   | GetBody
   | CreateBody
+  | CreateWalkinPatientBody
   | UpdateBody
   | DeleteBody
   | ResetPasswordBody
@@ -234,6 +241,86 @@ Deno.serve(async (req) => {
       userId,
       tempPassword,
     });
+  }
+
+  if (body.action === "create_walkin_patient") {
+    const auth = await requireStaffPortalRole(req, ["admin", "doctor"]);
+    if (!isAuthContext(auth)) return auth;
+
+    if (!body.fullName?.trim()) {
+      return jsonResponse({ error: "VALIDATION", message: "Thiếu tên bệnh nhân" }, 400);
+    }
+
+    const phone = body.phone?.trim() || null;
+    const email = (body.email?.trim() || (
+      phone
+        ? `patient_${phone.replace(/\D/g, "")}@walkin.internal`
+        : `walkin_${Date.now()}@walkin.internal`
+    )).toLowerCase();
+
+    if (await emailExists(email)) {
+      return jsonResponse({ error: "EMAIL_EXISTS", message: "Email đã tồn tại" }, 409);
+    }
+
+    const { data: patientRole, error: roleError } = await auth.admin
+      .from("roles")
+      .select("id")
+      .eq("slug", "patient")
+      .maybeSingle();
+
+    if (roleError || !patientRole?.id) {
+      return jsonResponse({ error: "DB_ERROR", message: "Không tìm thấy role bệnh nhân" }, 500);
+    }
+
+    const tempPassword = generateTempPassword(12);
+
+    const { data: created, error: createError } = await auth.admin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: body.fullName.trim() },
+    });
+
+    if (createError || !created.user?.id) {
+      return jsonResponse(
+        { error: "CREATE_FAILED", message: createError?.message ?? "Không tạo được user" },
+        500,
+      );
+    }
+
+    const userId = created.user.id;
+
+    const { error: profileError } = await auth.admin.from("user_profiles").upsert(
+      {
+        user_id: userId,
+        email,
+        full_name: body.fullName.trim(),
+        phone,
+        role_id: patientRole.id,
+        role: "patient",
+        status: "active",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+
+    if (profileError) {
+      await auth.admin.auth.admin.deleteUser(userId);
+      return jsonResponse({ error: "DB_ERROR", message: profileError.message }, 500);
+    }
+
+    await syncRoleToAppMetadata(auth.admin, userId, "patient");
+
+    await writeAuditLog(auth.admin, {
+      eventType: "WALKIN_PATIENT_CREATED",
+      userId: auth.userId,
+      email: auth.email,
+      ipAddress: ip,
+      userAgent: ua,
+      metadata: { targetUserId: userId, targetEmail: email },
+    });
+
+    return jsonResponse({ message: "Đã tạo tài khoản bệnh nhân walk-in", userId });
   }
 
   if (body.action === "update") {

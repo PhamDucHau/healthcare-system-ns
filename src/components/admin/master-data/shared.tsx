@@ -1,5 +1,9 @@
 import { useState, type LucideIcon } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // ─── Reusable table shell ─────────────────────────────────────────────────────
 
@@ -117,6 +121,68 @@ export function Field({ label, children }: { label: string; children: React.Reac
       </label>
       {children}
     </div>
+  );
+}
+
+export function ActiveStatusField({
+  value,
+  onChange,
+}: {
+  value: boolean;
+  onChange: (active: boolean) => void;
+}) {
+  return (
+    <Field label="Trạng thái">
+      <select
+        value={value ? 'active' : 'inactive'}
+        onChange={(e) => onChange(e.target.value === 'active')}
+        className={inputCls}
+      >
+        <option value="active">Hoạt động</option>
+        <option value="inactive">Vô hiệu</option>
+      </select>
+    </Field>
+  );
+}
+
+export function DeleteConfirmDialog({
+  open,
+  name,
+  entityLabel,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  name?: string;
+  entityLabel: string;
+  deleting?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={(o) => !o && onCancel()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Xóa {entityLabel}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {name
+              ? `Bạn có chắc muốn xóa "${name}"? Hành động này không thể hoàn tác.`
+              : `Bạn có chắc muốn xóa ${entityLabel} này? Hành động này không thể hoàn tác.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>Hủy</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            disabled={deleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleting ? 'Đang xóa…' : 'Xóa'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

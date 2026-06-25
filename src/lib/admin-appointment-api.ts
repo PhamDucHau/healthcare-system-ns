@@ -286,7 +286,8 @@ export function mapAdminError(message: string): string {
     CANNOT_RESCHEDULE:  "Lịch hẹn này không thể đổi giờ.",
     SLOT_UNAVAILABLE:   "Slot này đã được đặt. Vui lòng chọn slot khác.",
     SLOT_IN_PAST:       "Slot đã qua, không thể đặt.",
-    REASON_TOO_SHORT:   "Lý do hủy phải ít nhất 5 ký tự.",
+    SPECIALTY_MISMATCH: "Bác sĩ chỉ có thể tạo Walk-in thuộc chuyên khoa của mình.",
+    PATIENT_NO_ACCOUNT: "Hồ sơ bệnh nhân chưa có tài khoản. Vui lòng tạo hồ sơ mới.",
   };
   for (const [code, msg] of Object.entries(map)) {
     if (message.includes(code)) return msg;

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.49.1";
 import nodemailer from "npm:nodemailer@6.9.13";
+import { getSiteUrl } from "./site-url.ts";
 
 export type PreConsultReminderResult =
   | { sent: true; email: string }
@@ -62,7 +63,7 @@ export async function sendPreConsultReminderEmail(
     : `Walk-in, ${formatDate(appt.created_at?.slice(0, 10))}`;
 
   const specialtyName = sp?.name ?? "—";
-  const siteUrl = (Deno.env.get("SITE_URL") ?? "http://localhost:8080").replace(/\/$/, "");
+  const siteUrl = getSiteUrl();
   const fromName = Deno.env.get("EMAIL_FROM_NAME") ?? "QcarePlus";
   const preConsultUrl = `${siteUrl}/appointments/${appointmentId}/pre-consultation`;
 

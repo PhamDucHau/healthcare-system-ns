@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, PowerOff, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchSpecialtiesAdmin, upsertSpecialty, deactivateSpecialty } from '@/lib/master-data-api';
+import { fetchSpecialtiesAdmin, upsertSpecialty, deleteSpecialty } from '@/lib/master-data-api';
 import type { Specialty } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, useEntityDialog } from './shared';
+import {
+  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  Field, inputCls, useEntityDialog,
+} from './shared';
 
 const EMPTY: Omit<Specialty, 'id' | 'created_at'> = {
   name: '', description: '', icon: '', is_active: true,
@@ -13,6 +16,8 @@ const EMPTY: Omit<Specialty, 'id' | 'created_at'> = {
 export default function SpecialtiesTab() {
   const [rows, setRows] = useState<Specialty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Specialty | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Specialty>();
 
   const reload = () => {
@@ -25,12 +30,16 @@ export default function SpecialtiesTab() {
 
   useEffect(reload, []);
 
-  async function handleDeactivate(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deactivateSpecialty(id);
-      toast.success('Đã vô hiệu hóa chuyên khoa.');
+      await deleteSpecialty(deleteTarget.id);
+      toast.success('Đã xóa chuyên khoa.');
+      setDeleteTarget(null);
       reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDeleting(false); }
   }
 
   return (
@@ -50,9 +59,7 @@ export default function SpecialtiesTab() {
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                {r.is_active && (
-                  <ActionBtn icon={PowerOff} label="Vô hiệu" variant="destructive" onClick={() => handleDeactivate(r.id)} />
-                )}
+                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
             </td>
           </>
@@ -64,6 +71,15 @@ export default function SpecialtiesTab() {
         initial={editing ?? EMPTY}
         onClose={close}
         onSaved={reload}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        name={deleteTarget?.name}
+        entityLabel="chuyên khoa"
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
       />
     </>
   );
@@ -114,6 +130,10 @@ function SpecialtyDialog({
           <Field label="Icon slug">
             <input value={form.icon ?? ''} onChange={set('icon')} className={inputCls} placeholder="heart-pulse" />
           </Field>
+          <ActiveStatusField
+            value={form.is_active ?? true}
+            onChange={(is_active) => setForm((f) => ({ ...f, is_active }))}
+          />
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted">Hủy</button>
             <button type="submit" disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
@@ -124,16 +144,5 @@ function SpecialtyDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-const inputCls = 'w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">{label}</label>
-      {children}
-    </div>
   );
 }

@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Pencil, PowerOff } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchRooms, upsertRoom, deactivateRoom, fetchFacilities } from '@/lib/master-data-api';
+import { fetchRooms, upsertRoom, deleteRoom, fetchFacilities } from '@/lib/master-data-api';
 import type { Room, Facility } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, Field, FormActions, inputCls, useEntityDialog } from './shared';
+import {
+  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  Field, FormActions, inputCls, useEntityDialog,
+} from './shared';
 
 export default function RoomsTab() {
   const [rows, setRows] = useState<Room[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Room>();
 
   const reload = () => {
@@ -22,12 +27,16 @@ export default function RoomsTab() {
 
   useEffect(reload, []);
 
-  async function handleDeactivate(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deactivateRoom(id);
-      toast.success('Đã vô hiệu hóa phòng.');
+      await deleteRoom(deleteTarget.id);
+      toast.success('Đã xóa phòng.');
+      setDeleteTarget(null);
       reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDeleting(false); }
   }
 
   return (
@@ -49,9 +58,7 @@ export default function RoomsTab() {
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                {r.is_active && (
-                  <ActionBtn icon={PowerOff} label="Vô hiệu" variant="destructive" onClick={() => handleDeactivate(r.id)} />
-                )}
+                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
             </td>
           </>
@@ -59,6 +66,15 @@ export default function RoomsTab() {
       />
 
       <RoomDialog open={open} initial={editing} facilities={facilities} onClose={close} onSaved={reload} />
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        name={deleteTarget?.name}
+        entityLabel="phòng khám"
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }
@@ -66,7 +82,7 @@ export default function RoomsTab() {
 function RoomDialog({ open, initial, facilities, onClose, onSaved }: {
   open: boolean; initial: Room | null; facilities: Facility[]; onClose: () => void; onSaved: () => void;
 }) {
-  const blank: Partial<Room> = { name: '', room_number: '', facility_id: '', capacity: 1, equipment: '' };
+  const blank: Partial<Room> = { name: '', room_number: '', facility_id: '', capacity: 1, equipment: '', is_active: true };
   const [form, setForm] = useState<Partial<Room>>(initial ?? blank);
   const [saving, setSaving] = useState(false);
 
@@ -117,6 +133,10 @@ function RoomDialog({ open, initial, facilities, onClose, onSaved }: {
           <Field label="Thiết bị">
             <input value={form.equipment ?? ''} onChange={setStr('equipment')} className={inputCls} placeholder="ECG, máy đo huyết áp" />
           </Field>
+          <ActiveStatusField
+            value={form.is_active ?? true}
+            onChange={(is_active) => setForm((f) => ({ ...f, is_active }))}
+          />
           <FormActions saving={saving} onCancel={onClose} editMode={!!form.id} />
         </form>
       </DialogContent>
