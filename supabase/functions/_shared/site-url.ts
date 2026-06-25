@@ -4,6 +4,6 @@ export function getSiteUrl(): string {
     Deno.env.get("SITE_URL") ??
     Deno.env.get("VITE_SITE_URL") ??
     Deno.env.get("SUPABASE_SITE_URL") ??
-    "http://localhost:8080";
+    "https://healthcare-system-ns.vercel.app";
   return raw.replace(/\/$/, "");
 }
