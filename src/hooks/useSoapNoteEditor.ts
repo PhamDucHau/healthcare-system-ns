@@ -29,6 +29,14 @@ import {
   type RiskAssessment,
   type VoiceSession,
 } from '@/lib/ai-assistant-api';
+import {
+  analyzeTranscript,
+  buildTranscriptFromAudio,
+  createSttSession,
+  transcriptToPlainText,
+  type NlpAnalyzeResult,
+} from '@/lib/stt-nlp-api';
+import { supabase } from '@/lib/supabase';
 import type {
   MedicalExamination,
   SoapFormData,
@@ -61,10 +69,12 @@ export type UseSoapNoteEditorReturn = {
 
   // Voice recording & transcription (FR-023)
   isRecording: boolean;
+  isTranscribing: boolean;
   recordingDuration: number;
   recordingConsent: boolean;
   setRecordingConsent: (consent: boolean) => void;
   transcript: VoiceSession['transcript_raw'];
+  nlpAnalysis: NlpAnalyzeResult | null;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
 
@@ -115,9 +125,11 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
   // Voice recording & transcription
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingConsent, setRecordingConsent] = useState(false);
   const [transcript, setTranscript] = useState<VoiceSession['transcript_raw']>([]);
+  const [nlpAnalysis, setNlpAnalysis] = useState<NlpAnalyzeResult | null>(null);
 
   // AI SOAP generator states
   const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
@@ -136,8 +148,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const transcriptSimTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const conversationStepRef = useRef(0);
+  const sttSessionIdRef = useRef<string | null>(null);
 
   // Refs for EMR auto-save and debounce
   const examIdRef = useRef<string | null>(null);
@@ -411,16 +422,48 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     [reloadExam]
   );
 
+  const collectRecordedAudio = (): Promise<Blob | null> =>
+    new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder || recorder.state === 'inactive') {
+        resolve(
+          audioChunksRef.current.length > 0
+            ? new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            : null
+        );
+        return;
+      }
+
+      recorder.onstop = () => {
+        resolve(
+          audioChunksRef.current.length > 0
+            ? new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+            : null
+        );
+      };
+      recorder.stop();
+      recorder.stream.getTracks().forEach((track) => track.stop());
+    });
+
   // ─── Voice recording & transcription (FR-023) ──────────────────────────────
 
   const startRecording = async () => {
-    // Enforce consent checkbox (RULE-023a)
     if (!recordingConsent) {
       toast.error('Vui lòng xác nhận đã thông báo và nhận sự đồng ý của bệnh nhân.');
       return;
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Chưa đăng nhập');
+
+      const session = await createSttSession({
+        appointmentId,
+        doctorId: user.id,
+        consentConfirmed: true,
+      });
+      sttSessionIdRef.current = session.session_id;
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -430,44 +473,23 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setRecordingDuration(0);
       setTranscript([]);
-      conversationStepRef.current = 0;
+      setNlpAnalysis(null);
 
-      // Timer for recording duration
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
 
-      // Simulated transcription streaming dialogue (Vietnam clinical context)
-      const simulatedDialogue: Array<{ speaker: 'doctor' | 'patient'; text: string }> = [
-        { speaker: 'doctor', text: 'Chào anh, hôm nay anh đến khám vì lý do gì?' },
-        { speaker: 'patient', text: 'Chào bác sĩ, tôi bị đau tức ngực trái khoảng 3 ngày nay, thỉnh thoảng thấy hơi nhoi nhói lan lên vai.' },
-        { speaker: 'doctor', text: 'Cơn đau xuất hiện lúc nghỉ ngơi hay khi đang vận động nặng?' },
-        { speaker: 'patient', text: 'Khi đi bộ nhanh hoặc leo cầu thang thì đau tức nhiều hơn bác sĩ ạ, nghỉ một lát thì đỡ.' },
-        { speaker: 'doctor', text: 'Anh có cảm giác khó thở hay vã mồ hôi kèm theo không?' },
-        { speaker: 'patient', text: 'Dạ không khó thở, chỉ thấy hơi hồi hộp và trống ngực thôi.' },
-        { speaker: 'doctor', text: 'Để tôi nghe tim phổi xem sao... Tim phổi bình thường. Tôi đo huyết áp nhé... Huyết áp của anh là 145/90 mmHg, hơi cao.' },
-        { speaker: 'patient', text: 'Huyết áp bình thường của tôi tầm 120 thôi. Bác sĩ cho hỏi tôi có bị bệnh tim gì nguy hiểm không?' },
-        { speaker: 'doctor', text: 'Huyết áp cao kèm đau ngực gắng sức cần phải đo thêm điện tâm đồ và xét nghiệm men tim Troponin T để chẩn đoán chính xác. Tôi sẽ kê thuốc huyết áp uống sáng và chỉ định cận lâm sàng nhé.' },
-        { speaker: 'patient', text: 'Vâng, cảm ơn bác sĩ.' }
-      ];
-
-      transcriptSimTimerRef.current = setInterval(() => {
-        const step = conversationStepRef.current;
-        if (step < simulatedDialogue.length) {
-          setTranscript((prev) => [...prev, simulatedDialogue[step]]);
-          conversationStepRef.current = step + 1;
-        } else {
-          if (transcriptSimTimerRef.current) clearInterval(transcriptSimTimerRef.current);
-        }
-      }, 5000);
-
       toast.success('Bắt đầu ghi âm phiên khám...');
     } catch (e) {
-      toast.error('Không truy cập được microphone. Vui lòng kiểm tra quyền trình duyệt.');
+      toast.error(
+        e instanceof Error && e.message !== 'Chưa đăng nhập'
+          ? e.message
+          : 'Không truy cập được microphone. Vui lòng kiểm tra quyền trình duyệt.'
+      );
     }
   };
 
@@ -476,41 +498,61 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
     setIsRecording(false);
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    if (transcriptSimTimerRef.current) clearInterval(transcriptSimTimerRef.current);
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-    }
+    setIsTranscribing(true);
+    toast.info('Đang chuyển đổi giọng nói và phân tích hội thoại...');
 
-    toast.info('Đang lưu file ghi âm và xử lý transcript...');
+    try {
+      const audioBlob = await collectRecordedAudio();
+      mediaRecorderRef.current = null;
 
-    // Wait a brief moment to construct blob
-    setTimeout(async () => {
-      try {
-        const audioBlob = audioChunksRef.current.length > 0
-          ? new Blob(audioChunksRef.current, { type: 'audio/mp3' })
-          : undefined;
-
-        // Save session
-        await saveVoiceSession(appointmentId, transcript, audioBlob);
-        toast.success('Đã lưu file ghi âm thành công.');
-        
-        // Auto trigger SOAP note generator (FR-024)
-        void generateSoap();
-      } catch (e) {
-        toast.error((e as Error).message);
+      if (!audioBlob || audioBlob.size === 0) {
+        throw new Error('Không thu được dữ liệu âm thanh. Vui lòng thử ghi âm lại.');
       }
-    }, 500);
+
+      const { turns } = await buildTranscriptFromAudio(audioBlob);
+      if (turns.length === 0) {
+        throw new Error('Không nhận diện được nội dung hội thoại từ file ghi âm.');
+      }
+
+      setTranscript(turns);
+
+      const plainTranscript = transcriptToPlainText(turns);
+      const analysis = await analyzeTranscript(plainTranscript);
+      setNlpAnalysis(analysis);
+
+      if (analysis.red_flags.length > 0) {
+        toast.warning(`Phát hiện ${analysis.red_flags.length} dấu hiệu cảnh báo từ hội thoại.`);
+      }
+
+      await saveVoiceSession(appointmentId, turns, audioBlob);
+      toast.success('Đã lưu transcript phiên khám.');
+
+      await generateSoap(turns, analysis);
+    } catch (e) {
+      toast.error((e as Error).message || 'Lỗi xử lý ghi âm.');
+    } finally {
+      setIsTranscribing(false);
+      sttSessionIdRef.current = null;
+    }
   };
 
   // ─── AI SOAP Note Generator (FR-024) ──────────────────────────────────────────
 
-  const generateSoap = async () => {
+  const generateSoap = async (
+    transcriptOverride?: VoiceSession['transcript_raw'],
+    analysisOverride?: NlpAnalyzeResult | null
+  ) => {
     setIsGeneratingSoap(true);
     try {
-      const generated = await generateSoapFromAi(appointmentId);
-      
+      const generated = await generateSoapFromAi(appointmentId, transcriptOverride);
+
+      if (generated.analysis) {
+        setNlpAnalysis(generated.analysis);
+      } else if (analysisOverride) {
+        setNlpAnalysis(analysisOverride);
+      }
+
       setFormData({
         s_text: generated.s_text,
         o_text: generated.o_text,
@@ -518,7 +560,6 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         p_text: generated.p_text,
       });
 
-      // Turn on AI tags
       setSoapSourceBadge({
         s_text: true,
         o_text: true,
@@ -526,10 +567,10 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         p_text: true,
       });
 
-      // Enqueue ICD suggestions to database
       for (const icd of generated.icd_codes) {
+        if (!examIdRef.current) continue;
         await upsertIcdCode({
-          examId: examIdRef.current!,
+          examId: examIdRef.current,
           icdCode: icd.code,
           icdName: icd.name,
           isAiSuggested: true,
@@ -540,9 +581,9 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       }
 
       await reloadExam();
-      toast.success('Đã tự động tạo SOAP Note mẫu từ AI.');
+      toast.success('Đã tạo SOAP Note từ AI (Module 5/6).');
     } catch (e) {
-      toast.error('Gặp lỗi khi tạo SOAP Note tự động.');
+      toast.error((e as Error).message || 'Gặp lỗi khi tạo SOAP Note tự động.');
     } finally {
       setIsGeneratingSoap(false);
     }
@@ -642,10 +683,12 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
     // Voice recording & transcription
     isRecording,
+    isTranscribing,
     recordingDuration,
     recordingConsent,
     setRecordingConsent,
     transcript,
+    nlpAnalysis,
     startRecording,
     stopRecording,
 

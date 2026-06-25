@@ -1,4 +1,9 @@
 import { supabase } from './supabase';
+import {
+  generateSoapBundleFromTranscript,
+  transcriptToPlainText,
+  type NlpAnalyzeResult,
+} from './stt-nlp-api';
 
 export type VoiceSession = {
   id: string;
@@ -86,82 +91,39 @@ export async function getVoiceSession(appointmentId: string): Promise<VoiceSessi
   return data as VoiceSession | null;
 }
 
-// ─── AI SOAP Note Generator (FR-024) ──────────────────────────────────────────
+// ─── AI SOAP Note Generator (FR-024) — Module 5/6 NLP backend ────────────────
 
-export async function generateSoapFromAi(appointmentId: string): Promise<{
+export type GenerateSoapFromAiResult = {
   s_text: string;
   o_text: string;
   a_text: string;
   p_text: string;
   icd_codes: Array<{ code: string; name: string; confidence: number; reason: string }>;
-}> {
-  // 1. Fetch pre-consultation details
-  const { data: preConsultRaw, error: preConsultErr } = await supabase
-    .rpc('get_pre_consultation_by_appointment', { p_appointment_id: appointmentId });
-  
-  const preConsult = !preConsultErr && preConsultRaw && preConsultRaw.length > 0 ? preConsultRaw[0] : null;
+  analysis?: NlpAnalyzeResult;
+};
 
-  // 2. Fetch voice transcript
-  const voice = await getVoiceSession(appointmentId).catch(() => null);
+export async function generateSoapFromAi(
+  appointmentId: string,
+  transcriptOverride?: VoiceSession['transcript_raw']
+): Promise<GenerateSoapFromAiResult> {
+  const voice = transcriptOverride
+    ? { transcript_raw: transcriptOverride }
+    : await getVoiceSession(appointmentId).catch(() => null);
 
-  // 3. Extract keywords to build medical context
-  let chiefComplaint = preConsult?.chief_complaint || '';
-  let tags: string[] = preConsult?.symptom_tags || [];
-  let history = Array.isArray(preConsult?.medical_history) ? preConsult.medical_history : [];
+  const transcriptText = voice?.transcript_raw?.length
+    ? transcriptToPlainText(voice.transcript_raw)
+    : '';
 
-  if (voice && voice.transcript_raw) {
-    const speechText = voice.transcript_raw.map(t => t.text).join(' ');
-    if (speechText.includes('đau ngực') || speechText.includes('tim')) chiefComplaint = chiefComplaint || 'Đau ngực';
-    if (speechText.includes('đau đầu') || speechText.includes('chóng mặt')) chiefComplaint = chiefComplaint || 'Đau đầu';
-    if (speechText.includes('ho') || speechText.includes('sốt') || speechText.includes('đau họng')) chiefComplaint = chiefComplaint || 'Viêm đường hô hấp';
+  if (!transcriptText.trim()) {
+    throw new Error('Chưa có transcript phiên khám. Vui lòng ghi âm hoặc nhập nội dung trước.');
   }
 
-  // 4. Construct simulated response
-  const combined = chiefComplaint.toLowerCase();
-  
-  if (combined.includes('ngực') || combined.includes('tim')) {
-    return {
-      s_text: `Bệnh nhân khai báo đau tức ngực trái âm ỉ trong 3 ngày qua, lan ra vai trái. Đau tăng khi gắng sức, giảm khi nghỉ ngơi. Có cảm giác hồi hộp, trống ngực nhẹ. Không khó thở, không vã mồ hôi. Lịch sử gia đình có bố bị bệnh tim mạch.`,
-      o_text: `Tim nhịp đều 88 chu kỳ/phút, T1 T2 rõ, không nghe tiếng thổi bệnh lý. Phổi thông khí tốt, không rale. Huyết áp đo tại phòng khám 145/90 mmHg. Bụng mềm, gan lách không to.`,
-      a_text: `Đau thắt ngực không ổn định theo dõi / Tăng huyết áp độ I.`,
-      icd_codes: [
-        { code: 'R07.9', name: 'Đau ngực, không đặc hiệu', confidence: 92, reason: 'Triệu chứng đau ngực trái lan vai trái' },
-        { code: 'I10', name: 'Tăng huyết áp nguyên phát', confidence: 85, reason: 'Huyết áp ghi nhận 145/90 mmHg' }
-      ],
-      p_text: `1. Đo điện tâm đồ (ECG) tại giường.\n2. Thực hiện xét nghiệm Troponin T siêu nhạy, lipid panel máu.\n3. Kê đơn: Amlodipine 5mg x 1 viên uống sáng.\n4. Tránh hoạt động gắng sức mạnh, tái khám ngay nếu cơn đau thắt ngực kéo dài trên 15 phút.`
-    };
-  } else if (combined.includes('họng') || combined.includes('ho') || combined.includes('sốt') || combined.includes('hô hấp') || combined.includes('mũi')) {
-    return {
-      s_text: `Bệnh nhân khai đau rát họng, ho khan thành cơn 3 ngày nay, có sốt nhẹ (nhiệt độ đo tại nhà 38.2°C). Cảm giác ngạt mũi, chảy nước mũi trong, mệt mỏi nhẹ, không khó thở, ăn uống kém do đau họng.`,
-      o_text: `Niêm mạc họng đỏ, amidan hai bên sung huyết nhẹ, không có giả mạc. Hạch góc hàm không sưng đau. Phổi phế nang phế quản rì rào rõ, không rale. Nhiệt độ tại phòng khám 37.8°C. Mạch 82 bpm, HA 120/80 mmHg.`,
-      a_text: `Viêm mũi họng cấp tính (Cảm lạnh thông thường).`,
-      icd_codes: [
-        { code: 'J00', name: 'Viêm mũi họng cấp (Cảm lạnh thông thường)', confidence: 90, reason: 'Họng đỏ, ngạt mũi kèm chảy nước mũi' },
-        { code: 'J06.9', name: 'Nhiễm khuẩn hô hấp trên cấp tính, không đặc hiệu', confidence: 82, reason: 'Ho khan, sốt nhẹ và đau rát họng' }
-      ],
-      p_text: `1. Súc họng bằng nước muối sinh lý ấm 3-4 lần/ngày.\n2. Thuốc điều trị triệu chứng:\n   - Paracetamol 500mg: uống 1 viên khi sốt > 38.5°C (cách ít nhất 4-6 tiếng).\n   - Dextromethorphan 15mg: uống 1 viên x 2 lần/ngày khi ho nhiều.\n3. Uống nhiều nước ấm, tăng cường bổ sung vitamin C.\n4. Theo dõi và tái khám nếu sốt cao liên tục không hạ quá 3 ngày.`
-    };
-  } else if (combined.includes('đường') || combined.includes('tiểu đường') || combined.includes('đái tháo đường')) {
-    return {
-      s_text: `Bệnh nhân tiền sử Đái tháo đường týp 2 đang điều trị ngoại trú. Khám định kỳ theo hẹn. Khai báo không mệt mỏi đột ngột, không tê bì chân tay, tiểu tiện bình thường, ăn uống hạn chế chất ngọt tốt.`,
-      o_text: `Thể trạng trung bình. HA 125/80 mmHg, nhịp tim 76 bpm. Bụng mềm. Các cơ quan tim phổi bình thường. Các chi ấm, mạch ngoại vi bắt rõ. Đường huyết mao mạch lúc đói đo tại chỗ: 6.8 mmol/L.`,
-      a_text: `Đái tháo đường týp 2 ổn định.`,
-      icd_codes: [
-        { code: 'E11.9', name: 'Đái tháo đường týp 2, không biến chứng', confidence: 95, reason: 'Bệnh sử và các chỉ số đường huyết ổn định' }
-      ],
-      p_text: `1. Tiếp tục duy trì chế độ dinh dưỡng ít tinh bột, hạn chế đường ngọt.\n2. Thuốc duy trì hàng tháng:\n   - Metformin 850mg: uống 1 viên x 2 lần/ngày (sau ăn sáng, ăn tối).\n3. Tự đo đường huyết tại nhà 2 lần/tuần.\n4. Tái khám sau 1 tháng để xét nghiệm chỉ số HbA1c.`
-    };
-  }
+  const bundle = await generateSoapBundleFromTranscript(transcriptText);
 
-  // General Fallback consultation note
   return {
-    s_text: `Bệnh nhân đến khám kiểm tra sức khỏe tổng quát theo lịch hẹn. Hiện tại không có triệu chứng bất thường rõ rệt, không đau ngực, không khó thở, giấc ngủ bình thường.`,
-    o_text: `Huyết áp 120/80 mmHg, nhịp tim 75 bpm, nhiệt độ 36.8°C. Tim đều phổi trong. Bụng mềm không đau. Thể trạng cân đối.`,
-    a_text: `Khám sức khỏe tổng quát bình thường.`,
-    icd_codes: [
-      { code: 'Z00.0', name: 'Khám sức khỏe tổng quát định kỳ', confidence: 98, reason: 'BN khám định kỳ, không có triệu chứng bất thường' }
-    ],
-    p_text: `1. Tiếp tục tập luyện thể thao ít nhất 30 phút mỗi ngày.\n2. Ăn uống điều độ, bổ sung nhiều chất xơ, hạn chế đồ dầu mỡ.\n3. Khám sức khỏe định kỳ mỗi 6 tháng.`
+    ...bundle.fields,
+    icd_codes: bundle.icdCodes,
+    analysis: bundle.analysis,
   };
 }
 

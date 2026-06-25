@@ -109,7 +109,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                 variant="outline"
                 size="sm"
                 onClick={() => void editor.saveDraft()}
-                disabled={editor.saving || editor.submitting || editor.isRecording}
+                disabled={editor.saving || editor.submitting || editor.isRecording || editor.isTranscribing}
                 className="h-9 px-3 text-slate-600 hover:bg-slate-100/60"
               >
                 {editor.saving
@@ -126,7 +126,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                     setShowSignOff(true);
                   }
                 }}
-                disabled={editor.submitting || editor.isRecording}
+                disabled={editor.submitting || editor.isRecording || editor.isTranscribing}
                 className="h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm"
               >
                 {editor.submitting
@@ -378,6 +378,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                   {!editor.isRecording ? (
                     <Button
                       onClick={() => void editor.startRecording()}
+                      disabled={editor.isTranscribing || editor.isGeneratingSoap}
                       className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl gap-2 shadow-sm transition-all"
                     >
                       <Mic className="h-5 w-5" /> Bắt đầu ghi âm phiên khám
@@ -404,6 +405,27 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                       </Button>
                     </div>
                   )}
+
+                  {editor.isTranscribing && (
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
+                      <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                      Đang chuyển giọng nói → transcript và phân tích NLP...
+                    </div>
+                  )}
+
+                  {editor.nlpAnalysis?.red_flags && editor.nlpAnalysis.red_flags.length > 0 && (
+                    <Alert variant="destructive" className="py-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-xs space-y-1">
+                        <strong>Dấu hiệu cảnh báo ({editor.nlpAnalysis.red_flags.length}):</strong>
+                        <ul className="list-disc pl-4 mt-1">
+                          {editor.nlpAnalysis.red_flags.map((flag, i) => (
+                            <li key={i}>{flag.text}</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
 
                 {editor.transcript.length > 0 && (
@@ -429,7 +451,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                     {!editor.isRecording && (
                       <Button
                         onClick={() => void editor.generateSoap()}
-                        disabled={editor.isGeneratingSoap}
+                        disabled={editor.isGeneratingSoap || editor.isTranscribing}
                         variant="outline"
                         className="w-full h-10 border-primary/20 text-primary font-bold hover:bg-primary/5 rounded-xl gap-1.5 shadow-sm mt-2"
                       >

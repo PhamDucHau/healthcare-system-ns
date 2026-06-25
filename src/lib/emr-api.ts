@@ -3,6 +3,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { analyzeTranscript, suggestIcd10 } from '@/lib/stt-nlp-api';
 import type {
   MedicalExamination,
   SoapIcdCode,
@@ -250,21 +251,46 @@ export async function searchIcd10(query: string): Promise<{ code: string; name: 
 }
 
 /**
- * Simulate AI ICD-10 suggestions based on SOAP text
- * In production this would call an AI Edge Function
+ * AI ICD-10 suggestions via Module 5/6 backend (/icd10/suggest)
  */
 export async function getAiIcdSuggestions(
   sText: string,
   oText: string
 ): Promise<AiIcdSuggestion[]> {
-  const combined = `${sText} ${oText}`.toLowerCase();
-  const totalLength = sText.length + oText.length;
+  const combinedText = `${sText} ${oText}`.trim();
+  const totalLength = combinedText.length;
 
   // Minimum content threshold
   if (totalLength < 30) return [];
 
-  // Simulated AI suggestions based on keyword matching
-  // In production: call supabase.functions.invoke('ai-icd-suggest', { ... })
+  try {
+    const analysis = await analyzeTranscript(combinedText);
+    const complaints = analysis.complaints.map((c) => c.text);
+    const symptomsPresent = analysis.symptoms_present.map((s) => s.text);
+    const symptomsDenied = analysis.symptoms_denied.map((s) => s.text);
+
+    const result = await suggestIcd10({
+      complaints,
+      symptomsPresent,
+      symptomsDenied,
+      recentTranscript: combinedText,
+    });
+
+    const fromApi = (result.icd10 ?? []).map((item) => ({
+      icd_code: item.code,
+      icd_name: item.name_vi || item.name_en || item.code,
+      confidence: item.confidence,
+      reason: item.evidence ?? result.summary ?? 'Gợi ý từ AI ICD-10',
+    }));
+
+    if (fromApi.length > 0) {
+      return fromApi.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+    }
+  } catch {
+    // Fall back to keyword matching when STT API is unavailable
+  }
+
+  const combined = combinedText.toLowerCase();
   const suggestions: AiIcdSuggestion[] = [];
 
   if (/ho|cough|sốt|fever|đau họng|throat|hô hấp|respiratory|viêm mũi|mũi/i.test(combined)) {
