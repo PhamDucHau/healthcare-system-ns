@@ -119,13 +119,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
               </Button>
               <Button
                 size="sm"
-                onClick={() => {
-                  if (!editor.hasPinSet) {
-                    setShowSetupPin(true);
-                  } else {
-                    setShowSignOff(true);
-                  }
-                }}
+                onClick={() => setShowSignOff(true)}
                 disabled={editor.submitting || editor.isRecording || editor.isTranscribing}
                 className="h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm"
               >

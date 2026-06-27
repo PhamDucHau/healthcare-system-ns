@@ -3,7 +3,8 @@
  * Shows SOAP summary, checkbox for responsibility, PIN input
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { DEV_SIGN_PIN } from '@/lib/patient-health-records-storage';
 import { AlertTriangle, Check, Lock, Loader2, Shield } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -27,12 +28,20 @@ type DoctorSignOffDialogProps = {
 export default function DoctorSignOffDialog({
   open, onClose, onSign, confirmedIcds, exam,
 }: DoctorSignOffDialogProps) {
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(DEV_SIGN_PIN);
   const [ack, setAck] = useState(false);
   const [signing, setSigning] = useState(false);
   const [pinError, setPinError] = useState('');
 
-  const canSign = ack && pin.length === 6 && confirmedIcds.length > 0;
+  useEffect(() => {
+    if (open) {
+      setPin(DEV_SIGN_PIN);
+      setAck(false);
+      setPinError('');
+    }
+  }, [open]);
+
+  const canSign = ack && confirmedIcds.length > 0;
 
   const handleSign = async () => {
     if (!canSign) return;
@@ -150,12 +159,17 @@ export default function DoctorSignOffDialog({
                 setPinError('');
               }}
               placeholder="••••••"
-              className="text-center text-xl tracking-[0.5em] font-mono h-12"
+              className="text-center text-xl tracking-[0.5em] font-mono h-12 opacity-80"
               disabled={signing}
+              autoComplete="off"
+              aria-describedby="sign-pin-hint"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && canSign) void handleSign();
               }}
             />
+            <p id="sign-pin-hint" className="text-xs text-muted-foreground">
+              Tạm thời bỏ qua xác thực PIN — chỉ cần tick xác nhận và bấm ký duyệt.
+            </p>
             {pinError && <p className="text-xs text-destructive">{pinError}</p>}
           </div>
         </div>

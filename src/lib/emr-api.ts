@@ -199,17 +199,16 @@ export async function checkDoctorPinSet(): Promise<boolean> {
 }
 
 /**
- * Sign (lock) an examination with doctor PIN
- * FR-011: validates S, ≥1 CONFIRMED ICD, PIN match
+ * Sign (lock) an examination — PIN param kept for UI compatibility but not verified server-side (dev bypass).
  */
 export async function signExamination(params: {
   examId: string;
-  pinPlain: string;
+  pinPlain?: string;
   responsibilityAck: boolean;
 }): Promise<SignExaminationResult> {
   const { data, error } = await supabase.rpc('sign_examination', {
     p_exam_id: params.examId,
-    p_pin_plain: params.pinPlain,
+    p_pin_plain: params.pinPlain ?? '',
     p_responsibility_ack: params.responsibilityAck,
     p_ip_address: null,
     p_user_agent: navigator.userAgent,

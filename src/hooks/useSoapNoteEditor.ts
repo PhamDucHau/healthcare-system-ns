@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 import {
   createOrGetExamination,
   getExaminationByAppointment,
@@ -20,6 +21,9 @@ import {
   getAiIcdSuggestions,
   searchIcd10,
 } from '@/lib/emr-api';
+import {
+  appendHealthRecordVersion,
+} from '@/lib/patient-health-records-storage';
 import {
   getVoiceSession,
   saveVoiceSession,
@@ -36,7 +40,6 @@ import {
   transcriptToPlainText,
   type NlpAnalyzeResult,
 } from '@/lib/stt-nlp-api';
-import { supabase } from '@/lib/supabase';
 import type {
   MedicalExamination,
   SoapFormData,
@@ -231,9 +234,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       setError(null);
 
       try {
-        // Check PIN status
-        const pinSet = await checkDoctorPinSet();
-        setHasPinSet(pinSet);
+        setHasPinSet(await checkDoctorPinSet());
 
         // Create or get exam
         const examId = await createOrGetExamination(appointmentId);
@@ -626,10 +627,9 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         // Save latest draft first
         await saveSoapDraft(examIdRef.current, formData);
 
-        // Sign & Lock
+        // Sign & Lock (PIN bypass — UI only)
         await signExamination({
           examId: examIdRef.current,
-          pinPlain: params.pin,
           responsibilityAck: params.responsibilityAck,
         });
 
@@ -638,6 +638,18 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         setRiskAssessment(updatedRisk);
 
         toast.success('Hồ sơ khám đã được ký số và đóng băng thành công.');
+        const signedExam = await getExaminationByAppointment(appointmentId);
+        if (signedExam?.patient_id) {
+          appendHealthRecordVersion(signedExam.patient_id, signedExam);
+          const { data: apptRow } = await supabase
+            .from('appointments')
+            .select('profile_id')
+            .eq('id', signedExam.appointment_id)
+            .maybeSingle();
+          if (apptRow?.profile_id) {
+            appendHealthRecordVersion(String(apptRow.profile_id), signedExam);
+          }
+        }
         await reloadExam();
         return true;
       } catch (e) {
@@ -647,7 +659,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         setSubmitting(false);
       }
     },
-    [exam, formData, reloadExam]
+    [exam, formData, reloadExam, appointmentId]
   );
 
   // ─── Public: setup PIN ────────────────────────────────────────────────────

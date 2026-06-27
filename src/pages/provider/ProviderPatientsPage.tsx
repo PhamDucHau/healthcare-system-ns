@@ -28,6 +28,7 @@ import { computeBmi } from "@/types/vital-signs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import VitalSignsForm from "@/components/provider/VitalSignsForm";
 import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
+import PatientHealthRecordsPanel from "@/components/provider/PatientHealthRecordsPanel";
 
 const OVERVIEW_TABS = [
   { id: "overview", icon: SquareChartGantt, label: "Tổng quan" },
@@ -736,6 +737,14 @@ const ProviderPatientsPage = () => {
                     </div>
                   </div>
                 </>
+              ) : activeTab === "records" ? (
+                <PatientHealthRecordsPanel
+                  lookupIds={[
+                    realPatientUserId ?? "",
+                    activeNoteKey,
+                    patientDetail?.id ?? "",
+                  ].filter(Boolean)}
+                />
               ) : (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   {OVERVIEW_TABS.find((t) => t.id === activeTab)?.label} — đang phát triển.
