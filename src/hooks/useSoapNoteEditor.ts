@@ -20,6 +20,8 @@ import {
   setDoctorPin,
   getAiIcdSuggestions,
   searchIcd10,
+  saveSoapAiBaseline,
+  type Icd10SearchResult,
 } from '@/lib/emr-api';
 import {
   appendHealthRecordVersion,
@@ -27,6 +29,10 @@ import {
 import {
   getVoiceSession,
   saveVoiceSession,
+  getConsultationAudioUrl,
+  listConsultationRecordings,
+  type ConsultationRecording,
+  updateTranscriptEdited,
   generateSoapFromAi,
   getRiskAssessment,
   recalculateRiskScore,
@@ -36,10 +42,20 @@ import {
 import {
   analyzeTranscript,
   buildTranscriptFromAudio,
+  buildLiveTranscriptFromSnapshot,
+  checkSttApiHealth,
   createSttSession,
   transcriptToPlainText,
   type NlpAnalyzeResult,
 } from '@/lib/stt-nlp-api';
+import { SttWebSocketStream } from '@/lib/stt-ws-stream';
+import { startPcmCapture, type PcmCaptureHandle } from '@/lib/stt-pcm-capture';
+import {
+  isAiCircuitOpen,
+  recordAiFailure,
+  recordAiSuccess,
+  getAiCircuitCooldownRemaining,
+} from '@/lib/ai-circuit-breaker';
 import type {
   MedicalExamination,
   SoapFormData,
@@ -50,6 +66,8 @@ import { DEFAULT_SOAP_FORM, validateSoapForSign } from '@/types/emr';
 
 const AUTO_SAVE_INTERVAL_MS = 30_000; // RULE-010d: 30 seconds
 const AI_DEBOUNCE_MS = 2_000;          // RULE-015: 2 second debounce
+
+export type SoapJobStatus = 'idle' | 'streaming' | 'transcribing' | 'analyzing' | 'generating' | 'done' | 'error';
 
 export type UseSoapNoteEditorReturn = {
   // State
@@ -67,7 +85,7 @@ export type UseSoapNoteEditorReturn = {
   aiSuggestions: AiIcdSuggestion[];
   aiLoading: boolean;
   icdSearch: string;
-  icdSearchResults: { code: string; name: string }[];
+  icdSearchResults: Icd10SearchResult[];
   icdSearchLoading: boolean;
 
   // Voice recording & transcription (FR-023)
@@ -77,12 +95,27 @@ export type UseSoapNoteEditorReturn = {
   recordingConsent: boolean;
   setRecordingConsent: (consent: boolean) => void;
   transcript: VoiceSession['transcript_raw'];
+  streamingDraft: { text: string; speaker: 'doctor' | 'patient' } | null;
+  isWsStreaming: boolean;
+  isLiveTranscribing: boolean;
   nlpAnalysis: NlpAnalyzeResult | null;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
+  sttFallbackMode: boolean;
+  isEditingTranscript: boolean;
+  setIsEditingTranscript: (v: boolean) => void;
+  updateTranscriptLine: (index: number, text: string) => void;
+  saveTranscriptEdit: () => Promise<void>;
+  addManualTranscriptLine: (speaker: 'doctor' | 'patient', text: string) => void;
+  aiCircuitOpen: boolean;
+  aiCircuitCooldownMs: number;
+  consultationRecordings: Array<ConsultationRecording & { audioUrl?: string | null }>;
+  recordingsLoading: boolean;
+  resolveRecordingAudioUrl: (storagePath: string) => Promise<string | null>;
 
   // AI SOAP Note generation (FR-024)
   isGeneratingSoap: boolean;
+  soapJobStatus: SoapJobStatus;
   generateSoap: () => Promise<void>;
   soapSourceBadge: Record<keyof SoapFormData, boolean>;
 
@@ -123,7 +156,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
   // ICD manual search
   const [icdSearch, setIcdSearch] = useState('');
-  const [icdSearchResults, setIcdSearchResults] = useState<{ code: string; name: string }[]>([]);
+  const [icdSearchResults, setIcdSearchResults] = useState<Icd10SearchResult[]>([]);
   const [icdSearchLoading, setIcdSearchLoading] = useState(false);
 
   // Voice recording & transcription
@@ -132,10 +165,21 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingConsent, setRecordingConsent] = useState(false);
   const [transcript, setTranscript] = useState<VoiceSession['transcript_raw']>([]);
+  const [streamingDraft, setStreamingDraft] = useState<{ text: string; speaker: 'doctor' | 'patient' } | null>(null);
+  const [isWsStreaming, setIsWsStreaming] = useState(false);
+  const [isLiveTranscribing, setIsLiveTranscribing] = useState(false);
   const [nlpAnalysis, setNlpAnalysis] = useState<NlpAnalyzeResult | null>(null);
+  const [sttFallbackMode, setSttFallbackMode] = useState(false);
+  const [isEditingTranscript, setIsEditingTranscript] = useState(false);
+  const [aiCircuitOpen, setAiCircuitOpen] = useState(false);
+  const [consultationRecordings, setConsultationRecordings] = useState<
+    Array<ConsultationRecording & { audioUrl?: string | null }>
+  >([]);
+  const [recordingsLoading, setRecordingsLoading] = useState(false);
 
   // AI SOAP generator states
   const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
+  const [soapJobStatus, setSoapJobStatus] = useState<SoapJobStatus>('idle');
   const [soapSourceBadge, setSoapSourceBadge] = useState<Record<keyof SoapFormData, boolean>>({
     s_text: false,
     o_text: false,
@@ -152,6 +196,39 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sttSessionIdRef = useRef<string | null>(null);
+  const sttWsRef = useRef<SttWebSocketStream | null>(null);
+  const wsFailedRef = useRef(false);
+  const recordingActiveRef = useRef(false);
+  const incrementalTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const incrementalKickoffRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastIncrementalSizeRef = useRef(0);
+  const incrementalInFlightRef = useRef(false);
+  const wsLastPartialAtRef = useRef(0);
+  const pcmCaptureRef = useRef<PcmCaptureHandle | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingDurationRef = useRef(0);
+
+  const loadConsultationRecordings = useCallback(async () => {
+    setRecordingsLoading(true);
+    try {
+      const rows = await listConsultationRecordings(appointmentId);
+      const withUrls = await Promise.all(
+        rows.map(async (rec) => {
+          const audioUrl = await getConsultationAudioUrl(rec.audio_storage_path);
+          return { ...rec, audioUrl };
+        })
+      );
+      setConsultationRecordings(withUrls);
+    } catch {
+      setConsultationRecordings([]);
+    } finally {
+      setRecordingsLoading(false);
+    }
+  }, [appointmentId]);
+
+  const resolveRecordingAudioUrl = useCallback(async (storagePath: string) => {
+    return getConsultationAudioUrl(storagePath);
+  }, []);
 
   // Refs for EMR auto-save and debounce
   const examIdRef = useRef<string | null>(null);
@@ -224,6 +301,8 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     }
   }, [appointmentId]);
 
+  // ─── Recording audio playback ─────────────────────────────────────────────
+
   // ─── Load exam, voice session & risk assessment ───────────────────────────
 
   useEffect(() => {
@@ -255,11 +334,18 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
           }
         }
 
-        // Load voice session transcript
+        // Load voice session transcript + recording history
         const voiceSession = await getVoiceSession(appointmentId).catch(() => null);
         if (voiceSession) {
-          setTranscript(voiceSession.transcript_raw);
+          setTranscript(
+            voiceSession.transcript_edited?.length
+              ? voiceSession.transcript_edited
+              : voiceSession.transcript_raw
+          );
         }
+        await loadConsultationRecordings();
+
+        setAiCircuitOpen(isAiCircuitOpen());
 
         // Load risk assessment
         const risk = await getRiskAssessment(examId).catch(() => null);
@@ -320,7 +406,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
     icdSearchDebounceRef.current = setTimeout(() => {
       void performIcdSearch(icdSearch);
-    }, 300);
+    }, 500);
 
     return () => {
       if (icdSearchDebounceRef.current) clearTimeout(icdSearchDebounceRef.current);
@@ -446,6 +532,72 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       recorder.stream.getTracks().forEach((track) => track.stop());
     });
 
+  // ─── Live transcript polling while recording ─────────────────────────────
+
+  const stopLiveTranscriptPolling = useCallback(() => {
+    if (incrementalKickoffRef.current) {
+      clearTimeout(incrementalKickoffRef.current);
+      incrementalKickoffRef.current = null;
+    }
+    if (incrementalTimerRef.current) {
+      clearInterval(incrementalTimerRef.current);
+      incrementalTimerRef.current = null;
+    }
+    lastIncrementalSizeRef.current = 0;
+    incrementalInFlightRef.current = false;
+    setIsLiveTranscribing(false);
+  }, []);
+
+  const pollLiveTranscript = useCallback(async () => {
+    if (!recordingActiveRef.current || incrementalInFlightRef.current) return;
+
+    // WS partials are flowing — skip HTTP polling to avoid overwriting live draft
+    const wsActive = !wsFailedRef.current && Date.now() - wsLastPartialAtRef.current < 2500;
+    if (wsActive) return;
+
+    const mime = mediaRecorderRef.current?.mimeType || 'audio/webm';
+    const chunks = audioChunksRef.current;
+    if (chunks.length === 0) return;
+
+    const blob = new Blob(chunks, { type: mime });
+    const MIN_SIZE = 2000;
+    const MIN_GROWTH = 800;
+    if (blob.size < MIN_SIZE) return;
+    if (blob.size <= lastIncrementalSizeRef.current + MIN_GROWTH) return;
+
+    incrementalInFlightRef.current = true;
+    setIsLiveTranscribing(true);
+    setSoapJobStatus('streaming');
+
+    try {
+      const { turns } = await buildLiveTranscriptFromSnapshot(blob);
+      if (!recordingActiveRef.current) return;
+      if (turns.length > 0) {
+        setTranscript(turns);
+        const last = turns[turns.length - 1];
+        if (last) {
+          setStreamingDraft({ text: last.text, speaker: last.speaker });
+        }
+        lastIncrementalSizeRef.current = blob.size;
+        recordAiSuccess();
+      }
+    } catch {
+      // Silent during live poll — final stop will retry
+    } finally {
+      incrementalInFlightRef.current = false;
+      if (recordingActiveRef.current) {
+        setIsLiveTranscribing(false);
+      }
+    }
+  }, []);
+
+  const startLiveTranscriptPolling = useCallback(() => {
+    stopLiveTranscriptPolling();
+    const tick = () => { void pollLiveTranscript(); };
+    incrementalKickoffRef.current = setTimeout(tick, 1500);
+    incrementalTimerRef.current = setInterval(tick, 1200);
+  }, [pollLiveTranscript, stopLiveTranscriptPolling]);
+
   // ─── Voice recording & transcription (FR-023) ──────────────────────────────
 
   const startRecording = async () => {
@@ -454,7 +606,21 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       return;
     }
 
+    if (isAiCircuitOpen()) {
+      setSttFallbackMode(true);
+      toast.warning('Dịch vụ AI tạm ngưng. Vui lòng nhập bệnh án thủ công hoặc transcript tay.');
+      return;
+    }
+
     try {
+      const healthy = await checkSttApiHealth();
+      if (!healthy) {
+        recordAiFailure();
+        setSttFallbackMode(true);
+        toast.warning('Dịch vụ STT không khả dụng. Chuyển sang chế độ nhập tay.');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Chưa đăng nhập');
 
@@ -464,28 +630,105 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         consentConfirmed: true,
       });
       sttSessionIdRef.current = session.session_id;
+      wsLastPartialAtRef.current = 0;
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      mediaStreamRef.current = stream;
+
+      const wsStream = new SttWebSocketStream();
+      sttWsRef.current = wsStream;
+      wsFailedRef.current = false;
+
+      try {
+        await wsStream.connect(session.ws_url, {
+          onPartial: (text, speaker) => {
+            wsLastPartialAtRef.current = Date.now();
+            setStreamingDraft({ text, speaker: speaker ?? 'doctor' });
+            setSoapJobStatus('streaming');
+          },
+          onFinalTurn: (turn) => {
+            wsLastPartialAtRef.current = Date.now();
+            setTranscript((prev) => [...prev, turn]);
+            setStreamingDraft(null);
+          },
+          onError: () => {
+            wsFailedRef.current = true;
+          },
+          onConnected: () => {
+            setIsWsStreaming(true);
+            setSoapJobStatus('streaming');
+          },
+        }, { audioEncoding: 'pcm' });
+      } catch {
+        wsFailedRef.current = true;
+        sttWsRef.current = null;
+      }
+
+      if (sttWsRef.current?.isConnected()) {
+        try {
+          pcmCaptureRef.current = await startPcmCapture(stream, (pcm) => {
+            sttWsRef.current?.sendPcmChunk(pcm);
+          });
+        } catch {
+          wsFailedRef.current = true;
+        }
+      }
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : undefined;
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+          // WebM fallback only when PCM stream is unavailable
+          if (wsFailedRef.current && sttWsRef.current?.isConnected()) {
+            sttWsRef.current.sendAudioChunk(e.data);
+          }
+        }
       };
 
-      mediaRecorder.start(1000);
+      mediaRecorder.start(250);
+      recordingActiveRef.current = true;
       setIsRecording(true);
       setRecordingDuration(0);
+      recordingDurationRef.current = 0;
       setTranscript([]);
+      setStreamingDraft(null);
       setNlpAnalysis(null);
+      setSoapJobStatus('streaming');
+      startLiveTranscriptPolling();
 
       recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
+        setRecordingDuration((prev) => {
+          const next = prev + 1;
+          recordingDurationRef.current = next;
+          return next;
+        });
       }, 1000);
 
-      toast.success('Bắt đầu ghi âm phiên khám...');
+      toast.success(
+        wsFailedRef.current
+          ? 'Ghi âm — transcript cập nhật liên tục (~1 giây/lần).'
+          : 'Ghi âm realtime — nói đến đâu hiện chữ đến đó.'
+      );
     } catch (e) {
+      pcmCaptureRef.current?.stop();
+      pcmCaptureRef.current = null;
+      sttWsRef.current?.disconnect();
+      sttWsRef.current = null;
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      recordingActiveRef.current = false;
+      stopLiveTranscriptPolling();
       toast.error(
         e instanceof Error && e.message !== 'Chưa đăng nhập'
           ? e.message
@@ -497,26 +740,51 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const stopRecording = async () => {
     if (!isRecording) return;
 
+    recordingActiveRef.current = false;
+    stopLiveTranscriptPolling();
+    pcmCaptureRef.current?.stop();
+    pcmCaptureRef.current = null;
     setIsRecording(false);
+    setIsWsStreaming(false);
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
 
     setIsTranscribing(true);
-    toast.info('Đang chuyển đổi giọng nói và phân tích hội thoại...');
+    setSoapJobStatus('transcribing');
+    toast.info('Đang hoàn tất phiên ghi âm và phân tích hội thoại...');
 
     try {
       const audioBlob = await collectRecordedAudio();
       mediaRecorderRef.current = null;
+      mediaStreamRef.current = null;
 
       if (!audioBlob || audioBlob.size === 0) {
         throw new Error('Không thu được dữ liệu âm thanh. Vui lòng thử ghi âm lại.');
       }
 
-      const { turns } = await buildTranscriptFromAudio(audioBlob);
-      if (turns.length === 0) {
-        throw new Error('Không nhận diện được nội dung hội thoại từ file ghi âm.');
+      let turns = transcript;
+
+      if (sttWsRef.current && !wsFailedRef.current) {
+        const wsTurns = await sttWsRef.current.stop();
+        if (wsTurns.length > 0) {
+          turns = wsTurns;
+          setTranscript(wsTurns);
+        }
+        sttWsRef.current = null;
       }
 
-      setTranscript(turns);
+      setStreamingDraft(null);
+
+      if (turns.length === 0) {
+        const batch = await buildTranscriptFromAudio(audioBlob);
+        turns = batch.turns;
+        if (turns.length === 0) {
+          throw new Error('Không nhận diện được nội dung hội thoại từ file ghi âm.');
+        }
+        setTranscript(turns);
+      }
+
+      recordAiSuccess();
+      setSoapJobStatus('analyzing');
 
       const plainTranscript = transcriptToPlainText(turns);
       const analysis = await analyzeTranscript(plainTranscript);
@@ -526,17 +794,69 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         toast.warning(`Phát hiện ${analysis.red_flags.length} dấu hiệu cảnh báo từ hội thoại.`);
       }
 
-      await saveVoiceSession(appointmentId, turns, audioBlob);
-      toast.success('Đã lưu transcript phiên khám.');
+      const durationSeconds = recordingDurationRef.current;
+      const saved = await saveVoiceSession(appointmentId, turns, audioBlob, undefined, {
+        durationSeconds,
+      });
+      if (saved.storagePath) {
+        const persistedUrl = saved.audioUrl ?? await getConsultationAudioUrl(saved.storagePath);
+        setConsultationRecordings((prev) => [
+          {
+            id: saved.recordingId ?? `${Date.now()}`,
+            appointment_id: appointmentId,
+            doctor_id: '',
+            audio_storage_path: saved.storagePath!,
+            duration_seconds: durationSeconds,
+            transcript_snapshot: turns,
+            created_at: new Date().toISOString(),
+            audioUrl: persistedUrl,
+          },
+          ...prev,
+        ]);
+      } else {
+        await loadConsultationRecordings();
+      }
+      toast.success('Đã lưu bản ghi âm và transcript phiên khám.');
 
       await generateSoap(turns, analysis);
+      setSoapJobStatus('done');
     } catch (e) {
-      toast.error((e as Error).message || 'Lỗi xử lý ghi âm.');
+      recordAiFailure();
+      setSttFallbackMode(true);
+      setSoapJobStatus('error');
+      setAiCircuitOpen(isAiCircuitOpen());
+      sttWsRef.current?.disconnect();
+      sttWsRef.current = null;
+      toast.error(
+        (e as Error).message || 'Lỗi xử lý ghi âm. Chuyển sang chế độ nhập tay.',
+        { description: 'Bạn có thể nhập transcript thủ công bên dưới.' }
+      );
     } finally {
       setIsTranscribing(false);
+      setIsWsStreaming(false);
       sttSessionIdRef.current = null;
     }
   };
+
+  const updateTranscriptLine = useCallback((index: number, text: string) => {
+    setTranscript((prev) => prev.map((line, i) => (i === index ? { ...line, text } : line)));
+  }, []);
+
+  const addManualTranscriptLine = useCallback((speaker: 'doctor' | 'patient', text: string) => {
+    if (!text.trim()) return;
+    setTranscript((prev) => [...prev, { speaker, text: text.trim() }]);
+    setSttFallbackMode(true);
+  }, []);
+
+  const saveTranscriptEdit = useCallback(async () => {
+    try {
+      await updateTranscriptEdited(appointmentId, transcript);
+      toast.success('Đã lưu bản hiệu chỉnh transcript.');
+      setIsEditingTranscript(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }, [appointmentId, transcript]);
 
   // ─── AI SOAP Note Generator (FR-024) ──────────────────────────────────────────
 
@@ -544,9 +864,17 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     transcriptOverride?: VoiceSession['transcript_raw'],
     analysisOverride?: NlpAnalyzeResult | null
   ) => {
+    if (isAiCircuitOpen()) {
+      toast.warning('Dịch vụ AI tạm ngưng 5 phút. Vui lòng nhập SOAP thủ công.');
+      setAiCircuitOpen(true);
+      return;
+    }
+
     setIsGeneratingSoap(true);
+    setSoapJobStatus('generating');
     try {
       const generated = await generateSoapFromAi(appointmentId, transcriptOverride);
+      recordAiSuccess();
 
       if (generated.analysis) {
         setNlpAnalysis(generated.analysis);
@@ -554,12 +882,18 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         setNlpAnalysis(analysisOverride);
       }
 
-      setFormData({
+      const newForm = {
         s_text: generated.s_text,
         o_text: generated.o_text,
         a_text: generated.a_text,
         p_text: generated.p_text,
-      });
+      };
+
+      setFormData(newForm);
+
+      if (examIdRef.current) {
+        await saveSoapAiBaseline(examIdRef.current, newForm);
+      }
 
       setSoapSourceBadge({
         s_text: true,
@@ -582,8 +916,12 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       }
 
       await reloadExam();
+      setSoapJobStatus('done');
       toast.success('Đã tạo SOAP Note từ AI (Module 5/6).');
     } catch (e) {
+      recordAiFailure();
+      setSoapJobStatus('error');
+      setAiCircuitOpen(isAiCircuitOpen());
       toast.error((e as Error).message || 'Gặp lỗi khi tạo SOAP Note tự động.');
     } finally {
       setIsGeneratingSoap(false);
@@ -627,9 +965,10 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         // Save latest draft first
         await saveSoapDraft(examIdRef.current, formData);
 
-        // Sign & Lock (PIN bypass — UI only)
+        // Sign & Lock with PIN verification
         await signExamination({
           examId: examIdRef.current,
+          pinPlain: params.pin,
           responsibilityAck: params.responsibilityAck,
         });
 
@@ -700,12 +1039,27 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     recordingConsent,
     setRecordingConsent,
     transcript,
+    streamingDraft,
+    isWsStreaming,
+    isLiveTranscribing,
     nlpAnalysis,
     startRecording,
     stopRecording,
+    sttFallbackMode,
+    isEditingTranscript,
+    setIsEditingTranscript,
+    updateTranscriptLine,
+    saveTranscriptEdit,
+    addManualTranscriptLine,
+    aiCircuitOpen,
+    aiCircuitCooldownMs: getAiCircuitCooldownRemaining(),
+    consultationRecordings,
+    recordingsLoading,
+    resolveRecordingAudioUrl,
 
     // SOAP auto-generation
     isGeneratingSoap,
+    soapJobStatus,
     generateSoap,
     soapSourceBadge,
 

@@ -40,7 +40,9 @@ import { DoctorNotificationsProvider } from "./hooks/DoctorNotificationsContext"
 import QuestionLibraryPage from "./pages/admin/clinical-logic/QuestionLibraryPage.tsx";
 import QuestionnaireBuilderPage from "./pages/admin/clinical-logic/QuestionnaireBuilderPage.tsx";
 import ExaminationPage from "./pages/provider/ExaminationPage.tsx";
+import DoctorProfilePage from "./pages/provider/DoctorProfilePage.tsx";
 import ClinicalTasksContent from "./components/provider/ClinicalTasksContent.tsx";
+import AdminAiAccuracyPage from "./pages/admin/AdminAiAccuracyPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -151,6 +153,7 @@ const App = () => (
               <Route path="appointments" element={<ProviderAppointmentsPage />} />
               <Route path="examination/:appointmentId" element={<ExaminationPage />} />
               <Route path="tasks" element={<ClinicalTasksContent portal="doctor" />} />
+              <Route path="profile" element={<DoctorProfilePage />} />
               <Route path="analytics" element={<ProviderSectionPlaceholder title="Analytics" />} />
             </Route>
             <Route
@@ -185,6 +188,7 @@ const App = () => (
                 element={<PatientRecordsManagement portal="admin" />}
               />
               <Route path="appointments" element={<AdminAppointmentsContent />} />
+              <Route path="examination/:appointmentId" element={<ExaminationPage />} />
               <Route path="master-data" element={<MasterDataContent />} />
               <Route path="users" element={<AdminUsersContent />} />
               <Route path="roles" element={<AdminRolesContent />} />
@@ -194,6 +198,7 @@ const App = () => (
               <Route path="question-library" element={<QuestionLibraryPage />} />
               <Route path="question-library/new" element={<QuestionnaireBuilderPage />} />
               <Route path="question-library/:id" element={<QuestionnaireBuilderPage />} />
+              <Route path="ai-accuracy" element={<AdminAiAccuracyPage />} />
             </Route>
             <Route path="/admin/clinical-logic" element={<Navigate to="/admin/question-library" replace />} />
             <Route path="/admin/clinical-logic/question-library" element={<Navigate to="/admin/question-library" replace />} />

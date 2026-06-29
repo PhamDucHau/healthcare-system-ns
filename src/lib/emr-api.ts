@@ -179,8 +179,7 @@ export async function removeIcdCode(icdId: string): Promise<void> {
 }
 
 /**
- * Set/update doctor's sign-off PIN
- * RULE-011e: must be set before signing
+ * Set/update doctor's sign-off PIN (syncs hash + profile plain PIN).
  */
 export async function setDoctorPin(pinPlain: string): Promise<void> {
   const { error } = await supabase.rpc('set_doctor_pin', {
@@ -199,16 +198,16 @@ export async function checkDoctorPinSet(): Promise<boolean> {
 }
 
 /**
- * Sign (lock) an examination — PIN param kept for UI compatibility but not verified server-side (dev bypass).
+ * Sign (lock) an examination with doctor PIN verification (RULE-011).
  */
 export async function signExamination(params: {
   examId: string;
-  pinPlain?: string;
+  pinPlain: string;
   responsibilityAck: boolean;
 }): Promise<SignExaminationResult> {
   const { data, error } = await supabase.rpc('sign_examination', {
     p_exam_id: params.examId,
-    p_pin_plain: params.pinPlain ?? '',
+    p_pin_plain: params.pinPlain,
     p_responsibility_ack: params.responsibilityAck,
     p_ip_address: null,
     p_user_agent: navigator.userAgent,
@@ -226,12 +225,45 @@ export async function signExamination(params: {
   };
 }
 
+export type Icd10SearchResult = {
+  code: string;
+  name: string;
+  confidence?: number;
+  evidence?: string;
+};
+
 /**
- * Search ICD-10 codes from master data
+ * Search ICD-10 via Module 5/6 /icd10/suggest API (primary), DB fallback when offline.
  */
-export async function searchIcd10(query: string): Promise<{ code: string; name: string }[]> {
+export async function searchIcd10(query: string): Promise<Icd10SearchResult[]> {
   if (!query || query.trim().length < 2) return [];
 
+  const q = query.trim();
+
+  try {
+    const result = await suggestIcd10({
+      recentTranscript: q,
+      complaints: [q],
+    });
+
+    const fromApi = (result.icd10 ?? []).map((item) => ({
+      code: item.code,
+      name: item.name_vi || item.name_en || item.code,
+      confidence: item.confidence,
+      evidence: item.evidence,
+    }));
+
+    if (fromApi.length > 0) {
+      return fromApi.slice(0, 20);
+    }
+  } catch {
+    // Fall through to local DB / static list
+  }
+
+  return searchIcd10Local(q);
+}
+
+async function searchIcd10Local(query: string): Promise<Icd10SearchResult[]> {
   const { data, error } = await supabase
     .from('icd10_codes')
     .select('code, name')
@@ -239,7 +271,6 @@ export async function searchIcd10(query: string): Promise<{ code: string; name: 
     .limit(20);
 
   if (error) {
-    // Fallback: search from a static demo set if table doesn't exist
     return searchIcd10Fallback(query);
   }
 
@@ -262,6 +293,10 @@ export async function getAiIcdSuggestions(
   // Minimum content threshold
   if (totalLength < 30) return [];
 
+  const cacheKey = hashIcdCacheKey(sText, oText);
+  const cached = await getCachedIcdSuggestions(cacheKey);
+  if (cached && cached.length > 0) return cached;
+
   try {
     const analysis = await analyzeTranscript(combinedText);
     const complaints = analysis.complaints.map((c) => c.text);
@@ -283,7 +318,9 @@ export async function getAiIcdSuggestions(
     }));
 
     if (fromApi.length > 0) {
-      return fromApi.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+      const sorted = fromApi.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+      void setCachedIcdSuggestions(cacheKey, sorted);
+      return sorted;
     }
   } catch {
     // Fall back to keyword matching when STT API is unavailable
@@ -441,4 +478,85 @@ function mapEmrError(message: string): string {
   if (message.includes('VALIDATION_ERROR: PIN must be'))
     return 'Mã PIN phải gồm đúng 6 chữ số.';
   return message;
+}
+
+// ─── UAT gap closure APIs ─────────────────────────────────────────────────────
+
+export type IntegrityResult = {
+  valid: boolean;
+  reason?: string;
+  message: string;
+  stored_hash?: string;
+  computed_hash?: string;
+  signed_at?: string;
+};
+
+export async function verifyExaminationIntegrity(examId: string): Promise<IntegrityResult> {
+  const { data, error } = await supabase.rpc('verify_examination_integrity', {
+    p_exam_id: examId,
+  });
+  if (error) throw new Error(mapEmrError(error.message));
+  return data as IntegrityResult;
+}
+
+export async function createExamAddendum(
+  parentExamId: string,
+  fields: { s_text?: string; o_text?: string; a_text?: string; p_text?: string }
+): Promise<string> {
+  const { data, error } = await supabase.rpc('create_exam_addendum', {
+    p_parent_exam_id: parentExamId,
+    p_s_text: fields.s_text ?? null,
+    p_o_text: fields.o_text ?? null,
+    p_a_text: fields.a_text ?? null,
+    p_p_text: fields.p_text ?? null,
+  });
+  if (error) throw new Error(mapEmrError(error.message));
+  return data as string;
+}
+
+export async function saveSoapAiBaseline(
+  examId: string,
+  baseline: { s_text: string; o_text: string; a_text: string; p_text: string }
+): Promise<void> {
+  const { error } = await supabase.rpc('save_soap_ai_baseline', {
+    p_exam_id: examId,
+    p_baseline: baseline,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export type AiAccuracyStats = {
+  total_signed_with_ai: number;
+  doctor_edited_count: number;
+  avg_ai_retention_pct: number;
+  edit_rate_pct: number;
+};
+
+export async function getAiAccuracyStats(): Promise<AiAccuracyStats> {
+  const { data, error } = await supabase.rpc('get_ai_accuracy_stats');
+  if (error) throw new Error(error.message);
+  return data as AiAccuracyStats;
+}
+
+function hashIcdCacheKey(sText: string, oText: string): string {
+  const normalized = `${sText.trim()}|${oText.trim()}`.toLowerCase().slice(0, 500);
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = ((hash << 5) - hash) + normalized.charCodeAt(i);
+    hash |= 0;
+  }
+  return `icd_${Math.abs(hash)}`;
+}
+
+async function getCachedIcdSuggestions(key: string): Promise<AiIcdSuggestion[] | null> {
+  const { data } = await supabase.rpc('get_cached_icd_suggestions', { p_cache_key: key });
+  if (!data) return null;
+  return data as AiIcdSuggestion[];
+}
+
+async function setCachedIcdSuggestions(key: string, suggestions: AiIcdSuggestion[]): Promise<void> {
+  await supabase.rpc('set_cached_icd_suggestions', {
+    p_cache_key: key,
+    p_suggestions: suggestions,
+  });
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   LayoutGrid, Users, Search, HelpCircle,
-  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays, ClipboardList,
+  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays, ClipboardList, Brain,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ const sidebarItems = [
   { icon: ClipboardList, label: "Bộ câu hỏi lâm sàng", path: "/admin/question-library" },
   { icon: Users,         label: "Người dùng",    path: "/admin/users" },
   { icon: Shield,        label: "Phân quyền",    path: "/admin/roles" },
+  { icon: Brain,         label: "Độ chính xác AI", path: "/admin/ai-accuracy" },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>

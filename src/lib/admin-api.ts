@@ -120,7 +120,7 @@ export async function createAdminUser(input: {
   specialty?: string | null;
   status?: AdminUserStatus;
 }) {
-  return postAdmin<{ message: string; userId: string; tempPassword: string }>("admin-users", {
+  return postAdmin<{ message: string; userId: string; tempPassword: string; signPin?: string | null }>("admin-users", {
     action: "create",
     ...input,
   });

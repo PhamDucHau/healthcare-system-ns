@@ -10,8 +10,19 @@ export type VoiceSession = {
   appointment_id: string;
   doctor_id: string;
   audio_url: string | null;
+  audio_storage_path: string | null;
   transcript_raw: Array<{ speaker: 'doctor' | 'patient'; text: string; start_time?: string; end_time?: string }>;
   transcript_edited: Array<{ speaker: 'doctor' | 'patient'; text: string; start_time?: string; end_time?: string }> | null;
+  created_at: string;
+};
+
+export type ConsultationRecording = {
+  id: string;
+  appointment_id: string;
+  doctor_id: string;
+  audio_storage_path: string;
+  duration_seconds: number | null;
+  transcript_snapshot: VoiceSession['transcript_raw'];
   created_at: string;
 };
 
@@ -42,7 +53,6 @@ export type ClinicalTask = {
   created_by: string;
   created_at: string;
   updated_at: string;
-  // Joins
   patient?: {
     legal_first_name: string;
     legal_last_name: string;
@@ -50,21 +60,82 @@ export type ClinicalTask = {
   };
 };
 
-// ─── Voice Sessions API ──────────────────────────────────────────────────────
+const AUDIO_BUCKET = 'consultation-audios';
+/** Playback links — refreshed on demand via storage path. */
+const PRESIGNED_TTL_SEC = 3600;
+
+async function uploadConsultationAudio(
+  appointmentId: string,
+  audioBlob: Blob
+): Promise<{ storagePath: string; signedUrl: string }> {
+  const ext = audioBlob.type.includes('webm') ? 'webm' : 'wav';
+  const storagePath = `${appointmentId}/${Date.now()}.${ext}`;
+
+  const { error: uploadErr } = await supabase.storage
+    .from(AUDIO_BUCKET)
+    .upload(storagePath, audioBlob, {
+      upsert: true,
+      contentType: audioBlob.type || 'audio/webm',
+      cacheControl: '3600',
+    });
+
+  if (uploadErr) throw new Error(`Không thể lưu file âm thanh: ${uploadErr.message}`);
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from(AUDIO_BUCKET)
+    .createSignedUrl(storagePath, PRESIGNED_TTL_SEC);
+
+  if (signErr || !signed?.signedUrl) {
+    throw new Error('Không thể tạo liên kết truy cập âm thanh.');
+  }
+
+  return { storagePath, signedUrl: signed.signedUrl };
+}
+
+export async function getConsultationAudioUrl(
+  storagePath: string
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(AUDIO_BUCKET)
+    .createSignedUrl(storagePath, PRESIGNED_TTL_SEC);
+
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
 
 export async function saveVoiceSession(
   appointmentId: string,
   transcript: VoiceSession['transcript_raw'],
-  audioBlob?: Blob
-): Promise<void> {
+  audioBlob?: Blob,
+  transcriptEdited?: VoiceSession['transcript_edited'],
+  options?: { durationSeconds?: number }
+): Promise<{ audioUrl: string | null; storagePath: string | null; recordingId: string | null }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Chưa đăng nhập');
 
   let audioUrl: string | null = null;
+  let storagePath: string | null = null;
+  let recordingId: string | null = null;
+
   if (audioBlob) {
-    // In production, upload to a storage bucket (e.g. 'consultation-audios')
-    // Here we'll simulate the URL link
-    audioUrl = `https://storage.clinic.local/audios/${appointmentId}.mp3`;
+    const uploaded = await uploadConsultationAudio(appointmentId, audioBlob);
+    audioUrl = uploaded.signedUrl;
+    storagePath = uploaded.storagePath;
+
+    const { data: recordingRow, error: recordingErr } = await supabase
+      .from('consultation_recordings')
+      .insert({
+        appointment_id: appointmentId,
+        doctor_id: user.id,
+        audio_storage_path: storagePath,
+        duration_seconds: options?.durationSeconds ?? null,
+        transcript_snapshot: transcript,
+      })
+      .select('id')
+      .single();
+
+    if (recordingErr) throw new Error(recordingErr.message);
+    recordingId = recordingRow?.id ? String(recordingRow.id) : null;
   }
 
   const { error } = await supabase
@@ -73,9 +144,37 @@ export async function saveVoiceSession(
       appointment_id: appointmentId,
       doctor_id: user.id,
       audio_url: audioUrl,
+      audio_storage_path: storagePath,
       transcript_raw: transcript,
-      transcript_edited: null,
+      transcript_edited: transcriptEdited ?? null,
     }, { onConflict: 'appointment_id' });
+
+  if (error) throw new Error(error.message);
+
+  return { audioUrl, storagePath, recordingId };
+}
+
+export async function listConsultationRecordings(
+  appointmentId: string
+): Promise<ConsultationRecording[]> {
+  const { data, error } = await supabase
+    .from('consultation_recordings')
+    .select('*')
+    .eq('appointment_id', appointmentId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ConsultationRecording[];
+}
+
+export async function updateTranscriptEdited(
+  appointmentId: string,
+  transcriptEdited: VoiceSession['transcript_edited']
+): Promise<void> {
+  const { error } = await supabase
+    .from('voice_sessions')
+    .update({ transcript_edited: transcriptEdited })
+    .eq('appointment_id', appointmentId);
 
   if (error) throw new Error(error.message);
 }
@@ -91,8 +190,6 @@ export async function getVoiceSession(appointmentId: string): Promise<VoiceSessi
   return data as VoiceSession | null;
 }
 
-// ─── AI SOAP Note Generator (FR-024) — Module 5/6 NLP backend ────────────────
-
 export type GenerateSoapFromAiResult = {
   s_text: string;
   o_text: string;
@@ -107,12 +204,14 @@ export async function generateSoapFromAi(
   transcriptOverride?: VoiceSession['transcript_raw']
 ): Promise<GenerateSoapFromAiResult> {
   const voice = transcriptOverride
-    ? { transcript_raw: transcriptOverride }
+    ? { transcript_raw: transcriptOverride, transcript_edited: null }
     : await getVoiceSession(appointmentId).catch(() => null);
 
-  const transcriptText = voice?.transcript_raw?.length
-    ? transcriptToPlainText(voice.transcript_raw)
-    : '';
+  const turns = voice?.transcript_edited?.length
+    ? voice.transcript_edited
+    : voice?.transcript_raw ?? [];
+
+  const transcriptText = turns.length ? transcriptToPlainText(turns) : '';
 
   if (!transcriptText.trim()) {
     throw new Error('Chưa có transcript phiên khám. Vui lòng ghi âm hoặc nhập nội dung trước.');
@@ -127,8 +226,6 @@ export async function generateSoapFromAi(
   };
 }
 
-// ─── Patient Risk Assessments API (FR-025) ───────────────────────────────────
-
 export async function getRiskAssessment(examId: string): Promise<RiskAssessment | null> {
   const { data, error } = await supabase
     .from('risk_assessments')
@@ -141,16 +238,13 @@ export async function getRiskAssessment(examId: string): Promise<RiskAssessment 
 }
 
 export async function recalculateRiskScore(examId: string): Promise<RiskAssessment | null> {
-  const { data, error } = await supabase.rpc('calculate_risk_score', { p_exam_id: examId });
+  const { error } = await supabase.rpc('calculate_risk_score', { p_exam_id: examId });
   if (error) throw new Error(error.message);
-  
   return getRiskAssessment(examId);
 }
 
-// ─── Clinical Tasks API (FR-025 Follow-ups) ──────────────────────────────────
-
-export async function fetchClinicalTasks(portal: 'doctor' | 'admin'): Promise<ClinicalTask[]> {
-  const query = supabase
+export async function fetchClinicalTasks(_portal: 'doctor' | 'admin'): Promise<ClinicalTask[]> {
+  const { data, error } = await supabase
     .from('clinical_tasks')
     .select(`
       *,
@@ -162,10 +256,9 @@ export async function fetchClinicalTasks(portal: 'doctor' | 'admin'): Promise<Cl
     `)
     .order('due_date', { ascending: true });
 
-  const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: Record<string, unknown>) => ({
     ...row,
     patient: Array.isArray(row.patient) ? row.patient[0] : row.patient || undefined,
   })) as ClinicalTask[];

@@ -4,9 +4,10 @@ import {
   FileUser,
   LayoutDashboard,
   LogOut,
+  UserCircle,
   Users,
 } from "lucide-react";
-import { NavLink, Outlet, useMatch } from "react-router-dom";
+import { NavLink, Outlet, useMatch, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { useDoctorNotifications } from "@/hooks/DoctorNotificationsContext";
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { path: "/provider-portal/patient-records", icon: FileUser, label: "Hồ sơ bệnh nhân" },
   { path: "/provider-portal/patients", icon: Users, label: "Bệnh nhân" },
   { path: "/provider-portal/appointments", icon: Calendar, label: "Lịch hẹn" },
+  { path: "/provider-portal/profile", icon: UserCircle, label: "Hồ sơ bác sĩ" },
 ] as const;
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -132,10 +134,13 @@ const ProviderLayout = () => {
                   onClearAll={clearAll}
                   appointmentsPath="/provider-portal/appointments"
                 />
-                <div className="rounded-lg border px-3 py-2">
-                  <p className="text-sm font-semibold">Dr. Sarah Chen</p>
-                  {/* <p className="text-xs text-muted-foreground">Internal Medicine</p> */}
-                </div>
+                <Link
+                  to="/provider-portal/profile"
+                  className="rounded-lg border px-3 py-2 hover:bg-muted transition-colors"
+                >
+                  <p className="text-sm font-semibold">Hồ sơ bác sĩ</p>
+                  <p className="text-xs text-muted-foreground">PIN ký duyệt</p>
+                </Link>
               </div>
             </header>
           )}

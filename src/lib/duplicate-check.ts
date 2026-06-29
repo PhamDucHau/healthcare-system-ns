@@ -46,7 +46,8 @@ export async function logDedupAudit(
     normalizedValue: string;
     matchedPatientId: string | null;
     result: "no_match" | "blocked" | "warned" | "bypassed";
-    context: "onboarding" | "edit";
+    context: "onboarding" | "edit" | "admin_create";
+    bypassReason?: string;
   },
 ): Promise<void> {
   await supabase.from("dedup_audit").insert({
@@ -56,5 +57,6 @@ export async function logDedupAudit(
     matched_patient_id: entry.matchedPatientId,
     result: entry.result,
     context: entry.context,
+    bypass_reason: entry.bypassReason ?? null,
   });
 }

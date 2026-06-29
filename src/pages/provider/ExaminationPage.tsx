@@ -4,11 +4,12 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import { ChevronLeft, Loader2, Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchDoctorAppointments } from '@/lib/doctor-appointment-api';
+import { fetchAdminAppointments } from '@/lib/admin-appointment-api';
 import {
   getAppointmentReadiness,
   getAppointmentReadinessMessage,
@@ -24,6 +25,9 @@ import { ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR } from '@/types/admin-appointmen
 export default function ExaminationPage() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminPortal = location.pathname.startsWith('/admin');
+  const appointmentsPath = isAdminPortal ? '/admin/appointments' : '/provider-portal/appointments';
   const [appointment, setAppointment] = useState<AdminAppointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,7 +37,8 @@ export default function ExaminationPage() {
     void (async () => {
       setLoading(true);
       try {
-        const all = await fetchDoctorAppointments({});
+        const fetchAppointments = isAdminPortal ? fetchAdminAppointments : fetchDoctorAppointments;
+        const all = await fetchAppointments({});
         const appt = all.find((a) => a.id === appointmentId);
         if (!appt) {
           setError('Không tìm thấy lịch hẹn.');
@@ -52,7 +57,7 @@ export default function ExaminationPage() {
         setLoading(false);
       }
     })();
-  }, [appointmentId]);
+  }, [appointmentId, isAdminPortal]);
 
   const slotLabel = appointment?.slot_date
     ? format(parseISO(appointment.slot_date), 'dd/MM/yyyy', { locale: vi })
@@ -77,7 +82,7 @@ export default function ExaminationPage() {
           variant="ghost"
           size="sm"
           className="gap-1.5 text-muted-foreground hover:text-foreground h-8 px-2"
-          onClick={() => navigate('/provider-portal/appointments')}
+          onClick={() => navigate(appointmentsPath)}
         >
           <ChevronLeft className="h-4 w-4" />
           Lịch hẹn
@@ -107,7 +112,7 @@ export default function ExaminationPage() {
 
         <div className="ml-auto">
           <Link
-            to="/provider-portal/appointments"
+            to={appointmentsPath}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Quay lại danh sách
@@ -128,7 +133,7 @@ export default function ExaminationPage() {
             <Alert variant="destructive">
               <AlertDescription>{error || 'Không tìm thấy lịch hẹn.'}</AlertDescription>
             </Alert>
-            <Button variant="outline" onClick={() => navigate('/provider-portal/appointments')}>
+            <Button variant="outline" onClick={() => navigate(appointmentsPath)}>
               <ChevronLeft className="h-4 w-4 mr-1" /> Quay lại lịch hẹn
             </Button>
           </div>

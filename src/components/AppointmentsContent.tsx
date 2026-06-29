@@ -6,6 +6,7 @@ import {
   Calendar, Plus, Loader2, QrCode, XCircle, ChevronRight, Stethoscope, ClipboardList, CheckCircle2,
 } from 'lucide-react';
 import CheckinButton from '@/components/patient/booking/CheckinButton';
+import QrCodeDisplay from '@/components/common/QrCodeDisplay';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { fetchMyAppointments, cancelAppointment, mapBookingError } from '@/lib/appointment-api';
@@ -183,13 +184,14 @@ function UpcomingCard({
         </p>
       )}
 
-      {/* QR Token */}
-      {apt.status === 'CONFIRMED' && (
-        <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 mb-3">
-          <QrCode className="h-4 w-4 text-foreground flex-shrink-0" />
-          <span className="text-[11px] font-mono text-muted-foreground truncate flex-1">
-            {apt.qr_token}
-          </span>
+      {/* QR Token — scannable */}
+      {apt.status === 'CONFIRMED' && apt.qr_token && (
+        <div className="flex justify-center mb-3">
+          <QrCodeDisplay
+            value={apt.qr_token}
+            size={120}
+            label="Quét mã tại quầy tiếp nhận"
+          />
         </div>
       )}
 

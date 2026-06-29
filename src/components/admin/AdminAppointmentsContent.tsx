@@ -519,6 +519,7 @@ function AppointmentRow({
 
       {/* Actions */}
       <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+        {appt.status !== "COMPLETED" && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -568,6 +569,7 @@ function AppointmentRow({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
     </div>
   );

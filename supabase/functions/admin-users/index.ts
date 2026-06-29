@@ -6,6 +6,7 @@ import {
 } from "../_shared/audit.ts";
 import { PERMISSIONS, isAuthContext, requirePermission, requireStaffPortalRole } from "../_shared/rbac.ts";
 import { generateTempPassword } from "../_shared/temp-password.ts";
+import { generateSignPin } from "../_shared/sign-pin.ts";
 import { syncRoleToAppMetadata } from "../_shared/user-profile.ts";
 import { emailExists, signOutAllSessions } from "../_shared/supabase-admin.ts";
 import type { PortalType } from "../_shared/portal.ts";
@@ -66,6 +67,35 @@ async function resolvePortalRole(
   const pr = data?.portal_role;
   if (pr === "patient" || pr === "doctor" || pr === "admin") return pr;
   return null;
+}
+
+async function provisionDoctorSignPinIfNeeded(
+  admin: ReturnType<typeof import("../_shared/supabase-admin.ts").getAdminClient>,
+  userId: string,
+  portalRole: PortalType | null,
+): Promise<string | null> {
+  if (portalRole !== "doctor") return null;
+
+  const { data: existing } = await admin
+    .from("user_profiles")
+    .select("sign_pin_plain")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existing?.sign_pin_plain) return existing.sign_pin_plain as string;
+
+  const signPin = generateSignPin();
+  const { error } = await admin.rpc("provision_doctor_sign_pin", {
+    p_doctor_id: userId,
+    p_pin_plain: signPin,
+  });
+
+  if (error) {
+    console.warn("[provisionDoctorSignPin]", error.message);
+    return null;
+  }
+
+  return signPin;
 }
 
 async function sendTempPasswordEmail(email: string): Promise<void> {
@@ -220,6 +250,8 @@ Deno.serve(async (req) => {
 
     if (portalRole) await syncRoleToAppMetadata(auth.admin, userId, portalRole);
 
+    const signPin = await provisionDoctorSignPinIfNeeded(auth.admin, userId, portalRole);
+
     await sendTempPasswordEmail(email);
 
     await writeAuditLog(auth.admin, {
@@ -233,13 +265,17 @@ Deno.serve(async (req) => {
         targetEmail: email,
         roleId: body.roleId,
         facilityId: body.facilityId ?? null,
+        doctorSignPinProvisioned: signPin != null,
       },
     });
 
     return jsonResponse({
-      message: "Đã tạo user và gửi email thông báo",
+      message: signPin
+        ? "Đã tạo user bác sĩ, gửi email và cấp mã PIN ký duyệt"
+        : "Đã tạo user và gửi email thông báo",
       userId,
       tempPassword,
+      signPin,
     });
   }
 
@@ -354,11 +390,17 @@ Deno.serve(async (req) => {
       .from("user_profiles")
       .update(updates)
       .eq("user_id", body.userId)
-      .select("user_id, email, full_name, status")
+      .select("user_id, email, full_name, status, role")
       .maybeSingle();
 
     if (error) return jsonResponse({ error: "DB_ERROR", message: error.message }, 500);
     if (!data) return jsonResponse({ error: "NOT_FOUND" }, 404);
+
+    let signPin: string | null = null;
+    if (body.roleId) {
+      const portalRole = await resolvePortalRole(auth.admin, body.roleId);
+      signPin = await provisionDoctorSignPinIfNeeded(auth.admin, body.userId, portalRole);
+    }
 
     if (body.status === "locked" || body.status === "inactive") {
       await signOutAllSessions(body.userId);
@@ -381,7 +423,11 @@ Deno.serve(async (req) => {
       metadata: { targetUserId: body.userId, updates },
     });
 
-    return jsonResponse({ message: "Đã cập nhật user", user: data });
+    return jsonResponse({
+      message: signPin ? "Đã cập nhật user và cấp mã PIN ký duyệt" : "Đã cập nhật user",
+      user: data,
+      signPin,
+    });
   }
 
   if (body.action === "delete") {

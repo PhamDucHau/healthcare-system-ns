@@ -9,9 +9,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import UploadCard from "@/components/onboarding/UploadCard";
+import DuplicatePatientAlert from "@/components/common/DuplicatePatientAlert";
 import { supabase } from "@/lib/supabase";
 import { createAdminUser, listAdminRoles } from "@/lib/admin-api";
 import { adminInsertPatientProfile, staffCreatePatientProfile } from "@/lib/admin-appointment-api";
+import { checkPatientDuplicate, logDedupAudit, type DupCheckResult } from "@/lib/duplicate-check";
 import {
   fetchOcrSingle,
   mapBhytParsedToInsuranceUpdates,
@@ -81,6 +83,8 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   const [ocrBhyt, setOcrBhyt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [dupResult, setDupResult] = useState<DupCheckResult | null>(null);
+  const [dupBypassed, setDupBypassed] = useState(false);
 
   const set = (k: keyof FormData) => (v: string) => {
     setForm(p => ({ ...p, [k]: v }));
@@ -95,6 +99,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
 
   const handleClose = () => {
     setForm(empty); setErrors({});
+    setDupResult(null); setDupBypassed(false);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
     onClose();
   };
@@ -159,8 +164,58 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
     return Object.keys(errs).length === 0;
   };
 
-  const handleSave = async () => {
+  const handleSave = async (bypassReason?: string) => {
     if (!validate()) { toast.error("Vui lòng điền đầy đủ các trường bắt buộc"); return; }
+
+    const fullName = `${form.legalLastName.trim()} ${form.legalFirstName.trim()}`;
+
+    if (!dupBypassed) {
+      const dup = await checkPatientDuplicate(supabase, {
+        cccd: form.idNumber.trim() || undefined,
+        phone: form.phoneNumber.trim() || undefined,
+        name: fullName,
+        dob: form.dateOfBirth.trim() || undefined,
+      });
+
+      if (dup.cccdMatchId) {
+        setDupResult(dup);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await logDedupAudit(supabase, {
+            checkerUserId: user.id,
+            checkType: 'cccd',
+            normalizedValue: form.idNumber.trim(),
+            matchedPatientId: dup.cccdMatchId,
+            result: 'blocked',
+            context: 'admin_create',
+          });
+        }
+        toast.error('Trùng số CCCD — không thể tạo hồ sơ mới.');
+        return;
+      }
+
+      if (dup.phoneMatchId || dup.nameDobMatchId) {
+        if (!bypassReason) {
+          setDupResult(dup);
+          return;
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const checkType = dup.phoneMatchId ? 'phone' as const : 'name_dob' as const;
+          await logDedupAudit(supabase, {
+            checkerUserId: user.id,
+            checkType,
+            normalizedValue: checkType === 'phone' ? form.phoneNumber.trim() : fullName,
+            matchedPatientId: dup.phoneMatchId ?? dup.nameDobMatchId,
+            result: 'bypassed',
+            context: 'admin_create',
+            bypassReason,
+          });
+        }
+        setDupBypassed(true);
+      }
+    }
+
     setSaving(true);
     try {
       const phone = form.phoneNumber.trim();
@@ -169,13 +224,12 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
       let userId: string | null = null;
 
       if (portal === "provider") {
-        // Check for existing patient by phone or CCCD before inserting
         const idNumber = form.idNumber.trim();
         const orFilters: string[] = [];
         if (phone) orFilters.push(`phone_number.eq.${phone}`);
         if (idNumber) orFilters.push(`id_number.eq.${idNumber}`);
 
-        if (orFilters.length > 0) {
+        if (orFilters.length > 0 && !dupBypassed) {
           const { data: existing } = await supabase
             .from("patient")
             .select("id, legal_last_name, legal_first_name, phone_number, id_number")
@@ -398,6 +452,14 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               <F label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
             </div>
           </section>
+
+          {dupResult && !dupBypassed && (
+            <DuplicatePatientAlert
+              result={dupResult}
+              onBypass={(reason) => void handleSave(reason)}
+              onCancel={() => setDupResult(null)}
+            />
+          )}
         </div>
 
         <div className="flex items-center justify-between border-t pt-3">

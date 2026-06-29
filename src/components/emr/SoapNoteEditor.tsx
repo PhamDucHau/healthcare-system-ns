@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   Activity, AlertTriangle, Check, ChevronDown, ChevronUp,
-  ClipboardList, Loader2, Lock, Save, Sparkles, X,
+  ClipboardList, Loader2, Lock, Save, Sparkles, X, Pencil,
   Mic, StopCircle, Brain, Heart, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useSoapNoteEditor } from '@/hooks/useSoapNoteEditor';
 import type { SoapIcdCode, AiIcdSuggestion } from '@/types/emr';
 import IcdSearchPanel from './IcdSearchPanel';
@@ -27,6 +31,7 @@ import SetupPinDialog from './SetupPinDialog';
 import VitalSignsReadOnly from './VitalSignsReadOnly';
 import PreConsultationReadOnly from './PreConsultationReadOnly';
 import QuestionnaireAssignPanel from './QuestionnaireAssignPanel';
+import VoiceRecordingHistory from './VoiceRecordingHistory';
 
 type PatientInfo = {
   name: string;
@@ -44,6 +49,9 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
   const editor = useSoapNoteEditor(appointmentId);
   const [showSignOff, setShowSignOff] = useState(false);
   const [showSetupPin, setShowSetupPin] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [manualLine, setManualLine] = useState('');
+  const [manualSpeaker, setManualSpeaker] = useState<'doctor' | 'patient'>('doctor');
   const [sectionExpanded, setSectionExpanded] = useState({
     vitals: true,
     preConsult: false,
@@ -299,7 +307,6 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
             locked={editor.isLocked}
             isAiSuggested={editor.soapSourceBadge.a_text}
             placeholder="Mô tả chẩn đoán bổ sung, tóm tắt lâm sàng..."
-            rows={3}
           />
 
           {/* Confirmed ICD codes display */}
@@ -326,15 +333,15 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
             locked={editor.isLocked}
             isAiSuggested={editor.soapSourceBadge.p_text}
             placeholder="Ví dụ: 1. Amoxicillin 500mg x 2v/ngày x 5 ngày. 2. Paracetamol 500mg khi sốt. 3. Tái khám sau 1 tuần nếu không giảm..."
-            rows={5}
+            rows={7}
           />
         </div>
 
         {/* Right: Assistant & ICD panel */}
         {!editor.isLocked && (
-          <div className="w-80 border-l flex flex-col overflow-hidden bg-card flex-shrink-0 shadow-sm">
-            <Tabs defaultValue="voice" className="flex flex-col h-full">
-              <div className="border-b px-3 pt-3">
+          <div className="w-80 border-l flex flex-col min-h-0 overflow-hidden bg-card flex-shrink-0 shadow-sm">
+            <Tabs defaultValue="voice" className="flex h-full min-h-0 flex-col">
+              <div className="shrink-0 border-b px-3 pt-3 pb-3">
                 <TabsList className="w-full">
                   <TabsTrigger value="voice" className="flex-1 text-xs">
                     <Mic className="h-3.5 w-3.5 mr-1 text-red-500" />
@@ -353,8 +360,9 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                 </TabsList>
               </div>
 
+              <div className="min-h-0 flex-1 overflow-y-auto">
               {/* Tab 1: Voice Recording Assistant */}
-              <TabsContent value="voice" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0 flex flex-col">
+              <TabsContent value="voice" className="mt-0 p-4 space-y-4 outline-none">
                 <div className="space-y-3">
                   <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200/80 rounded-xl p-3">
                     <Checkbox
@@ -375,14 +383,20 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                       disabled={editor.isTranscribing || editor.isGeneratingSoap}
                       className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl gap-2 shadow-sm transition-all"
                     >
-                      <Mic className="h-5 w-5" /> Bắt đầu ghi âm phiên khám
+                      <Mic className="h-5 w-5" /> Bắt đầu ghi âm realtime
                     </Button>
                   ) : (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-xl">
                         <div className="flex items-center gap-2">
                           <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-ping" />
-                          <span className="text-xs font-bold text-red-700 uppercase tracking-wider">Đang ghi âm...</span>
+                          <span className="text-xs font-bold text-red-700 uppercase tracking-wider">
+                            {editor.isLiveTranscribing
+                              ? 'Đang nhận diện giọng nói...'
+                              : editor.isWsStreaming
+                                ? 'Đang stream STT realtime...'
+                                : 'Đang ghi âm...'}
+                          </span>
                         </div>
                         <span className="text-sm font-mono font-bold text-red-700">
                           {Math.floor(editor.recordingDuration / 60)
@@ -397,6 +411,42 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                       >
                         <StopCircle className="h-5 w-5" /> Dừng & Tự động tạo SOAP
                       </Button>
+                    </div>
+                  )}
+
+                  {editor.aiCircuitOpen && (
+                    <Alert className="py-2 border-amber-200 bg-amber-50">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-xs text-amber-800">
+                        Dịch vụ AI tạm ngưng 5 phút do lỗi liên tục. Vui lòng nhập SOAP thủ công.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {editor.sttFallbackMode && !editor.isRecording && (
+                    <Alert className="py-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        Chế độ dự phòng: STT không khả dụng. Nhập transcript thủ công bên dưới.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {editor.soapJobStatus !== 'idle' && (
+                    <div className="flex items-center gap-2 p-2.5 bg-slate-50 border rounded-xl text-xs">
+                      <Loader2 className={`h-3.5 w-3.5 ${editor.soapJobStatus === 'done' || editor.soapJobStatus === 'error' ? 'hidden' : 'animate-spin'}`} />
+                      <span className="font-medium text-slate-600">
+                        {editor.soapJobStatus === 'streaming' && (
+                          editor.isLiveTranscribing
+                            ? 'Đang cập nhật transcript từ giọng nói...'
+                            : 'Đang nhận transcript realtime...'
+                        )}
+                        {editor.soapJobStatus === 'transcribing' && 'Đang chuyển giọng nói...'}
+                        {editor.soapJobStatus === 'analyzing' && 'Đang phân tích NLP...'}
+                        {editor.soapJobStatus === 'generating' && 'Đang sinh SOAP Note...'}
+                        {editor.soapJobStatus === 'done' && '✓ Hoàn tất xử lý AI'}
+                        {editor.soapJobStatus === 'error' && '✗ Lỗi — chuyển sang nhập tay'}
+                      </span>
                     </div>
                   )}
 
@@ -422,29 +472,96 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                   )}
                 </div>
 
-                {editor.transcript.length > 0 && (
-                  <div className="flex-1 flex flex-col space-y-2.5 min-h-[250px] overflow-hidden">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hội thoại phiên khám (Streaming Transcript)</span>
-                    <div className="flex-1 overflow-y-auto border border-slate-100 rounded-xl bg-slate-50/50 p-3 space-y-3.5 scrollbar-thin text-xs">
+                {!editor.isRecording && (
+                  <VoiceRecordingHistory
+                    recordings={editor.consultationRecordings}
+                    loading={editor.recordingsLoading}
+                    resolveAudioUrl={editor.resolveRecordingAudioUrl}
+                  />
+                )}
+
+                {(editor.transcript.length > 0 || editor.isRecording || editor.streamingDraft) && (
+                  <div className="flex flex-col space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        Hội thoại phiên khám
+                        {editor.isWsStreaming && editor.isRecording && (
+                          <span className="ml-2 normal-case font-semibold text-red-600">· realtime</span>
+                        )}
+                      </span>
+                      {!editor.isRecording && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => editor.setIsEditingTranscript(!editor.isEditingTranscript)}
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          {editor.isEditingTranscript ? 'Xem' : 'Hiệu chỉnh'}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="overflow-y-auto border border-slate-100 rounded-xl bg-slate-50/50 p-3 space-y-3.5 scrollbar-thin text-xs max-h-[320px]">
+                      {editor.isRecording && editor.transcript.length === 0 && !editor.streamingDraft && !editor.isLiveTranscribing && (
+                        <p className="text-center text-muted-foreground py-8 leading-relaxed">
+                          🎙 Đang lắng nghe…
+                          <br />
+                          <span className="text-[11px]">Nói ngay — chữ sẽ hiện dần theo giọng nói của bạn.</span>
+                        </p>
+                      )}
+                      {editor.isRecording && editor.isLiveTranscribing && editor.transcript.length === 0 && (
+                        <p className="text-center text-muted-foreground py-8 leading-relaxed">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+                          Đang nhận diện giọng nói lần đầu…
+                        </p>
+                      )}
                       {editor.transcript.map((line, idx) => (
                         <div key={idx} className="space-y-1">
                           <span className={`text-[10px] font-bold ${line.speaker === 'doctor' ? 'text-primary' : 'text-slate-600'}`}>
                             {line.speaker === 'doctor' ? '🩺 BÁC SĨ' : '🧑 BỆNH NHÂN'}
                           </span>
-                          <p className={`p-2.5 rounded-2xl max-w-[90%] leading-relaxed ${
-                            line.speaker === 'doctor' 
-                              ? 'bg-blue-50 text-blue-900 border border-blue-100 rounded-tl-none' 
-                              : 'bg-white text-slate-800 border border-slate-200/60 rounded-tr-none shadow-sm'
-                          }`}>
-                            {line.text}
-                          </p>
+                          {editor.isEditingTranscript ? (
+                            <Textarea
+                              value={line.text}
+                              onChange={(e) => editor.updateTranscriptLine(idx, e.target.value)}
+                              className="text-xs min-h-[48px]"
+                            />
+                          ) : (
+                            <p className={`p-2.5 rounded-2xl max-w-[90%] leading-relaxed ${
+                              line.speaker === 'doctor'
+                                ? 'bg-blue-50 text-blue-900 border border-blue-100 rounded-tl-none'
+                                : 'bg-white text-slate-800 border border-slate-200/60 rounded-tr-none shadow-sm'
+                            }`}>
+                              {line.text}
+                            </p>
+                          )}
                         </div>
                       ))}
+                      {editor.streamingDraft && (
+                        <div className="space-y-1 opacity-80">
+                          <span className={`text-[10px] font-bold ${editor.streamingDraft.speaker === 'doctor' ? 'text-primary' : 'text-slate-600'}`}>
+                            {editor.streamingDraft.speaker === 'doctor' ? '🩺 BÁC SĨ' : '🧑 BỆNH NHÂN'} · đang nghe...
+                          </span>
+                          <p className="p-2.5 rounded-2xl max-w-[90%] text-xs italic border border-dashed border-primary/30 bg-primary/5 animate-pulse">
+                            {editor.streamingDraft.text}
+                          </p>
+                        </div>
+                      )}
                     </div>
+
+                    {editor.isEditingTranscript && (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => void editor.saveTranscriptEdit()}
+                      >
+                        Lưu bản hiệu chỉnh transcript
+                      </Button>
+                    )}
 
                     {!editor.isRecording && (
                       <Button
-                        onClick={() => void editor.generateSoap()}
+                        onClick={() => setShowRegenerateConfirm(true)}
                         disabled={editor.isGeneratingSoap || editor.isTranscribing}
                         variant="outline"
                         className="w-full h-10 border-primary/20 text-primary font-bold hover:bg-primary/5 rounded-xl gap-1.5 shadow-sm mt-2"
@@ -459,10 +576,43 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                     )}
                   </div>
                 )}
+
+                {(editor.sttFallbackMode || editor.transcript.length === 0) && !editor.isRecording && (
+                  <div className="space-y-2 border-t pt-3">
+                    <p className="text-xs font-semibold text-muted-foreground">Nhập transcript thủ công</p>
+                    <select
+                      value={manualSpeaker}
+                      onChange={(e) => setManualSpeaker(e.target.value as 'doctor' | 'patient')}
+                      className="w-full h-8 rounded-lg border text-xs px-2"
+                    >
+                      <option value="doctor">Bác sĩ</option>
+                      <option value="patient">Bệnh nhân</option>
+                    </select>
+                    <Textarea
+                      value={manualLine}
+                      onChange={(e) => setManualLine(e.target.value)}
+                      placeholder="Nhập nội dung hội thoại..."
+                      rows={2}
+                      className="text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="w-full"
+                      disabled={!manualLine.trim()}
+                      onClick={() => {
+                        editor.addManualTranscriptLine(manualSpeaker, manualLine);
+                        setManualLine('');
+                      }}
+                    >
+                      Thêm dòng hội thoại
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
 
               {/* Tab 2: AI ICD Suggestions */}
-              <TabsContent value="ai" className="flex-1 overflow-y-auto p-3 space-y-2 mt-0">
+              <TabsContent value="ai" className="mt-0 p-3 outline-none">
                 <AiIcdPanel
                   suggestions={editor.aiSuggestions}
                   existingIcds={editor.exam?.icd_codes ?? []}
@@ -474,7 +624,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
               </TabsContent>
 
               {/* Tab 3: Search ICD database */}
-              <TabsContent value="search" className="flex-1 overflow-y-auto p-3 mt-0">
+              <TabsContent value="search" className="mt-0 p-3 outline-none">
                 <IcdSearchPanel
                   search={editor.icdSearch}
                   results={editor.icdSearchResults}
@@ -484,6 +634,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                   onAdd={(code, name) => void editor.addIcdCode(code, name, true)}
                 />
               </TabsContent>
+              </div>
             </Tabs>
           </div>
         )}
@@ -514,6 +665,24 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
           return ok;
         }}
       />
+
+      <AlertDialog open={showRegenerateConfirm} onOpenChange={setShowRegenerateConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tạo lại SOAP bằng AI?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Thao tác này sẽ ghi đè nội dung SOAP nháp hiện tại bằng bản mới do AI sinh ra từ transcript.
+              Bạn có chắc muốn tiếp tục?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void editor.generateSoap()}>
+              Xác nhận ghi đè
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -554,7 +723,7 @@ function ExpandableSection({
 }
 
 function SoapSection({
-  label, description, required, value, onChange, locked, isAiSuggested, placeholder, rows = 4,
+  label, description, required, value, onChange, locked, isAiSuggested, placeholder, rows = 6,
 }: {
   label: string;
   description: string;
@@ -586,7 +755,7 @@ function SoapSection({
         placeholder={locked ? '—' : placeholder}
         rows={rows}
         disabled={locked}
-        className={`resize-none text-sm leading-relaxed border-slate-200 focus-visible:ring-primary ${
+        className={`resize-none min-h-[128px] text-sm leading-relaxed border-slate-200 focus-visible:ring-primary ${
           locked 
             ? 'bg-slate-100/60 cursor-default border-slate-200/50 text-slate-700' 
             : isAiSuggested 
@@ -641,19 +810,42 @@ function AiIcdPanel({
   const pendingExisting = existingIcds.filter((c) => c.confirm_status === 'PENDING');
   const rejectedExisting = existingIcds.filter((c) => c.confirm_status === 'REJECTED');
 
+  const sortedItems = [
+    ...pendingExisting.map((icd) => ({
+      kind: 'pending' as const,
+      key: icd.id,
+      code: icd.icd_code,
+      name: icd.icd_name,
+      confidence: icd.ai_confidence ?? 0,
+      reason: icd.ai_reason,
+      icd,
+    })),
+    ...suggestions
+      .filter((s) => !existingIcds.some((e) => e.icd_code === s.icd_code))
+      .map((s) => ({
+        kind: 'new' as const,
+        key: s.icd_code,
+        code: s.icd_code,
+        name: s.icd_name,
+        confidence: s.confidence ?? 0,
+        reason: s.reason,
+        suggestion: s,
+      })),
+  ].sort((a, b) => b.confidence - a.confidence);
+
   if (loading) {
     return (
-      <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-10 justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
         AI đang phân tích triệu chứng...
       </div>
     );
   }
 
-  if (suggestions.length === 0 && pendingExisting.length === 0) {
+  if (sortedItems.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 text-center px-4 space-y-2">
-        <Brain className="h-8 w-8 text-muted-foreground/40" />
+      <div className="text-center px-2 py-6 space-y-2">
+        <Brain className="h-8 w-8 text-muted-foreground/40 mx-auto" />
         <p className="text-xs text-muted-foreground leading-relaxed">
           Nhập nội dung vào phần S và O hoặc sử dụng trợ lý ghi âm để AI tự động phân tích gợi ý chẩn đoán.
         </p>
@@ -662,33 +854,26 @@ function AiIcdPanel({
   }
 
   return (
-    <div className="space-y-2.5">
-      {/* Pending existing (added but not confirmed) */}
-      {pendingExisting.map((icd) => (
+    <div className="space-y-2.5 w-full">
+      {sortedItems.map((item) => (
         <IcdSuggestionCard
-          key={icd.id}
-          code={icd.icd_code}
-          name={icd.icd_name}
-          confidence={icd.ai_confidence}
-          reason={icd.ai_reason}
-          onConfirm={() => onConfirmExisting(icd)}
-          onReject={() => onReject(icd)}
+          key={item.key}
+          code={item.code}
+          name={item.name}
+          confidence={item.confidence}
+          reason={item.reason}
+          onConfirm={() =>
+            item.kind === 'pending'
+              ? onConfirmExisting(item.icd)
+              : onConfirm(item.suggestion)
+          }
+          onReject={
+            item.kind === 'pending'
+              ? () => onReject(item.icd)
+              : undefined
+          }
         />
       ))}
-
-      {/* New AI suggestions not yet added */}
-      {suggestions
-        .filter((s) => !existingIcds.some((e) => e.icd_code === s.icd_code))
-        .map((s) => (
-          <IcdSuggestionCard
-            key={s.icd_code}
-            code={s.icd_code}
-            name={s.icd_name}
-            confidence={s.confidence}
-            reason={s.reason}
-            onConfirm={() => onConfirm(s)}
-          />
-        ))}
 
       {rejectedExisting.length > 0 && (
         <p className="text-[10px] text-slate-400 text-center font-medium pt-1">

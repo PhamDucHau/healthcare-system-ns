@@ -267,6 +267,27 @@ export async function buildTranscriptFromAudio(audioBlob: Blob): Promise<{
   };
 }
 
+/** Incremental live STT while recording — sync mode for low latency on short clips. */
+export async function buildLiveTranscriptFromSnapshot(audioBlob: Blob): Promise<{
+  turns: TranscriptTurn[];
+  plainTranscript: string;
+}> {
+  const mode = audioBlob.size > 900_000 ? 'auto' : 'sync';
+  const transcribed = await transcribeAudio(audioBlob, { diarize: true, mode });
+
+  let turns: TranscriptTurn[] = [];
+  if (transcribed.turns?.length) {
+    turns = mapApiTurnsToTranscript(transcribed.turns);
+  } else if (transcribed.transcript?.trim()) {
+    turns = await diarizeTranscript(transcribed.transcript);
+  }
+
+  return {
+    turns,
+    plainTranscript: transcribed.transcript || transcriptToPlainText(turns),
+  };
+}
+
 export async function generateSoapBundleFromTranscript(transcript: string): Promise<{
   soap: NlpSoapResult;
   fields: ReturnType<typeof formatSoapFields>;

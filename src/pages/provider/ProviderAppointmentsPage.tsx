@@ -391,6 +391,7 @@ export default function ProviderAppointmentsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {row.status !== "COMPLETED" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -458,6 +459,7 @@ export default function ProviderAppointmentsPage() {
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

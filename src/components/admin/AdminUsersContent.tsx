@@ -82,6 +82,7 @@ const AdminUsersContent = () => {
 
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [createdSignPin, setCreatedSignPin] = useState<string | null>(null);
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === form.roleId),
@@ -169,6 +170,7 @@ const AdminUsersContent = () => {
           status: form.status,
         });
         setTempPassword(res.tempPassword);
+        if (res.signPin) setCreatedSignPin(res.signPin);
         toast.success(res.message);
       }
       setFormOpen(false);
@@ -396,18 +398,38 @@ const AdminUsersContent = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!tempPassword} onOpenChange={() => setTempPassword(null)}>
+      <Dialog open={!!tempPassword} onOpenChange={() => { setTempPassword(null); setCreatedSignPin(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mật khẩu tạm (12 ký tự)</DialogTitle>
+            <DialogTitle>Thông tin tài khoản mới</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground mb-2">
-            Sao chép mật khẩu này — email thông báo cũng đã được gửi tới user.
+            Sao chép thông tin bên dưới — email thông báo cũng đã được gửi tới user.
           </p>
-          <code className="block rounded-lg bg-muted p-3 text-sm font-mono break-all">{tempPassword}</code>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Mật khẩu đăng nhập (12 ký tự)</p>
+              <code className="block rounded-lg bg-muted p-3 text-sm font-mono break-all">{tempPassword}</code>
+            </div>
+            {createdSignPin && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Mã PIN ký duyệt (6 số — bác sĩ)</p>
+                <code className="block rounded-lg bg-primary/5 border border-primary/20 p-3 text-sm font-mono tracking-widest">{createdSignPin}</code>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Bác sĩ xem lại PIN tại Provider Portal → Hồ sơ bác sĩ.
+                </p>
+              </div>
+            )}
+          </div>
           <DialogFooter>
-            <Button onClick={() => { navigator.clipboard.writeText(tempPassword ?? ""); toast.success("Đã copy"); }}>
-              Copy
+            <Button onClick={() => {
+              const text = createdSignPin
+                ? `Mật khẩu: ${tempPassword}\nPIN ký duyệt: ${createdSignPin}`
+                : (tempPassword ?? '');
+              void navigator.clipboard.writeText(text);
+              toast.success('Đã copy');
+            }}>
+              Copy tất cả
             </Button>
           </DialogFooter>
         </DialogContent>

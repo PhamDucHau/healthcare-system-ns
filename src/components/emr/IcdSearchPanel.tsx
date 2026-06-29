@@ -3,13 +3,14 @@
  * Allows doctors to search and add ICD codes outside of AI suggestions
  */
 
-import { Plus, Search, Loader2 } from 'lucide-react';
+import { Plus, Search, Loader2, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import type { Icd10SearchResult } from '@/lib/emr-api';
 
 type IcdSearchPanelProps = {
   search: string;
-  results: { code: string; name: string }[];
+  results: Icd10SearchResult[];
   loading: boolean;
   existingCodes: string[];
   onSearch: (q: string) => void;
@@ -26,7 +27,7 @@ export default function IcdSearchPanel({
         <Input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder="Tìm mã ICD (VD: J06, cảm cúm...)"
+          placeholder="Tìm mã ICD (VD: J06, cảm cúm, đau đầu...)"
           className="pl-8 h-8 text-xs"
         />
       </div>
@@ -34,7 +35,7 @@ export default function IcdSearchPanel({
       {loading && (
         <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" />
-          Đang tìm...
+          Đang gợi ý ICD-10...
         </div>
       )}
 
@@ -54,8 +55,21 @@ export default function IcdSearchPanel({
                 className="flex items-start gap-2 p-2 rounded-lg border border-border/50 bg-card hover:bg-muted/30"
               >
                 <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-mono font-bold text-primary block">{item.code}</span>
-                  <span className="text-[11px] text-foreground leading-snug">{item.name}</span>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-[11px] font-mono font-bold text-primary">{item.code}</span>
+                    {item.confidence != null && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-purple-700 bg-purple-50 border border-purple-100 rounded px-1 py-0">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        {Math.round(item.confidence)}%
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-foreground leading-snug block">{item.name}</span>
+                  {item.evidence && (
+                    <span className="text-[10px] text-muted-foreground leading-snug block mt-0.5 line-clamp-2">
+                      {item.evidence}
+                    </span>
+                  )}
                 </div>
                 <Button
                   size="sm"
@@ -74,7 +88,7 @@ export default function IcdSearchPanel({
 
       {!search && (
         <p className="text-xs text-muted-foreground text-center py-4">
-          Nhập tên bệnh hoặc mã ICD để tìm kiếm.
+          Nhập tên bệnh hoặc mã ICD — hệ thống gợi ý qua AI ICD-10.
         </p>
       )}
     </div>
