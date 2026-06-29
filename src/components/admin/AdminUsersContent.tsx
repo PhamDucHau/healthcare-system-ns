@@ -404,7 +404,7 @@ const AdminUsersContent = () => {
             <DialogTitle>Thông tin tài khoản mới</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground mb-2">
-            Sao chép thông tin bên dưới — email thông báo cũng đã được gửi tới user.
+            Sao chép thông tin bên dưới — email thiết lập mật khẩu cũng đã được gửi tới user (link dẫn về trang đặt mật khẩu lần đầu).
           </p>
           <div className="space-y-3">
             <div>

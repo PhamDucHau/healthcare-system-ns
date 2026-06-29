@@ -9,6 +9,7 @@ import { generateTempPassword } from "../_shared/temp-password.ts";
 import { generateSignPin } from "../_shared/sign-pin.ts";
 import { syncRoleToAppMetadata } from "../_shared/user-profile.ts";
 import { emailExists, signOutAllSessions } from "../_shared/supabase-admin.ts";
+import { getSiteUrl } from "../_shared/site-url.ts";
 import type { PortalType } from "../_shared/portal.ts";
 
 type UserStatus = "active" | "inactive" | "locked";
@@ -98,22 +99,18 @@ async function provisionDoctorSignPinIfNeeded(
   return signPin;
 }
 
-async function sendTempPasswordEmail(email: string): Promise<void> {
-  const url = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!url || !anonKey) return;
+async function sendStaffPasswordSetupEmail(
+  admin: ReturnType<typeof import("../_shared/supabase-admin.ts").getAdminClient>,
+  email: string,
+): Promise<void> {
+  const redirectTo = `${getSiteUrl()}/auth/set-password`;
 
-  try {
-    await fetch(`${url}/auth/v1/recover`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: anonKey,
-      },
-      body: JSON.stringify({ email }),
-    });
-  } catch (err) {
-    console.warn("[sendTempPasswordEmail]", err);
+  const { error } = await admin.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+
+  if (error) {
+    console.warn("[sendStaffPasswordSetupEmail]", error.message);
   }
 }
 
@@ -252,7 +249,7 @@ Deno.serve(async (req) => {
 
     const signPin = await provisionDoctorSignPinIfNeeded(auth.admin, userId, portalRole);
 
-    await sendTempPasswordEmail(email);
+    await sendStaffPasswordSetupEmail(auth.admin, email);
 
     await writeAuditLog(auth.admin, {
       eventType: "USER_CREATED",
@@ -488,7 +485,7 @@ Deno.serve(async (req) => {
     }
 
     await signOutAllSessions(body.userId);
-    await sendTempPasswordEmail(profile.email);
+    await sendStaffPasswordSetupEmail(auth.admin, profile.email);
 
     await writeAuditLog(auth.admin, {
       eventType: "ADMIN_PASSWORD_RESET",

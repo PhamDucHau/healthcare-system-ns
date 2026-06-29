@@ -15,6 +15,8 @@ import Messages from "./pages/Messages.tsx";
 import Login, { AdminLogin, DoctorLogin, PatientLogin } from "./pages/Login.tsx";
 import Signup from "./pages/Signup.tsx";
 import AuthCallback from "./pages/AuthCallback.tsx";
+import SetPasswordFromEmail from "./pages/SetPasswordFromEmail.tsx";
+import AuthHashRedirect from "./components/auth/AuthHashRedirect.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import About from "./pages/About.tsx";
 import Admin from "./pages/Admin.tsx";
@@ -58,6 +60,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AuthHashRedirect />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route
@@ -131,6 +134,7 @@ const App = () => (
             {/* legacy aliases */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/set-password" element={<SetPasswordFromEmail />} />
             <Route path="/register" element={<Signup />} />
             <Route path="/signup" element={<Signup />} />
             <Route

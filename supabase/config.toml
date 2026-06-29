@@ -33,12 +33,19 @@ site_url = "https://healthcare-system-ns.vercel.app"
 additional_redirect_urls = [
   "https://healthcare-system-ns.vercel.app",
   "https://healthcare-system-ns.vercel.app/auth/callback",
+  "https://healthcare-system-ns.vercel.app/auth/set-password",
+  "http://localhost:8080",
+  "http://localhost:8080/auth/callback",
+  "http://localhost:8080/auth/set-password",
   "http://localhost:5173",
   "http://localhost:5173/auth/callback",
+  "http://localhost:5173/auth/set-password",
   "http://localhost:5190",
   "http://localhost:5190/auth/callback",
+  "http://localhost:5190/auth/set-password",
   "https://localhost:5173",
   "https://localhost:5173/auth/callback",
+  "https://localhost:5173/auth/set-password",
 ]
 enable_signup = true
 jwt_expiry = 3600
@@ -53,7 +60,20 @@ enable_signup = true
 # OTP 6 số qua signInWithOtp (client), không dùng link Confirm signup
 enable_confirmations = false
 otp_length = 6
-otp_expiry = 300
+# Link email (mời nhân viên / đặt lại mật khẩu) — 24 giờ cho UAT
+otp_expiry = 86400
+
+[auth.email.template.recovery]
+subject = "Thiết lập mật khẩu — Qcare Plus"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.invite]
+subject = "Mời tham gia Qcare Plus"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.confirmation]
+subject = "Xác nhận email — Qcare Plus"
+content_path = "./supabase/templates/confirmation.html"
 
 [functions.signup-send-otp]
 verify_jwt = false
