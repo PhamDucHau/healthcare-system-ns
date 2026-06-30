@@ -9,11 +9,11 @@ export type UserProfileRow = {
   role_id?: string | null;
 };
 
-const PORTAL_ROLES = new Set<PortalType>(["patient", "doctor", "admin"]);
+const PORTAL_ROLES = new Set<PortalType>(["patient", "doctor", "admin", "customer"]);
 
 export function normalizePortalRole(raw: string | null | undefined): PortalType | null {
   const role = raw?.trim().toLowerCase();
-  if (role === "patient" || role === "doctor" || role === "admin") {
+  if (role === "patient" || role === "doctor" || role === "admin" || role === "customer") {
     return role;
   }
   return null;

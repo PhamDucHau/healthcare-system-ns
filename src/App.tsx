@@ -24,6 +24,7 @@ import AdminOverview from "./pages/admin/AdminOverview.tsx";
 import AdminSectionPlaceholder from "./pages/admin/AdminSectionPlaceholder.tsx";
 import AdminUsersContent from "./components/admin/AdminUsersContent.tsx";
 import AdminRolesContent from "./components/admin/AdminRolesContent.tsx";
+import AdminPermissionsContent from "./components/admin/AdminPermissionsContent.tsx";
 import MasterDataContent from "./components/admin/MasterDataContent.tsx";
 import AdminAppointmentsContent from "./components/admin/AdminAppointmentsContent.tsx";
 import PatientRecordsManagement from "./components/patient-records/PatientRecordsManagement.tsx";
@@ -45,6 +46,10 @@ import ExaminationPage from "./pages/provider/ExaminationPage.tsx";
 import DoctorProfilePage from "./pages/provider/DoctorProfilePage.tsx";
 import ClinicalTasksContent from "./components/provider/ClinicalTasksContent.tsx";
 import AdminAiAccuracyPage from "./pages/admin/AdminAiAccuracyPage.tsx";
+import CustomerPortal from "./pages/customer/CustomerPortal.tsx";
+import CustomerOverviewPage from "./pages/customer/CustomerOverviewPage.tsx";
+import CustomerPermissionGuard from "./pages/customer/CustomerPermissionGuard.tsx";
+import { PermissionsProvider } from "./hooks/use-permissions.tsx";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +61,7 @@ function RedirectClinicalLogicQuestionnaire() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <PermissionsProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -176,6 +182,26 @@ const App = () => (
               <Route path="insurance" element={<Navigate to="/onboarding" replace />} />
               <Route path="review" element={<Navigate to="/onboarding" replace />} />
             </Route>
+            <Route
+              path="/customer-portal"
+              element={
+                <ProtectedRoute requiredPortal="customer">
+                  <CustomerPortal />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route element={<CustomerPermissionGuard />}>
+                <Route path="overview" element={<CustomerOverviewPage />} />
+                <Route
+                  path="patient-records"
+                  element={<PatientRecordsManagement portal="admin" />}
+                />
+                <Route path="patients" element={<ProviderPatientsPage />} />
+                <Route path="appointments" element={<AdminAppointmentsContent />} />
+                <Route path="master-data" element={<MasterDataContent />} />
+              </Route>
+            </Route>
             <Route path="/about" element={<About />} />
             <Route
               path="/admin"
@@ -191,10 +217,12 @@ const App = () => (
                 path="patient-records"
                 element={<PatientRecordsManagement portal="admin" />}
               />
+              <Route path="patients" element={<ProviderPatientsPage />} />
               <Route path="appointments" element={<AdminAppointmentsContent />} />
               <Route path="examination/:appointmentId" element={<ExaminationPage />} />
               <Route path="master-data" element={<MasterDataContent />} />
               <Route path="users" element={<AdminUsersContent />} />
+              <Route path="permissions" element={<AdminPermissionsContent />} />
               <Route path="roles" element={<AdminRolesContent />} />
               <Route path="tasks" element={<ClinicalTasksContent portal="admin" />} />
               <Route path="logs" element={<AdminSectionPlaceholder title="System Logs" />} />
@@ -213,6 +241,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </PermissionsProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

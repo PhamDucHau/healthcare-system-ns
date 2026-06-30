@@ -4,7 +4,8 @@ import {
   clientUserAgent,
   writeAuditLog,
 } from "../_shared/audit.ts";
-import { PERMISSIONS, isAuthContext, requirePermission } from "../_shared/rbac.ts";
+import { PERMISSIONS, getPermissionsForUser, isAuthContext, requirePermission } from "../_shared/rbac.ts";
+import { getAdminClient } from "../_shared/supabase-admin.ts";
 
 const SYSTEM_ROLE_SLUGS = new Set(["patient", "doctor", "admin"]);
 
@@ -26,6 +27,7 @@ type UpdateBody = {
   permissionIds?: string[];
 };
 type DeleteBody = { action: "delete"; roleId: string };
+type MyPermissionsBody = { action: "my_permissions" };
 
 type RequestBody =
   | ListBody
@@ -33,7 +35,8 @@ type RequestBody =
   | GetBody
   | CreateBody
   | UpdateBody
-  | DeleteBody;
+  | DeleteBody
+  | MyPermissionsBody;
 
 function normalizeSlug(raw: string): string {
   return raw
@@ -59,6 +62,37 @@ Deno.serve(async (req) => {
 
   const ip = clientIp(req);
   const ua = clientUserAgent(req);
+
+  if (body.action === "my_permissions") {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!token) {
+      return jsonResponse({ error: "UNAUTHORIZED", message: "Thiếu access token" }, 401);
+    }
+
+    const admin = getAdminClient();
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user?.id) {
+      return jsonResponse({ error: "UNAUTHORIZED", message: "Token không hợp lệ" }, 401);
+    }
+
+    const userId = userData.user.id;
+    const permissions = await getPermissionsForUser(admin, userId);
+    const { data: profile } = await admin
+      .from("user_profiles")
+      .select("role, status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (profile?.status === "locked" || profile?.status === "inactive") {
+      return jsonResponse({ error: "FORBIDDEN", message: "Tài khoản bị khóa" }, 403);
+    }
+
+    return jsonResponse({
+      permissions: [...permissions],
+      portalRole: profile?.role ?? null,
+    });
+  }
 
   if (body.action === "permissions") {
     const auth = await requirePermission(req, PERMISSIONS.ROLES_READ);
@@ -159,7 +193,7 @@ Deno.serve(async (req) => {
         name: body.name.trim(),
         description: body.description?.trim() || null,
         is_system: false,
-        portal_role: null,
+        portal_role: "customer",
       })
       .select("id, slug, name")
       .single();
@@ -191,7 +225,7 @@ Deno.serve(async (req) => {
       metadata: { roleId: role.id, slug, permissionIds: body.permissionIds ?? [] },
     });
 
-    return jsonResponse({ message: "Đã tạo role", role });
+    return jsonResponse({ message: "Tạo Role thành công", role });
   }
 
   if (body.action === "update") {
@@ -259,7 +293,7 @@ Deno.serve(async (req) => {
 
     if (role.is_system || SYSTEM_ROLE_SLUGS.has(role.slug)) {
       return jsonResponse(
-        { error: "SYSTEM_ROLE", message: "Không thể xóa system role (Patient, Doctor, Admin)" },
+        { error: "SYSTEM_ROLE", message: "Không thể xóa Role mặc định của hệ thống" },
         403,
       );
     }

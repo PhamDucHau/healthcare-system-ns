@@ -165,6 +165,12 @@ export async function listAdminRoles() {
   return postAdmin<{ roles: AdminRoleRow[] }>("admin-roles", { action: "list" });
 }
 
+export async function fetchMyPermissions() {
+  return postAdmin<{ permissions: string[]; portalRole: string | null }>("admin-roles", {
+    action: "my_permissions",
+  });
+}
+
 export async function listPermissions() {
   return postAdmin<{ permissions: PermissionRow[] }>("admin-roles", { action: "permissions" });
 }

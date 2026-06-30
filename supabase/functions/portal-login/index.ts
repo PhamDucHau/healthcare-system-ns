@@ -247,6 +247,11 @@ Deno.serve(async (req) => {
     await redis.del(loginAttemptKey(email));
     await syncRoleToAppMetadata(admin, userId, userRole);
 
+    await admin
+      .from("user_profiles")
+      .update({ role: userRole, updated_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
     // Admin phải xác minh OTP trước khi nhận session
     if (userRole === "admin") {
       // Kiểm tra cooldown qua DB

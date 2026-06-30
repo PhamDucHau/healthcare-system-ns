@@ -8,11 +8,6 @@ import {
 export function getSessionRole(session: Session | null): PortalType | null {
   if (!session) return null;
 
-  const appRole = session.user.app_metadata?.role;
-  if (typeof appRole === "string" && isPortalType(appRole)) {
-    return appRole;
-  }
-
   try {
     const payload = JSON.parse(
       atob(session.access_token.split(".")[1] ?? ""),
@@ -22,6 +17,11 @@ export function getSessionRole(session: Session | null): PortalType | null {
     }
   } catch {
     /* ignore */
+  }
+
+  const appRole = session.user.app_metadata?.role;
+  if (typeof appRole === "string" && isPortalType(appRole)) {
+    return appRole;
   }
 
   return null;
@@ -60,7 +60,8 @@ function isSafeReturnPath(path: string): boolean {
 function isPathAllowedForRole(path: string, role: PortalType): boolean {
   if (role === "admin") return path.startsWith("/admin");
   if (role === "doctor") return path.startsWith("/provider-portal");
-  return !path.startsWith("/admin") && !path.startsWith("/provider-portal");
+  if (role === "customer") return path.startsWith("/customer-portal");
+  return !path.startsWith("/admin") && !path.startsWith("/provider-portal") && !path.startsWith("/customer-portal");
 }
 
 /** After login, return to the page the user originally requested when safe. */

@@ -149,7 +149,7 @@ const AdminUsersContent = () => {
     setSaving(true);
     try {
       if (editing) {
-        await updateAdminUser({
+        const res = await updateAdminUser({
           userId: editing.user_id,
           fullName: form.fullName,
           phone: form.phone,
@@ -158,7 +158,7 @@ const AdminUsersContent = () => {
           specialty: isDoctor ? form.specialty : null,
           status: form.status,
         });
-        toast.success("Đã cập nhật người dùng");
+        toast.success(res.message ?? "Cập nhật thành công");
       } else {
         const res = await createAdminUser({
           fullName: form.fullName,

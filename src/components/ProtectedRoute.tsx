@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
-import { stashAuthReturnTo } from "@/lib/portal-auth";
+import { stashAuthReturnTo, homePathForRole } from "@/lib/portal-auth";
 import { portalLoginMessage } from "@/types/portal";
 import type { PortalType } from "@/types/portal";
 import { PORTAL_CONFIG } from "@/types/portal";
@@ -40,7 +40,7 @@ const ProtectedRoute = ({ children, requiredPortal }: ProtectedRouteProps) => {
     if (role !== requiredPortal) {
       return (
         <Navigate
-          to={PORTAL_CONFIG[role].loginPath}
+          to={homePathForRole(role)}
           replace
           state={{
             portalError: portalLoginMessage(requiredPortal),

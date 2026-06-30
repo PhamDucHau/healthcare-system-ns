@@ -96,6 +96,7 @@ async function applyLoginSession(result: PortalLoginResult): Promise<PortalLogin
     refresh_token: result.session.refresh_token,
   });
   if (error) throw new PortalAuthError(500, { message: error.message });
+  await supabase.auth.refreshSession();
   return result;
 }
 

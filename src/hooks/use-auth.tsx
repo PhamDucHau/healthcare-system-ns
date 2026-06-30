@@ -34,8 +34,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(nextSession);
       setIsLoading(false);
       if (event === "TOKEN_REFRESHED" && nextSession) {
-        /* AC6: supabase-js auto-refreshes access token */
+        /* JWT user_role claim updated from custom_access_token_hook */
       }
+    });
+
+    // Pick up role changes after admin reassignment (new JWT from refresh)
+    void supabase.auth.refreshSession().then(({ data }) => {
+      if (data.session) setSession(data.session);
     });
 
     return () => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  LayoutGrid, Users, Search, HelpCircle,
-  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays, ClipboardList, Brain,
+  LayoutGrid, Users, Search,
+  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays, ClipboardList, Brain, KeyRound, UserRound,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -13,12 +13,14 @@ import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 const sidebarItems = [
   { icon: LayoutGrid,    label: "Bảng tổng quan",      path: "/admin/overview" },
   { icon: FileUser,      label: "Hồ sơ bệnh nhân",     path: "/admin/patient-records" },
-  { icon: CalendarDays,  label: "Lịch hẹn",     path: "/admin/appointments" },
-  { icon: Database,      label: "Danh mục",      path: "/admin/master-data" },
+  { icon: UserRound,     label: "Bệnh nhân",           path: "/admin/patients" },
+  { icon: CalendarDays,  label: "Lịch hẹn",            path: "/admin/appointments" },
+  { icon: Database,      label: "Danh mục",            path: "/admin/master-data" },
   { icon: ClipboardList, label: "Bộ câu hỏi lâm sàng", path: "/admin/question-library" },
-  { icon: Users,         label: "Người dùng",    path: "/admin/users" },
-  { icon: Shield,        label: "Phân quyền",    path: "/admin/roles" },
-  { icon: Brain,         label: "Độ chính xác AI", path: "/admin/ai-accuracy" },
+  { icon: Users,         label: "Người dùng",          path: "/admin/users" },
+  { icon: KeyRound,      label: "Danh sách quyền",     path: "/admin/permissions" },
+  { icon: Shield,        label: "Quản lý vai trò",     path: "/admin/roles" },
+  { icon: Brain,         label: "Độ chính xác AI",     path: "/admin/ai-accuracy" },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>

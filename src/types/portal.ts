@@ -1,11 +1,12 @@
-export type PortalType = "patient" | "doctor" | "admin";
+export type PortalType = "patient" | "doctor" | "admin" | "customer";
 
-export const PORTALS: PortalType[] = ["patient", "doctor", "admin"];
+export const PORTALS: PortalType[] = ["patient", "doctor", "admin", "customer"];
 
 export const ACCESS_TTL_BY_ROLE: Record<PortalType, number> = {
   patient: 3600,
   doctor: 1800,
   admin: 900,
+  customer: 1800,
 };
 
 export const REFRESH_TTL_SECONDS = 604800;
@@ -43,6 +44,13 @@ export const PORTAL_CONFIG: Record<
     subtitle: "Quản lý người dùng, báo cáo và cấu hình hệ thống.",
     forgotPasswordPath: "/forgot-password",
   },
+  customer: {
+    loginPath: "/login",
+    homePath: "/customer-portal/overview",
+    title: "Portal Nhân viên",
+    subtitle: "Truy cập theo quyền được gán cho vai trò của bạn.",
+    forgotPasswordPath: "/forgot-password",
+  },
 };
 
 export function portalLoginMessage(portal: PortalType): string {
@@ -50,6 +58,7 @@ export function portalLoginMessage(portal: PortalType): string {
     patient: "Bệnh nhân",
     doctor: "Bác sĩ",
     admin: "Quản trị",
+    customer: "Nhân viên",
   };
   return `Tài khoản không có quyền truy cập Portal ${labels[portal]}. Vui lòng đăng nhập đúng cổng.`;
 }

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { getPermissionCategoryLabel, groupPermissionsByCategory } from "@/config/rbac-permissions";
 
 type RoleForm = {
   name: string;
@@ -48,15 +49,10 @@ const AdminRolesContent = () => {
   const [form, setForm] = useState<RoleForm>(emptyRoleForm());
   const [deleteTarget, setDeleteTarget] = useState<AdminRoleRow | null>(null);
 
-  const permissionsByCategory = useMemo(() => {
-    const map = new Map<string, PermissionRow[]>();
-    for (const p of permissions) {
-      const list = map.get(p.category) ?? [];
-      list.push(p);
-      map.set(p.category, list);
-    }
-    return map;
-  }, [permissions]);
+  const permissionsByCategory = useMemo(
+    () => groupPermissionsByCategory(permissions),
+    [permissions],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,7 +128,7 @@ const AdminRolesContent = () => {
           description: form.description,
           permissionIds,
         });
-        toast.success("Đã tạo vai trò");
+        toast.success("Tạo Role thành công");
       }
       setFormOpen(false);
       await load();
@@ -197,7 +193,11 @@ const AdminRolesContent = () => {
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-foreground">{role.name}</h3>
-                      {role.is_system && <Badge variant="secondary">Hệ thống</Badge>}
+                      {role.is_system ? (
+                        <Badge variant="secondary">Hệ thống</Badge>
+                      ) : (
+                        <Badge variant="outline">Custom Role</Badge>
+                      )}
                       <Badge variant="outline">{role.userCount} người dùng</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">{role.slug}</p>
@@ -255,9 +255,11 @@ const AdminRolesContent = () => {
             </div>
             <div>
               <Label className="mb-2 block">Quyền hạn</Label>
-              {[...permissionsByCategory.entries()].map(([category, perms]) => (
+              {[...permissionsByCategory].map(([category, perms]) => (
                 <div key={category} className="mb-4">
-                  <p className="text-xs font-bold uppercase text-muted-foreground mb-2">{category}</p>
+                  <p className="text-xs font-bold uppercase text-muted-foreground mb-2">
+                    {getPermissionCategoryLabel(category)}
+                  </p>
                   <div className="space-y-2">
                     {perms.map((p) => (
                       <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">

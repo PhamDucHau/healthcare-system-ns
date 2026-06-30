@@ -35,8 +35,9 @@ const UnifiedLoginPage = () => {
 
   useEffect(() => {
     if (isLoading || !session || !role) return;
+    if (location.pathname !== "/login") return;
     redirectAfterLogin(role);
-  }, [isLoading, session, role, location.state]);
+  }, [isLoading, session, role, location.pathname, location.state]);
 
   useEffect(() => {
     if (lockSeconds <= 0) return;

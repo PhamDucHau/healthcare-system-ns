@@ -62,11 +62,12 @@ async function resolvePortalRole(
 ): Promise<PortalType | null> {
   const { data } = await admin
     .from("roles")
-    .select("portal_role")
+    .select("portal_role, is_system")
     .eq("id", roleId)
     .maybeSingle();
   const pr = data?.portal_role;
-  if (pr === "patient" || pr === "doctor" || pr === "admin") return pr;
+  if (pr === "patient" || pr === "doctor" || pr === "admin" || pr === "customer") return pr;
+  if (data && !data.is_system) return "customer";
   return null;
 }
 
@@ -205,6 +206,7 @@ Deno.serve(async (req) => {
     }
 
     const portalRole = await resolvePortalRole(auth.admin, body.roleId);
+    const effectiveRole: PortalType = portalRole ?? "patient";
     const tempPassword = generateTempPassword(12);
 
     const { data: created, error: createError } = await auth.admin.auth.admin.createUser({
@@ -231,7 +233,7 @@ Deno.serve(async (req) => {
         full_name: body.fullName.trim(),
         phone: body.phone?.trim() || null,
         role_id: body.roleId,
-        role: portalRole ?? "patient",
+        role: effectiveRole,
         facility_id: body.facilityId || null,
         specialty: body.specialty?.trim() || null,
         status,
@@ -245,7 +247,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "DB_ERROR", message: profileError.message }, 500);
     }
 
-    if (portalRole) await syncRoleToAppMetadata(auth.admin, userId, portalRole);
+    await syncRoleToAppMetadata(auth.admin, userId, effectiveRole);
 
     const signPin = await provisionDoctorSignPinIfNeeded(auth.admin, userId, portalRole);
 
@@ -377,10 +379,10 @@ Deno.serve(async (req) => {
     if (body.roleId) {
       updates.role_id = body.roleId;
       const portalRole = await resolvePortalRole(auth.admin, body.roleId);
-      if (portalRole) {
-        updates.role = portalRole;
-        await syncRoleToAppMetadata(auth.admin, body.userId, portalRole);
-      }
+      const effectiveRole: PortalType = portalRole ?? "patient";
+      updates.role = effectiveRole;
+      await syncRoleToAppMetadata(auth.admin, body.userId, effectiveRole);
+      await signOutAllSessions(body.userId);
     }
 
     const { data, error } = await auth.admin
@@ -420,8 +422,13 @@ Deno.serve(async (req) => {
       metadata: { targetUserId: body.userId, updates },
     });
 
+    const roleChanged = Boolean(body.roleId);
     return jsonResponse({
-      message: signPin ? "Đã cập nhật user và cấp mã PIN ký duyệt" : "Đã cập nhật user",
+      message: roleChanged
+        ? "Cập nhật thành công. Người dùng cần đăng nhập lại để áp dụng vai trò mới."
+        : signPin
+          ? "Đã cập nhật user và cấp mã PIN ký duyệt"
+          : "Cập nhật thành công",
       user: data,
       signPin,
     });
