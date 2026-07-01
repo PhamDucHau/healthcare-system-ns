@@ -122,7 +122,7 @@ const AdminLayout = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
-                placeholder="Search operational metrics..."
+                placeholder="Tìm kiếm các chỉ số vận hành..."
                 className="h-10 w-64 md:w-80 rounded-lg border bg-background pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
