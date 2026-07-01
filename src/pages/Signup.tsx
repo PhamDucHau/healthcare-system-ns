@@ -262,7 +262,7 @@ const Signup = () => {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b bg-card px-6">
         <Link to="/" className="text-lg font-bold text-primary">
-          Qcare Plus
+          Rcare Plus
         </Link>
         <Link
           to="/login"
@@ -365,7 +365,7 @@ const Signup = () => {
 
       <footer className="flex border-t px-6 py-4">
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          © 2024 Qcare Plus Clinical Services.
+          © 2024 Rcare Plus Clinical Services.
         </p>
       </footer>
     </div>

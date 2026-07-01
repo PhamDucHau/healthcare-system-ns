@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import RolePermissionsSummary from "@/components/admin/RolePermissionsSummary";
 import { getPermissionCategoryLabel, groupPermissionsByCategory } from "@/config/rbac-permissions";
 
 type RoleForm = {
@@ -204,14 +205,8 @@ const AdminRolesContent = () => {
                     {role.description && (
                       <p className="text-sm text-muted-foreground mt-1">{role.description}</p>
                     )}
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {role.permissions.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">Không có quyền hạn</span>
-                      ) : (
-                        role.permissions.map((p) => (
-                          <Badge key={p.id} variant="outline" className="text-[10px]">{p.slug}</Badge>
-                        ))
-                      )}
+                    <div className="mt-3">
+                      <RolePermissionsSummary permissions={role.permissions} />
                     </div>
                   </div>
                 </div>

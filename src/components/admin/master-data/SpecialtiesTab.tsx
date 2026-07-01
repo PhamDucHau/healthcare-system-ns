@@ -48,13 +48,13 @@ export default function SpecialtiesTab() {
         loading={loading}
         title="Chuyên khoa"
         onAdd={openAdd}
-        headers={['Tên', 'Mô tả', 'Icon', 'Trạng thái', '']}
+        headers={['Tên', 'Mô tả', 'Trạng thái', '']}
         rows={rows}
         renderRow={(r) => (
           <>
             <td className="px-4 py-3 font-semibold text-sm">{r.name}</td>
             <td className="px-4 py-3 text-sm text-muted-foreground">{r.description ?? '—'}</td>
-            <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{r.icon ?? '—'}</td>
+            {/* <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{r.icon ?? '—'}</td> */}
             <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
             <td className="px-4 py-3 text-right">
               <div className="flex justify-end gap-2">

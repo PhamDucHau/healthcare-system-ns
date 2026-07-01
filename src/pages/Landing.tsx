@@ -12,31 +12,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navItems = [
-  { label: "How it Works", href: "#how-it-works" },
-  { label: "Our Care", href: "#our-care" },
-  { label: "About Us", href: "/about" },
-  { label: "Pricing", href: "#cta" },
+  { label: "Cách thức hoạt động", href: "#how-it-works" },
+  { label: "Dịch vụ chăm sóc", href: "#our-care" },
+  { label: "Về chúng tôi", href: "/about" },
+  { label: "Bảng giá", href: "#cta" },
 ];
 
 const steps = [
   {
     icon: Video,
-    title: "Online Consultation",
-    description: "Connect with our expert LGBTQ+ care providers through a secure, non-judgmental video call.",
+    title: "Tư vấn trực tuyến",
+    description: "Kết nối với đội ngũ chuyên gia chăm sóc LGBTQ+ qua cuộc gọi video an toàn, không phán xét.",
     iconBg: "bg-accent",
     iconColor: "text-primary",
   },
   {
     icon: FlaskConical,
-    title: "Home Lab Testing",
-    description: "We send a discreet testing kit to your door. Complete it at home and mail it back for free.",
+    title: "Xét nghiệm tại nhà",
+    description: "Chúng tôi gửi bộ dụng cụ xét nghiệm kín đáo đến tận nhà. Bạn tự thực hiện tại nhà và gửi trả miễn phí.",
     iconBg: "bg-blue-50",
     iconColor: "text-blue-600",
   },
   {
     icon: Pill,
-    title: "Fast Rx Delivery",
-    description: "Once approved, your PrEP is shipped discreetly to your home. Refills handled automatically.",
+    title: "Giao thuốc nhanh",
+    description: "Sau khi được phê duyệt, PrEP được giao kín đáo tận nhà. Tái cấp thuốc được xử lý tự động.",
     iconBg: "bg-accent",
     iconColor: "text-primary",
   },
@@ -45,43 +45,43 @@ const steps = [
 const features = [
   {
     icon: ShieldCheck,
-    title: "100% Secure & HIPAA Compliant",
-    description: "Your health data is encrypted and protected with industry-leading security standards.",
+    title: "100% an toàn & tuân thủ HIPAA",
+    description: "Dữ liệu sức khỏe của bạn được mã hóa và bảo vệ theo tiêu chuẩn bảo mật hàng đầu.",
   },
   {
     icon: Users,
-    title: "Expert LGBTQ+ Care Providers",
-    description: "Care from clinicians who understand our community's unique needs and history.",
+    title: "Chuyên gia chăm sóc LGBTQ+",
+    description: "Được chăm sóc bởi bác sĩ hiểu rõ nhu cầu và lịch sử đặc thù của cộng đồng chúng ta.",
   },
   {
     icon: Heart,
-    title: "Inclusive, No-Judgment Support",
-    description: "A sanctuary of support where you are seen, heard, and respected for who you are.",
+    title: "Hỗ trợ toàn diện, không phán xét",
+    description: "Một không gian an toàn nơi bạn được lắng nghe, thấu hiểu và tôn trọng vì chính con người bạn.",
   },
 ];
 
 const testimonials = [
   {
-    quote: "Qcare Plus changed how I view healthcare. I finally feel like my doctor actually understands my life.",
+    quote: "Rcare Plus đã thay đổi cách tôi nhìn nhận y tế. Cuối cùng tôi cũng cảm thấy bác sĩ thực sự hiểu cuộc sống của mình.",
     name: "Alex R.",
-    since: "Patient since 2022",
+    since: "Bệnh nhân từ 2022",
   },
   {
-    quote: "The home testing was so easy. No awkward lab visits or explaining myself to strangers.",
+    quote: "Xét nghiệm tại nhà thật dễ dàng. Không còn phải đến phòng lab khó xử hay giải thích với người lạ.",
     name: "Jordan M.",
-    since: "Patient since 2023",
+    since: "Bệnh nhân từ 2023",
   },
   {
-    quote: "Fast delivery and amazing customer support. They truly care about the LGBTQ+ community.",
+    quote: "Giao hàng nhanh và hỗ trợ khách hàng tuyệt vời. Họ thực sự quan tâm đến cộng đồng LGBTQ+.",
     name: "Sam T.",
-    since: "Patient since 2021",
+    since: "Bệnh nhân từ 2021",
   },
 ];
 
 const badges = [
-  { icon: Award, title: "EQUALITY 100", subtitle: "LEADER IN LGBTQ+ INCLUSION" },
-  { icon: Shield, title: "HIPAA COMPLIANT", subtitle: "SECURE DATA STANDARDS" },
-  { icon: BadgeCheck, title: "CLIA CERTIFIED", subtitle: "LABORATORY EXCELLENCE" },
+  { icon: Award, title: "EQUALITY 100", subtitle: "DẪN ĐẦU VỀ BÌNH ĐẲNG LGBTQ+" },
+  { icon: Shield, title: "TUÂN THỦ HIPAA", subtitle: "TIÊU CHUẨN BẢO MẬT DỮ LIỆU" },
+  { icon: BadgeCheck, title: "CHỨNG NHẬN CLIA", subtitle: "XUẤT SẮC PHÒNG XÉT NGHIỆM" },
 ];
 
 const Landing = () => {
@@ -107,7 +107,7 @@ const Landing = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card px-4 md:px-8 max-w-7xl mx-auto w-full">
-        <span className="text-lg font-bold text-primary">Qcare Plus</span>
+        <span className="text-lg font-bold text-primary">Rcare Plus</span>
         <nav className="hidden md:flex items-center gap-8">
           {navItems.map((item) =>
             item.href.startsWith("/") ? (
@@ -162,11 +162,11 @@ const Landing = () => {
               to="/login"
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              Login
+              Đăng nhập
             </Link>
           )}
           <Link to="/signup" className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity">
-            Get Started
+            Bắt đầu
           </Link>
         </div>
       </header>
@@ -176,21 +176,21 @@ const Landing = () => {
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div>
             <span className="inline-block rounded-full bg-accent px-4 py-1.5 text-xs font-bold text-primary uppercase tracking-wider mb-6">
-              Empowering LGBTQ+ Health
+              Trao quyền cho sức khỏe LGBTQ+
             </span>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-              Care That Sees You.{" "}
-              <span className="text-primary">PrEP That Empowers You.</span>
+              Chăm sóc thấu hiểu bạn.{" "}
+              <span className="text-primary">PrEP trao quyền cho bạn.</span>
             </h1>
             <p className="text-muted-foreground text-base md:text-lg max-w-md mb-8">
-              Skip the waiting room. Access expert, inclusive sexual health care from the comfort of your sanctuary. Secure, discreet, and designed for our community.
+              Bỏ qua phòng chờ. Tiếp cận dịch vụ chăm sóc sức khỏe tình dục chuyên biệt, toàn diện ngay tại nhà. An toàn, kín đáo và được thiết kế cho cộng đồng của chúng ta.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link to="/signup" className="rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity">
-                Get Started Now
+                Bắt đầu ngay
               </Link>
               <a href="#how-it-works" className="rounded-lg border border-border px-6 py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors">
-                View Our Plans
+                Xem gói dịch vụ
               </a>
             </div>
           </div>
@@ -198,7 +198,7 @@ const Landing = () => {
             <div className="rounded-2xl bg-gradient-to-br from-accent to-muted aspect-[4/3] flex items-center justify-center overflow-hidden">
               <div className="text-center p-8">
                 <Users className="h-20 w-20 text-primary/30 mx-auto mb-4" />
-                <p className="text-muted-foreground text-sm">Expert Care Team</p>
+                <p className="text-muted-foreground text-sm">Đội ngũ chăm sóc chuyên nghiệp</p>
               </div>
             </div>
           </div>
@@ -209,7 +209,7 @@ const Landing = () => {
       <section id="how-it-works" className="bg-card py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold mb-2">How it Works</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">Cách thức hoạt động</h2>
             <div className="h-1 w-12 bg-primary rounded-full mx-auto" />
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -240,7 +240,7 @@ const Landing = () => {
               <div className="space-y-4">
                 <div className="rounded-xl bg-primary p-4 text-primary-foreground">
                   <p className="text-lg font-bold">LGBTQ+</p>
-                  <p className="text-xs opacity-80">Provider Expertise</p>
+                  <p className="text-xs opacity-80">Chuyên môn đội ngũ</p>
                 </div>
                 <div className="rounded-2xl bg-muted aspect-[4/3] flex items-center justify-center">
                   <Users className="h-12 w-12 text-muted-foreground/30" />
@@ -249,13 +249,13 @@ const Landing = () => {
               <div className="col-span-2">
                 <div className="inline-block rounded-xl bg-primary p-4 text-primary-foreground">
                   <p className="text-2xl font-bold">100%</p>
-                  <p className="text-xs opacity-80">Secure & Private</p>
+                  <p className="text-xs opacity-80">An toàn & riêng tư</p>
                 </div>
               </div>
             </div>
           </div>
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-8">Expert Care Without the Hurdles.</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-8">Chăm sóc chuyên nghiệp, không rào cản.</h2>
             <div className="space-y-6">
               {features.map((feat, idx) => {
                 const Icon = feat.icon;
@@ -279,7 +279,7 @@ const Landing = () => {
       {/* Testimonials */}
       <section className="bg-card py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">Patient Experiences</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">Trải nghiệm bệnh nhân</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t, idx) => (
               <div key={idx} className="rounded-xl border bg-background p-6">
@@ -321,12 +321,12 @@ const Landing = () => {
       {/* CTA */}
       <section id="cta" className="max-w-7xl mx-auto px-4 md:px-8 py-12">
         <div className="rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-10 md:p-16 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground mb-4">Your Health, Your Way.</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground mb-4">Sức khỏe của bạn, theo cách của bạn.</h2>
           <p className="text-primary-foreground/80 text-sm md:text-base max-w-md mx-auto mb-8">
-            Join thousands who have already taken control of their health with Qcare Plus. Start your journey today.
+            Hàng nghìn người đã chủ động chăm sóc sức khỏe cùng Rcare Plus. Bắt đầu hành trình của bạn ngay hôm nay.
           </p>
           <Link to="/signup" className="inline-block rounded-lg bg-card px-8 py-3 text-sm font-semibold text-primary hover:opacity-90 transition-opacity">
-            Join Qcare Plus
+            Tham gia Rcare Plus
           </Link>
         </div>
       </section>
@@ -335,15 +335,15 @@ const Landing = () => {
       <footer className="border-t py-8">
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <span className="text-base font-bold text-foreground">Qcare Plus</span>
-            <p className="text-xs text-muted-foreground">Empowering the LGBTQ+ community with expert care.</p>
+            <span className="text-base font-bold text-foreground">Rcare Plus</span>
+            <p className="text-xs text-muted-foreground">Trao quyền cho cộng đồng LGBTQ+ với dịch vụ chăm sóc chuyên nghiệp.</p>
           </div>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link to="/support" className="hover:text-foreground transition-colors">Support</Link>
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+            <Link to="/support" className="hover:text-foreground transition-colors">Hỗ trợ</Link>
+            <a href="#" className="hover:text-foreground transition-colors">Quyền riêng tư</a>
+            <a href="#" className="hover:text-foreground transition-colors">Điều khoản</a>
           </div>
-          <p className="text-xs text-muted-foreground">© 2024 Qcare Plus. All rights reserved.</p>
+          <p className="text-xs text-muted-foreground">© 2024 Rcare Plus. Bảo lưu mọi quyền.</p>
         </div>
       </footer>
     </div>

@@ -125,7 +125,7 @@ const SetPasswordFromEmail = () => {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b bg-card px-6">
         <Link to="/" className="text-lg font-bold text-primary">
-          Qcare Plus
+          Rcare Plus
         </Link>
         <Link
           to="/login"

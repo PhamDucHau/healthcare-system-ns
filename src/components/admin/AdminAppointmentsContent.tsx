@@ -175,7 +175,7 @@ export default function AdminAppointmentsContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-0.5">
-            Staff Dashboard
+            Bảng Điều khiển
           </p>
           {viewMode !== "all" && (
             <div className="flex items-center gap-3">

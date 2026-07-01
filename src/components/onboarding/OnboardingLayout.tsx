@@ -7,7 +7,7 @@ const OnboardingLayout = () => {
       <header className="border-b bg-card/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 md:px-8">
           <Link to="/" className="text-lg font-bold text-primary">
-            Qcare Plus
+            Rcare Plus
           </Link>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <span className="inline-flex min-h-9 items-center gap-1 rounded-full border bg-card px-3 py-1.5">
@@ -32,7 +32,7 @@ const OnboardingLayout = () => {
 
       <footer className="border-t bg-card">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 py-4 text-xs text-muted-foreground md:flex-row md:px-8">
-          <p>Qcare Plus Clinical Network</p>
+          <p>Rcare Plus Clinical Network</p>
           <div className="flex items-center gap-4">
             <button className="hover:text-foreground">Chính sách bảo mật</button>
             <button className="hover:text-foreground">Điều khoản dịch vụ</button>

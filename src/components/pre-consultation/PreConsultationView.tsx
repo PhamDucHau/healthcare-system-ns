@@ -414,7 +414,7 @@ export default function PreConsultationView({
       </div>
 
       {/* Generate SOAP Button */}
-      {onGenerateSOAP && (
+      {/* {onGenerateSOAP && (
         <div className="pt-4">
           <Button
             onClick={() => onGenerateSOAP(preConsult)}
@@ -424,7 +424,7 @@ export default function PreConsultationView({
             Dùng thông tin này tạo SOAP tự động
           </Button>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

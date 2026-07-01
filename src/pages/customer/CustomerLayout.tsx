@@ -39,7 +39,7 @@ const CustomerSidebarContent = ({
         <Shield className="h-5 w-5 text-primary-foreground" />
       </div>
       <div>
-        <p className="text-sm font-bold text-primary">Qcare Plus</p>
+        <p className="text-sm font-bold text-primary">Rcare Plus</p>
         <p className="text-xs text-muted-foreground">Portal Nhân viên</p>
       </div>
     </div>

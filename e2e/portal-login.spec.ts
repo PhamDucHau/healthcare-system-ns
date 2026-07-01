@@ -7,7 +7,7 @@ import {
 test.describe("Unified login", () => {
   test("login page renders at /login", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: /Đăng nhập Qcare Plus/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Đăng nhập Rcare Plus/i })).toBeVisible();
   });
 
   test("legacy portal URLs redirect to /login", async ({ page }) => {

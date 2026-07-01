@@ -45,9 +45,9 @@ export default function PatientPortalLayout() {
         {/* Logo */}
         <div className="flex items-center gap-2 px-5 py-5 border-b border-gray-100">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
-            <span className="text-white font-black text-sm">Q</span>
+            <span className="text-white font-black text-sm">R</span>
           </div>
-          <span className="font-bold text-gray-800 text-base">QCARE</span>
+          <span className="font-bold text-gray-800 text-base">RCARE</span>
         </div>
 
         {/* Section label */}

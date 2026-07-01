@@ -132,7 +132,7 @@ export async function fetchPatientProfile(userId: string) {
 /** Maps Supabase RPC error codes to user-facing messages */
 export function mapBookingError(message: string): string {
   if (message.includes('SLOT_UNAVAILABLE'))
-    return 'Slot vừa được đặt, vui lòng chọn slot khác.';
+    return 'Giờ khám vừa được đặt, vui lòng chọn giờ khám khác.';
   if (message.includes('DUPLICATE_SESSION'))
     return 'Bạn đã có lịch trong buổi này (sáng/chiều). Vui lòng chọn buổi khác.';
   if (message.includes('PROFILE_UNVERIFIED'))

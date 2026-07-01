@@ -36,7 +36,7 @@ const About = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card px-4 md:px-8 max-w-7xl mx-auto w-full">
-        <Link to="/" className="text-lg font-bold text-primary">Qcare Plus</Link>
+        <Link to="/" className="text-lg font-bold text-primary">Rcare Plus</Link>
         <nav className="hidden md:flex items-center gap-8">
           <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Our Care</Link>
           <Link to="/about" className="text-sm font-medium text-foreground underline underline-offset-4">About Us</Link>
@@ -62,7 +62,7 @@ const About = () => {
               <span className="text-primary">Community.</span>
             </h1>
             <p className="text-muted-foreground text-base md:text-lg max-w-md">
-              At QCare Plus, we believe healthcare isn't just about medicine—it's about belonging. We curate inclusive clinical experiences where empathy meets excellence.
+              At Rcare Plus, we believe healthcare isn't just about medicine—it's about belonging. We curate inclusive clinical experiences where empathy meets excellence.
             </p>
           </div>
           <div className="relative">
@@ -189,8 +189,8 @@ const About = () => {
       <footer className="border-t py-8 mt-8">
         <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
-            <span className="text-base font-bold text-foreground">QCare Plus</span>
-            <p className="text-xs text-muted-foreground mt-1">© 2024 QCare Plus. Healthcare for the modern world.</p>
+            <span className="text-base font-bold text-foreground">Rcare Plus</span>
+            <p className="text-xs text-muted-foreground mt-1">© 2024 Rcare Plus. Healthcare for the modern world.</p>
           </div>
           <div>
             <p className="text-xs font-bold mb-2">Company</p>
@@ -208,7 +208,7 @@ const About = () => {
           </div>
           <div>
             <p className="text-xs font-bold mb-2">Contact</p>
-            <p className="text-xs text-muted-foreground">support@qcareplus.com</p>
+            <p className="text-xs text-muted-foreground">support@rcareplus.com</p>
           </div>
         </div>
       </footer>

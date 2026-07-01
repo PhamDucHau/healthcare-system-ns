@@ -102,7 +102,7 @@ const OnboardingPersonal = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Welcome to Qcare Plus</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Welcome to Rcare Plus</h1>
       <p className="mt-2 max-w-2xl text-base text-muted-foreground">
         Let&apos;s start with your identity and personal details to ensure safe and accurate care.
       </p>

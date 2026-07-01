@@ -64,7 +64,7 @@ export async function sendPreConsultReminderEmail(
 
   const specialtyName = sp?.name ?? "—";
   const siteUrl = getSiteUrl();
-  const fromName = Deno.env.get("EMAIL_FROM_NAME") ?? "QcarePlus";
+  const fromName = Deno.env.get("EMAIL_FROM_NAME") ?? "RcarePlus";
   const preConsultUrl = `${siteUrl}/appointments/${appointmentId}/pre-consultation`;
 
   const transporter = nodemailer.createTransport({
@@ -77,7 +77,7 @@ export async function sendPreConsultReminderEmail(
   await transporter.sendMail({
     from: `"${fromName}" <${smtpUser}>`,
     to: toEmail,
-    subject: "Nhắc nhở khai báo y tế trước khám – QcarePlus",
+    subject: "Nhắc nhở khai báo y tế trước khám – RcarePlus",
     html: buildEmailHtml({
       fullName,
       appointmentLine,
@@ -125,7 +125,7 @@ function buildEmailHtml(p: {
 
         <tr>
           <td style="background:#db2777;padding:28px 36px;">
-            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">QcarePlus</h1>
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">RcarePlus</h1>
             <p style="margin:4px 0 0;color:rgba(255,255,255,.85);font-size:13px;">Nhắc nhở khai báo y tế trước khám</p>
           </td>
         </tr>
@@ -179,8 +179,8 @@ function buildEmailHtml(p: {
         <tr>
           <td style="background:#f9fafb;padding:20px 36px;border-top:1px solid #e5e7eb;">
             <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;line-height:1.6;">
-              Email tự động từ QcarePlus – vui lòng không trả lời.<br/>
-              © 2026 QcarePlus
+              Email tự động từ RcarePlus – vui lòng không trả lời.<br/>
+              © 2026 RcarePlus
             </p>
           </td>
         </tr>

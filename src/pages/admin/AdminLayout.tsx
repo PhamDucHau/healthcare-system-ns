@@ -43,7 +43,7 @@ const AdminSidebarContent = ({
           <Shield className="h-5 w-5 text-primary-foreground" />
         </div>
         <div>
-          <p className="text-sm font-bold text-primary">Qcare Plus</p>
+          <p className="text-sm font-bold text-primary">Rcare Plus</p>
           <p className="text-xs text-muted-foreground">IT Operations</p>
         </div>
       </div>
@@ -73,7 +73,7 @@ const AdminSidebarContent = ({
           ) : (
             <LogOut className="h-4 w-4" aria-hidden="true" />
           )}
-          {isLoggingOut ? "Đang đăng xuất…" : "LOGOUT"}
+          {isLoggingOut ? "Đang đăng xuất…" : "Đăng Xuất"}
         </button>
       </div>
     </>

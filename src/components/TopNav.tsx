@@ -47,7 +47,7 @@ const TopNav = () => {
           </SheetTrigger>
           <SheetContent side="left" className="w-72 p-0">
             <div className="p-4 border-b">
-              <span className="text-lg font-bold text-primary">Qcare Plus</span>
+              <span className="text-lg font-bold text-primary">Rcare Plus</span>
             </div>
             <div className="p-4">
               <div className="flex items-center gap-3 p-3 mb-2">
@@ -97,7 +97,7 @@ const TopNav = () => {
           </SheetContent>
         </Sheet>
 
-        <Link to="/" className="text-lg font-bold text-primary">Qcare Plus</Link>
+        <Link to="/" className="text-lg font-bold text-primary">Rcare Plus</Link>
         <nav className="hidden md:flex items-center gap-6">
           {navItems.map(({ label, path }) => {
             const isActive = location.pathname === path;

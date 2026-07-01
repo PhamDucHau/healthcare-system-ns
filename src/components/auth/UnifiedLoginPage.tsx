@@ -157,7 +157,7 @@ const UnifiedLoginPage = () => {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="flex h-16 items-center justify-between border-b bg-card px-6">
         <Link to="/" className="text-lg font-bold text-primary">
-          Qcare Plus
+          Rcare Plus
         </Link>
         <button
           type="button"
@@ -214,7 +214,7 @@ const UnifiedLoginPage = () => {
             ) : (
               <>
                 <h1 className="mb-2 text-2xl font-bold leading-tight text-foreground md:text-3xl">
-                  Đăng nhập Qcare Plus
+                  Đăng nhập Rcare Plus
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Nhập email và mật khẩu — hệ thống tự chuyển đến portal Bệnh nhân, Bác sĩ hoặc Quản trị.

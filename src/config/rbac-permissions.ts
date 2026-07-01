@@ -29,6 +29,10 @@ export function getPermissionCategoryLabel(category: string): string {
   return PERMISSION_CATEGORY_LABELS[category] ?? category;
 }
 
+export function getPermissionDisplayName(p: { name: string; slug: string }): string {
+  return p.name?.trim() || p.slug;
+}
+
 export function comparePermissionCategories(a: string, b: string): number {
   const ia = PERMISSION_CATEGORY_ORDER.indexOf(a as (typeof PERMISSION_CATEGORY_ORDER)[number]);
   const ib = PERMISSION_CATEGORY_ORDER.indexOf(b as (typeof PERMISSION_CATEGORY_ORDER)[number]);

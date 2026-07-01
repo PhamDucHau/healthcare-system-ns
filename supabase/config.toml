@@ -64,15 +64,15 @@ otp_length = 6
 otp_expiry = 86400
 
 [auth.email.template.recovery]
-subject = "Thiết lập mật khẩu — Qcare Plus"
+subject = "Thiết lập mật khẩu — Rcare Plus"
 content_path = "./supabase/templates/recovery.html"
 
 [auth.email.template.invite]
-subject = "Mời tham gia Qcare Plus"
+subject = "Mời tham gia Rcare Plus"
 content_path = "./supabase/templates/invite.html"
 
 [auth.email.template.confirmation]
-subject = "Xác nhận email — Qcare Plus"
+subject = "Xác nhận email — Rcare Plus"
 content_path = "./supabase/templates/confirmation.html"
 
 [functions.signup-send-otp]

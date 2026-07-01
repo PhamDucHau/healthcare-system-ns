@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
     const specialtyName = sp?.name ?? "—";
     const siteUrl       = getSiteUrl();
-    const fromName      = Deno.env.get("EMAIL_FROM_NAME") ?? "QcarePlus";
+    const fromName      = Deno.env.get("EMAIL_FROM_NAME") ?? "RcarePlus";
 
     // ── 4. Send via Gmail SMTP ────────────────────────────────────────────────
     const transporter = nodemailer.createTransport({
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     await transporter.sendMail({
       from:    `"${fromName}" <${smtpUser}>`,
       to:      toEmail,
-      subject: "Thông báo hủy lịch hẹn – QcarePlus",
+      subject: "Thông báo hủy lịch hẹn – RcarePlus",
       html:    buildEmailHtml({ fullName, appointmentLine, specialtyName, cancel_reason, siteUrl }),
     });
 
@@ -138,7 +138,7 @@ function buildEmailHtml(p: {
         <!-- Header -->
         <tr>
           <td style="background:#c0392b;padding:28px 36px;">
-            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">QcarePlus</h1>
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">RcarePlus</h1>
             <p style="margin:4px 0 0;color:rgba(255,255,255,.8);font-size:13px;">Hệ thống quản lý y tế</p>
           </td>
         </tr>
@@ -198,8 +198,8 @@ function buildEmailHtml(p: {
         <tr>
           <td style="background:#f9fafb;padding:20px 36px;border-top:1px solid #e5e7eb;">
             <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;line-height:1.6;">
-              Email tự động từ QcarePlus – vui lòng không trả lời.<br/>
-              © 2026 QcarePlus
+              Email tự động từ RcarePlus – vui lòng không trả lời.<br/>
+              © 2026 RcarePlus
             </p>
           </td>
         </tr>

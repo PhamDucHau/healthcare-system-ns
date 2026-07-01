@@ -1284,7 +1284,7 @@ CONFIRMED → CHECKED\_IN → IN\_PROGRESS → COMPLETED
 
 * **AF-1 (Hủy lịch trên app):** BN vào "Lịch của tôi" → "Hủy" (nếu ≥ 2h trước giờ khám). Sau 2h → phải gọi hotline.  
 * **AF-2 (Walk-in):** Lễ tân tạo lịch trực tiếp trên Admin Portal — đi qua FR-009.  
-* **AF-3 (Slot bị đặt trước trong lúc chọn):** Race condition → hệ thống báo "Slot vừa được đặt, vui lòng chọn slot khác".  
+* **AF-3 (Slot bị đặt trước trong lúc chọn):** Race condition → hệ thống báo "Slot vừa được đặt, vui lòng chọn giờ khám khác".  
 * **AF-4 (Trùng buổi):** BN đã có lịch sáng ngày X → cố đặt thêm sáng ngày X → chặn theo RULE-008a.
 
 **Business Rules:**

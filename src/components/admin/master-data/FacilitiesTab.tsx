@@ -110,7 +110,7 @@ function FacilityDialog({ open, initial, onClose, onSaved }: {
             <input value={form.name ?? ''} onChange={set('name')} className={inputCls} placeholder="Phòng khám Đa khoa ABC" />
           </Field>
           <Field label="Mã cơ sở">
-            <input value={form.code ?? ''} onChange={set('code')} className={inputCls} placeholder="QC-MAIN" />
+            <input value={form.code ?? ''} onChange={set('code')} className={inputCls} placeholder="RC-MAIN" />
           </Field>
           <Field label="Địa chỉ">
             <input value={form.address ?? ''} onChange={set('address')} className={inputCls} placeholder="123 Nguyễn Huệ, Q.1, TP.HCM" />

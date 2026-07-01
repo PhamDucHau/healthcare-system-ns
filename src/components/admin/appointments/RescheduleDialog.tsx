@@ -103,7 +103,7 @@ export default function RescheduleDialog({ appointment, open, onClose, onSuccess
           {/* Slot picker */}
           {date && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Chọn slot</p>
+              <p className="text-sm font-medium">Chọn giờ khám</p>
               {isFetching ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
                   <Loader2 className="h-4 w-4 animate-spin" /> Đang tải…

@@ -216,7 +216,7 @@ const OnboardingFormPage = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-        Chào mừng đến với Qcare Plus
+        Chào mừng đến với Rcare Plus
       </h1>
       <p className="mt-2 max-w-2xl text-base text-muted-foreground">
         Tải ảnh CCCD và thẻ BHYT, chạy OCR (nếu có), điền thông tin và gửi một lần.
