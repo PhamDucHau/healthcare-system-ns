@@ -136,7 +136,7 @@ export type UseSoapNoteEditorReturn = {
   setIcdSearch: (query: string) => void;
 
   // Sign-off actions
-  sign: (params: { pin: string; responsibilityAck: boolean }) => Promise<boolean>;
+  sign: (params: { pin: string | null; responsibilityAck: boolean }) => Promise<boolean>;
   setupPin: (pin: string) => Promise<boolean>;
 };
 
@@ -948,7 +948,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   // ─── Public: sign examination (with PIN) ───────────────────────────────────
 
   const sign = useCallback(
-    async (params: { pin: string; responsibilityAck: boolean }): Promise<boolean> => {
+    async (params: { pin: string | null; responsibilityAck: boolean }): Promise<boolean> => {
       if (!examIdRef.current) return false;
 
       // Validate before sending
@@ -968,7 +968,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         // Sign & Lock with PIN verification
         await signExamination({
           examId: examIdRef.current,
-          pinPlain: params.pin,
+          pinPlain: params.pin?.trim() || null,
           responsibilityAck: params.responsibilityAck,
         });
 

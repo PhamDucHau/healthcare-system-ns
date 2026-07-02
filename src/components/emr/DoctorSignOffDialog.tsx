@@ -4,7 +4,6 @@
  */
 
 import { useEffect, useState } from 'react';
-import { DEV_SIGN_PIN } from '@/lib/patient-health-records-storage';
 import { AlertTriangle, Check, Lock, Loader2, Shield } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -20,7 +19,7 @@ import type { MedicalExamination, SoapIcdCode } from '@/types/emr';
 type DoctorSignOffDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSign: (pin: string, ack: boolean) => Promise<boolean>;
+  onSign: (pin: string | null, ack: boolean) => Promise<boolean>;
   confirmedIcds: SoapIcdCode[];
   exam: MedicalExamination | null;
 };
@@ -28,14 +27,14 @@ type DoctorSignOffDialogProps = {
 export default function DoctorSignOffDialog({
   open, onClose, onSign, confirmedIcds, exam,
 }: DoctorSignOffDialogProps) {
-  const [pin, setPin] = useState(DEV_SIGN_PIN);
+  const [pin, setPin] = useState('');
   const [ack, setAck] = useState(false);
   const [signing, setSigning] = useState(false);
   const [pinError, setPinError] = useState('');
 
   useEffect(() => {
     if (open) {
-      setPin(DEV_SIGN_PIN);
+      setPin('');
       setAck(false);
       setPinError('');
     }
@@ -48,7 +47,7 @@ export default function DoctorSignOffDialog({
     setPinError('');
     setSigning(true);
     try {
-      const ok = await onSign(pin, ack);
+      const ok = await onSign(pin.trim() || null, ack);
       if (ok) {
         setPin('');
         setAck(false);

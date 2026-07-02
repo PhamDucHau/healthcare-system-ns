@@ -5,9 +5,6 @@
 
 import type { MedicalExamination, SoapIcdCode } from '@/types/emr';
 
-/** Dev-only hardcoded sign-off PIN (temporary). */
-export const DEV_SIGN_PIN = '121938';
-
 const STORAGE_PREFIX = 'qcare_health_records_';
 
 export type HealthRecordVersion = {

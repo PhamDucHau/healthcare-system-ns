@@ -202,12 +202,12 @@ export async function checkDoctorPinSet(): Promise<boolean> {
  */
 export async function signExamination(params: {
   examId: string;
-  pinPlain: string;
+  pinPlain: string | null;
   responsibilityAck: boolean;
 }): Promise<SignExaminationResult> {
   const { data, error } = await supabase.rpc('sign_examination', {
     p_exam_id: params.examId,
-    p_pin_plain: params.pinPlain,
+    p_pin_plain: params.pinPlain?.trim() || null,
     p_responsibility_ack: params.responsibilityAck,
     p_ip_address: null,
     p_user_agent: navigator.userAgent,
