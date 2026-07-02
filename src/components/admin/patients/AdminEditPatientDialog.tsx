@@ -12,8 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { getPatientRecordById } from "@/lib/patient-records";
 import {
   fetchOcrSingle,
-  mapBhytParsedToInsuranceUpdates,
-  mapCccdParsedToFormUpdates,
+  applyBhytParsedFillEmpty,
+  applyCccdParsedFillEmpty,
 } from "@/lib/cccd-ocr";
 import type { PatientPortalDetail } from "@/types/patient-portal";
 
@@ -211,38 +211,12 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
       if (type === "bhyt") {
         const json = await fetchOcrSingle(file, "bhyt", "front");
         if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        const ins = mapBhytParsedToInsuranceUpdates(json.parsed);
-        setForm(p => p ? {
-          ...p,
-          provider: ins.provider ?? p.provider,
-          memberId: ins.memberId ?? p.memberId,
-          groupNumber: ins.groupNumber ?? p.groupNumber,
-          bhytName: ins.bhytName ?? p.bhytName,
-          bhytDob: ins.bhytDob ?? p.bhytDob,
-          bhytGender: ins.bhytGender ?? p.bhytGender,
-          bhytAddress: ins.bhytAddress ?? p.bhytAddress,
-          bhytKcb: ins.bhytKcb ?? p.bhytKcb,
-          bhytKcbCode: ins.bhytKcbCode ?? p.bhytKcbCode,
-          bhytValidFrom: ins.bhytValidFrom ?? p.bhytValidFrom,
-          bhytFiveYear: ins.bhytFiveYear ?? p.bhytFiveYear,
-        } : p);
+        setForm(p => p ? applyBhytParsedFillEmpty(p, json.parsed) : p);
         toast.success("OCR BHYT hoàn tất");
       } else {
         const json = await fetchOcrSingle(file, "cccd", "front");
         if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        const { identity, personal, gender } = mapCccdParsedToFormUpdates(json.parsed);
-        setForm(p => p ? {
-          ...p,
-          idNumber: identity.idNumber ?? p.idNumber,
-          expirationDate: identity.expirationDate ?? p.expirationDate,
-          residentialAddress: identity.residentialAddress ?? p.residentialAddress,
-          issuedDate: identity.issuedDate ?? p.issuedDate,
-          issuer: identity.issuer ?? p.issuer,
-          legalFirstName: personal.legalFirstName ?? p.legalFirstName,
-          legalLastName: personal.legalLastName ?? p.legalLastName,
-          dateOfBirth: personal.dateOfBirth ?? p.dateOfBirth,
-          gender: gender ?? p.gender,
-        } : p);
+        setForm(p => p ? applyCccdParsedFillEmpty(p, json.parsed) : p);
         toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
       }
     } catch (e) {

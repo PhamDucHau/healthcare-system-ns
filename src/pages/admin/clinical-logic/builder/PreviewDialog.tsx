@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { QuestionnaireSection } from "@/types/questionnaire";
+import { getScaleBounds } from "@/lib/questionnaire-scoring";
 import { QUESTION_TYPE_LABELS, SECTION_ROLE_LABELS } from "@/types/questionnaire";
 
 type Props = {
@@ -31,7 +32,13 @@ export default function PreviewDialog({ open, onClose, name, sections }: Props) 
                       {si + 1}.{qi + 1} {q.text || "(câu hỏi chưa đặt tên)"}
                       <span className="ml-2 text-[10px] uppercase tracking-wider text-muted-foreground">{QUESTION_TYPE_LABELS[q.type]}</span>
                     </p>
-                    {q.options.length > 0 && (
+                    {q.type === "SCALE" && (() => {
+                      const { min, max } = getScaleBounds(q.config);
+                      return (
+                        <p className="mt-1 text-xs text-muted-foreground">Thang {min}–{max}</p>
+                      );
+                    })()}
+                    {q.type !== "SCALE" && q.options.length > 0 && (
                       <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                         {q.options.map((o) => (
                           <li key={o.id}>· {o.label || "(lựa chọn)"} {o.score != null && `(${o.score} điểm)`}</li>

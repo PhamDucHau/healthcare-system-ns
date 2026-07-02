@@ -193,7 +193,10 @@ export default function QuestionnaireAssignPanel({
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="border-t px-2.5 pb-3">
+                    <div
+                      className="border-t px-2.5 pb-3"
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
                       <QuestionnaireFillForm
                         assignment={a}
                         onSubmitted={() => void loadData()}

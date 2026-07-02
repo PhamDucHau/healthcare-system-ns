@@ -36,6 +36,9 @@ const OnboardingFormPage = () => {
     updatePersonal,
     updateIdentity,
     updateInsurance,
+    updatePersonalFromOcr,
+    updateIdentityFromOcr,
+    updateInsuranceFromOcr,
     setAcceptedPrivacy,
     setIdFile,
     setIdBackFile,
@@ -85,8 +88,8 @@ const OnboardingFormPage = () => {
       const json = await fetchOcrSingle(uploadFiles.idFile, "cccd", "front");
       if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
       const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
-      updateIdentity(identity);
-      updatePersonal(personal);
+      updateIdentityFromOcr(identity);
+      updatePersonalFromOcr(personal);
       toast.success("OCR CCCD mặt trước hoàn tất");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR thất bại.";
@@ -105,8 +108,8 @@ const OnboardingFormPage = () => {
       const json = await fetchOcrSingle(uploadFiles.idBackFile, "cccd", "front");
       if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
       const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
-      updateIdentity(identity);
-      updatePersonal(personal);
+      updateIdentityFromOcr(identity);
+      updatePersonalFromOcr(personal);
       toast.success("OCR CCCD mặt sau hoàn tất");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR thất bại.";
@@ -124,7 +127,7 @@ const OnboardingFormPage = () => {
     try {
       const json = await fetchOcrSingle(uploadFiles.cardFrontFile, "bhyt", "front");
       if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-      updateInsurance(mapBhytParsedToInsuranceUpdates(json.parsed));
+      updateInsuranceFromOcr(mapBhytParsedToInsuranceUpdates(json.parsed));
       toast.success("OCR BHYT hoàn tất");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR BHYT thất bại.";

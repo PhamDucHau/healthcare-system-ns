@@ -10,8 +10,8 @@ type Props = {
 export default function ScoringPanel({ scoring, onChange, disabled }: Props) {
   const rangeLabel =
     scoring.min != null && scoring.max != null
-      ? `Range: ${scoring.min} - ${scoring.max}`
-      : "Range: —";
+      ? `${scoring.min} – ${scoring.max}`
+      : "—";
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm space-y-4">
@@ -19,12 +19,12 @@ export default function ScoringPanel({ scoring, onChange, disabled }: Props) {
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100">
           <Sigma className="h-4 w-4 text-violet-600" strokeWidth={2.5} />
         </div>
-        <p className="text-sm font-bold text-foreground">Scoring Module</p>
+        <p className="text-sm font-bold text-foreground">Module chấm điểm</p>
       </div>
 
       <div>
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-          Calculation Formula
+          Công thức tính điểm
         </p>
         <input
           value={scoring.formula}
@@ -40,7 +40,7 @@ export default function ScoringPanel({ scoring, onChange, disabled }: Props) {
           value={scoring.result_type ?? ""}
           disabled={disabled}
           onChange={(e) => onChange({ ...scoring, result_type: e.target.value })}
-          placeholder="Integer Result"
+          placeholder="Kết quả số nguyên"
           className="rounded-full border-0 bg-muted/60 px-3 py-1 text-[11px] font-medium text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-200 disabled:opacity-60 w-auto min-w-[7rem]"
         />
         <div className="flex items-center gap-1 rounded-full bg-muted/60 px-3 py-1">
@@ -61,7 +61,7 @@ export default function ScoringPanel({ scoring, onChange, disabled }: Props) {
             placeholder="24"
             className="w-8 bg-transparent text-[11px] font-medium text-muted-foreground focus:outline-none disabled:opacity-60"
           />
-          <span className="text-[10px] text-muted-foreground ml-1">{rangeLabel.replace("Range: ", "")}</span>
+          <span className="text-[10px] text-muted-foreground ml-1">Khoảng: {rangeLabel}</span>
         </div>
       </div>
     </div>

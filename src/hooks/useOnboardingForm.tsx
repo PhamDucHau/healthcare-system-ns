@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { mergeOcrFillEmpty } from "@/lib/cccd-ocr";
 
 type PersonalData = {
   legalFirstName: string;
@@ -94,6 +95,9 @@ type OnboardingContextValue = {
   updatePersonal: (updates: Partial<PersonalData>) => void;
   updateIdentity: (updates: Partial<IdentityData>) => void;
   updateInsurance: (updates: Partial<InsuranceData>) => void;
+  updatePersonalFromOcr: (updates: Partial<PersonalData>) => void;
+  updateIdentityFromOcr: (updates: Partial<IdentityData>) => void;
+  updateInsuranceFromOcr: (updates: Partial<InsuranceData>) => void;
   setAcceptedPrivacy: (value: boolean) => void;
   setIdFile: (file: File | null) => void;
   setIdBackFile: (file: File | null) => void;
@@ -126,6 +130,15 @@ export const OnboardingFormProvider = ({ children }: { children: ReactNode }) =>
       },
       updateInsurance: (updates) => {
         setData((prev) => ({ ...prev, insurance: { ...prev.insurance, ...updates } }));
+      },
+      updatePersonalFromOcr: (updates) => {
+        setData((prev) => ({ ...prev, personal: mergeOcrFillEmpty(prev.personal, updates) }));
+      },
+      updateIdentityFromOcr: (updates) => {
+        setData((prev) => ({ ...prev, identity: mergeOcrFillEmpty(prev.identity, updates) }));
+      },
+      updateInsuranceFromOcr: (updates) => {
+        setData((prev) => ({ ...prev, insurance: mergeOcrFillEmpty(prev.insurance, updates) }));
       },
       setAcceptedPrivacy: (value) => {
         setData((prev) => ({ ...prev, acceptedPrivacy: value }));

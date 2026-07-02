@@ -209,3 +209,58 @@ export function mapBhytParsedToInsuranceUpdates(parsed: BhytParsed): Partial<Onb
 
   return updates;
 }
+
+/** Treat whitespace-only strings as empty for OCR auto-fill. */
+export function isOcrTargetFieldEmpty(value: string | undefined | null): boolean {
+  return !String(value ?? "").trim();
+}
+
+/** Keep existing non-empty value; otherwise use OCR suggestion. */
+export function coalesceOcrField(existing: string, incoming: string | undefined): string {
+  if (!isOcrTargetFieldEmpty(existing)) return existing;
+  const trimmed = incoming?.trim();
+  return trimmed ?? existing;
+}
+
+/** Merge OCR partial updates into string fields — fill empty only, never overwrite. */
+export function mergeOcrFillEmpty<T extends Record<string, string>>(
+  current: T,
+  updates: Partial<T>,
+): T {
+  const next = { ...current };
+  for (const key of Object.keys(updates) as (keyof T)[]) {
+    const incoming = updates[key];
+    if (incoming === undefined) continue;
+    next[key] = coalesceOcrField(current[key], incoming as string);
+  }
+  return next;
+}
+
+/** Apply CCCD OCR parsed data to a flat form record (fill-empty-only). */
+export function applyCccdParsedFillEmpty<T extends Record<string, string>>(
+  current: T,
+  parsed: CccdParsed,
+  genderField: keyof T = "gender" as keyof T,
+): T {
+  const { identity, personal, gender } = mapCccdParsedToFormUpdates(parsed);
+  const updates = {
+    idNumber: identity.idNumber,
+    expirationDate: identity.expirationDate,
+    residentialAddress: identity.residentialAddress,
+    issuedDate: identity.issuedDate,
+    issuer: identity.issuer,
+    legalFirstName: personal.legalFirstName,
+    legalLastName: personal.legalLastName,
+    dateOfBirth: personal.dateOfBirth,
+    ...(gender !== undefined ? { [genderField]: gender } : {}),
+  } as Partial<T>;
+  return mergeOcrFillEmpty(current, updates);
+}
+
+/** Apply BHYT OCR parsed data to a form/insurance record (fill-empty-only). */
+export function applyBhytParsedFillEmpty<T extends Record<string, string>>(
+  current: T,
+  parsed: BhytParsed,
+): T {
+  return mergeOcrFillEmpty(current, mapBhytParsedToInsuranceUpdates(parsed) as Partial<T>);
+}

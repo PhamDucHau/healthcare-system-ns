@@ -12,7 +12,7 @@ const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 const OnboardingPersonal = () => {
   const navigate = useNavigate();
-  const { data, uploadFiles, updatePersonal, updateIdentity, setIdFile, setIdBackFile } =
+  const { data, uploadFiles, updatePersonal, updateIdentity, updatePersonalFromOcr, updateIdentityFromOcr, setIdFile, setIdBackFile } =
     useOnboardingForm();
   const [errorMessage, setErrorMessage] = useState("");
   const [isOcrRunning, setIsOcrRunning] = useState(false);
@@ -53,8 +53,8 @@ const OnboardingPersonal = () => {
         throw new Error("OCR response did not include parsed data.");
       }
       const { identity, personal } = mapCccdParsedToFormUpdates(parsed);
-      updateIdentity(identity);
-      updatePersonal(personal);
+      updateIdentityFromOcr(identity);
+      updatePersonalFromOcr(personal);
       toast.success("OCR complete", { description: "Review and edit the suggested fields below." });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR request failed.";

@@ -29,9 +29,9 @@ export default function TreeCoveragePanel({ sections }: Props) {
 
   return (
     <div className="rounded-2xl bg-primary p-5 shadow-md space-y-3 text-primary-foreground">
-      <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Tree Coverage</p>
+      <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Độ hoàn thiện</p>
       <p className="text-3xl font-bold">{coverage}%</p>
-      <p className="text-sm opacity-90">Path completeness</p>
+      <p className="text-sm opacity-90">Mức đầy đủ luồng câu hỏi</p>
       <div className="h-2 rounded-full bg-white/25 overflow-hidden">
         <div
           className="h-full rounded-full bg-white transition-all duration-300"

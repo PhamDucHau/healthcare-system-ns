@@ -85,7 +85,7 @@ export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   TEXT: 'Văn bản',
   NUMBER: 'Số',
   SCALE: 'Thang đo',
-  GRID_MATRIX: 'Bảng (Grid/Matrix)',
+  GRID_MATRIX: 'Bảng ma trận',
 };
 
 export const SECTION_ROLE_LABELS: Record<SectionRole, string> = {

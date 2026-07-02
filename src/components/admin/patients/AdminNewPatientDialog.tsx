@@ -16,8 +16,8 @@ import { adminInsertPatientProfile, staffCreatePatientProfile } from "@/lib/admi
 import { checkPatientDuplicate, logDedupAudit, type DupCheckResult } from "@/lib/duplicate-check";
 import {
   fetchOcrSingle,
-  mapBhytParsedToInsuranceUpdates,
-  mapCccdParsedToFormUpdates,
+  applyBhytParsedFillEmpty,
+  applyCccdParsedFillEmpty,
 } from "@/lib/cccd-ocr";
 
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -113,38 +113,12 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
       if (type === "bhyt") {
         const json = await fetchOcrSingle(file, "bhyt", "front");
         if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        const ins = mapBhytParsedToInsuranceUpdates(json.parsed);
-        setForm(p => ({
-          ...p,
-          provider: ins.provider ?? p.provider,
-          memberId: ins.memberId ?? p.memberId,
-          groupNumber: ins.groupNumber ?? p.groupNumber,
-          bhytName: ins.bhytName ?? p.bhytName,
-          bhytDob: ins.bhytDob ?? p.bhytDob,
-          bhytGender: ins.bhytGender ?? p.bhytGender,
-          bhytAddress: ins.bhytAddress ?? p.bhytAddress,
-          bhytKcb: ins.bhytKcb ?? p.bhytKcb,
-          bhytKcbCode: ins.bhytKcbCode ?? p.bhytKcbCode,
-          bhytValidFrom: ins.bhytValidFrom ?? p.bhytValidFrom,
-          bhytFiveYear: ins.bhytFiveYear ?? p.bhytFiveYear,
-        }));
+        setForm(p => applyBhytParsedFillEmpty(p, json.parsed));
         toast.success("OCR BHYT hoàn tất");
       } else {
         const json = await fetchOcrSingle(file, "cccd", "front");
         if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        const { identity, personal, gender } = mapCccdParsedToFormUpdates(json.parsed);
-        setForm(p => ({
-          ...p,
-          idNumber: identity.idNumber ?? p.idNumber,
-          expirationDate: identity.expirationDate ?? p.expirationDate,
-          residentialAddress: identity.residentialAddress ?? p.residentialAddress,
-          issuedDate: identity.issuedDate ?? p.issuedDate,
-          issuer: identity.issuer ?? p.issuer,
-          legalFirstName: personal.legalFirstName ?? p.legalFirstName,
-          legalLastName: personal.legalLastName ?? p.legalLastName,
-          dateOfBirth: personal.dateOfBirth ?? p.dateOfBirth,
-          gender: gender ?? p.gender,
-        }));
+        setForm(p => applyCccdParsedFillEmpty(p, json.parsed));
         toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
       }
     } catch (e) {
@@ -385,7 +359,11 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
             </div>
             <div className="mt-3 flex justify-end">
               <Button type="button" size="sm" disabled={ocrRunning || !hasAnyFile}
-                onClick={() => void Promise.all([runOcr("front"), runOcr("back"), runOcr("bhyt")])}>
+                onClick={() => void (async () => {
+                  await runOcr("front");
+                  await runOcr("back");
+                  await runOcr("bhyt");
+                })()}>
                 <ScanLine className="mr-1.5 h-3.5 w-3.5" />
                 {ocrRunning ? "Đang đọc OCR…" : "OCR tất cả"}
               </Button>

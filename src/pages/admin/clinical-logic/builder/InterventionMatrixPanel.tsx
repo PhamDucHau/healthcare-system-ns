@@ -2,9 +2,9 @@ import { GitBranch, Plus, Trash2 } from "lucide-react";
 import type { InterventionRule } from "@/types/questionnaire";
 
 const PATH_STYLES: Record<string, { box: string; label: string }> = {
-  critical: { box: "bg-red-50 border-red-100", label: "Critical Path" },
-  moderate: { box: "bg-sky-50 border-sky-100", label: "Moderate Path" },
-  default:  { box: "bg-muted/40 border-border/60", label: "Rule" },
+  critical: { box: "bg-red-50 border-red-100", label: "Mức nghiêm trọng" },
+  moderate: { box: "bg-sky-50 border-sky-100", label: "Mức trung bình" },
+  default:  { box: "bg-muted/40 border-border/60", label: "Quy tắc" },
 };
 
 function pathStyle(label: string) {
@@ -40,7 +40,7 @@ export default function InterventionMatrixPanel({ rules, onChange, disabled }: P
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-pink-100">
             <GitBranch className="h-4 w-4 text-pink-600" strokeWidth={2} />
           </div>
-          <p className="text-sm font-bold text-foreground">Intervention Matrix</p>
+          <p className="text-sm font-bold text-foreground">Ma trận can thiệp</p>
         </div>
         <button
           type="button"
@@ -65,7 +65,7 @@ export default function InterventionMatrixPanel({ rules, onChange, disabled }: P
                   value={rule.label}
                   disabled={disabled}
                   onChange={(e) => updateRule(i, { label: e.target.value })}
-                  placeholder="critical / moderate"
+                  placeholder="nghiêm trọng / trung bình"
                   className="bg-transparent text-[10px] font-bold uppercase tracking-wider text-muted-foreground focus:outline-none disabled:opacity-60 w-32"
                 />
                 <button
@@ -81,7 +81,7 @@ export default function InterventionMatrixPanel({ rules, onChange, disabled }: P
                 value={rule.condition}
                 disabled={disabled}
                 onChange={(e) => updateRule(i, { condition: e.target.value })}
-                placeholder="IF PHQ_8 >= 10 AND func_level >= 2"
+                placeholder="VD: score >= 10"
                 className="w-full bg-transparent text-xs font-mono text-foreground focus:outline-none disabled:opacity-60"
               />
               <div className="flex items-center gap-2">
@@ -90,7 +90,7 @@ export default function InterventionMatrixPanel({ rules, onChange, disabled }: P
                   value={rule.action}
                   disabled={disabled}
                   onChange={(e) => updateRule(i, { action: e.target.value })}
-                  placeholder="Refer to psychiatry"
+                  placeholder="VD: Chuyển chuyên khoa tâm thần"
                   className="flex-1 rounded-full border border-border/60 bg-white px-3 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
                 />
               </div>

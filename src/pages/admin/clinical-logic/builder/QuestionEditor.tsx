@@ -4,6 +4,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type { QuestionnaireQuestion, QuestionnaireSection, QuestionType } from "@/types/questionnaire";
+import { QUESTION_TYPE_LABELS } from "@/types/questionnaire";
 import { newId } from "./types";
 
 const CHOICE_TYPES: QuestionType[] = ["SINGLE_CHOICE", "MULTIPLE_CHOICE"];
@@ -63,7 +64,7 @@ export default function QuestionEditor({
         <div className="flex-1 p-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <span className="inline-flex rounded-md bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-              Q{questionIndex}: {question.type}
+              Q{questionIndex}: {QUESTION_TYPE_LABELS[question.type]}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -89,22 +90,35 @@ export default function QuestionEditor({
 
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-              Question Text
+              Nội dung câu hỏi
             </label>
             <div className="flex gap-2">
               <Select
                 value={question.type}
                 disabled={disabled}
-                onValueChange={(v) => patch({ type: v as QuestionType })}
+                onValueChange={(v) => {
+                  const nextType = v as QuestionType;
+                  if (nextType === "SCALE") {
+                    onChange({
+                      ...question,
+                      type: nextType,
+                      options: [],
+                      skip_logic: [],
+                      config: {
+                        min: question.config.min ?? 0,
+                        max: question.config.max ?? 10,
+                      },
+                    });
+                  } else {
+                    patch({ type: nextType });
+                  }
+                }}
               >
                 <SelectTrigger className="w-36 shrink-0 h-10 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SINGLE_CHOICE">Single Choice</SelectItem>
-                  <SelectItem value="MULTIPLE_CHOICE">Multiple Choice</SelectItem>
-                  <SelectItem value="TEXT">Text</SelectItem>
-                  <SelectItem value="NUMBER">Number</SelectItem>
-                  <SelectItem value="SCALE">Scale</SelectItem>
-                  <SelectItem value="GRID_MATRIX">Grid/Matrix</SelectItem>
+                  {(Object.entries(QUESTION_TYPE_LABELS) as [QuestionType, string][]).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <input
@@ -120,7 +134,7 @@ export default function QuestionEditor({
           {isChoice && (
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Response Options &amp; Scores
+                Lựa chọn trả lời &amp; điểm
               </p>
               {question.options.map((opt, oi) => (
                 <div
@@ -140,7 +154,7 @@ export default function QuestionEditor({
                     ID: OPT_{oi}
                   </span>
                   <div className="flex shrink-0 items-center gap-1.5 rounded-lg bg-muted/50 px-2 py-1">
-                    <span className="text-[10px] font-medium text-muted-foreground">Score</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">Điểm</span>
                     <input
                       type="number"
                       value={opt.score ?? 0}
@@ -176,10 +190,10 @@ export default function QuestionEditor({
             <div className="flex gap-3">
               <input type="number" disabled={disabled} value={(question.config.min as number) ?? 0}
                 onChange={(e) => patchConfig({ min: Number(e.target.value) })}
-                placeholder="Min" className="w-28 rounded-xl border px-3 py-2 text-sm disabled:opacity-60" />
+                placeholder="Tối thiểu" className="w-28 rounded-xl border px-3 py-2 text-sm disabled:opacity-60" />
               <input type="number" disabled={disabled} value={(question.config.max as number) ?? 10}
                 onChange={(e) => patchConfig({ max: Number(e.target.value) })}
-                placeholder="Max" className="w-28 rounded-xl border px-3 py-2 text-sm disabled:opacity-60" />
+                placeholder="Tối đa" className="w-28 rounded-xl border px-3 py-2 text-sm disabled:opacity-60" />
             </div>
           )}
 
@@ -204,10 +218,10 @@ export default function QuestionEditor({
                 className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-teal-700"
               >
                 <span>
-                  Skip Logic
+                  Logic bỏ qua
                   {question.skip_logic.length > 0 && (
                     <span className="font-normal text-teal-600/80">
-                      {" "}({question.skip_logic.length} active rules)
+                      {" "}({question.skip_logic.length} quy tắc)
                     </span>
                   )}
                 </span>

@@ -1,0 +1,137 @@
+import { describe, it, expect } from "vitest";
+import {
+  applyBhytParsedFillEmpty,
+  applyCccdParsedFillEmpty,
+  coalesceOcrField,
+  isOcrTargetFieldEmpty,
+  mergeOcrFillEmpty,
+} from "@/lib/cccd-ocr";
+
+describe("isOcrTargetFieldEmpty", () => {
+  it("treats empty and whitespace as empty", () => {
+    expect(isOcrTargetFieldEmpty("")).toBe(true);
+    expect(isOcrTargetFieldEmpty("   ")).toBe(true);
+    expect(isOcrTargetFieldEmpty(undefined)).toBe(true);
+    expect(isOcrTargetFieldEmpty(null)).toBe(true);
+  });
+
+  it("treats non-empty strings as filled", () => {
+    expect(isOcrTargetFieldEmpty("LÊ THỊ THU VÂN")).toBe(false);
+  });
+});
+
+describe("coalesceOcrField", () => {
+  it("fills empty field from OCR", () => {
+    expect(coalesceOcrField("", "THU VÂN")).toBe("THU VÂN");
+  });
+
+  it("keeps existing value when OCR differs (signer name case)", () => {
+    expect(coalesceOcrField("THU VÂN", "QUỐC HÙNG")).toBe("THU VÂN");
+    expect(coalesceOcrField("LÊ", "NGUYỄN")).toBe("LÊ");
+  });
+
+  it("treats whitespace-only existing as empty", () => {
+    expect(coalesceOcrField("  ", "001234567890")).toBe("001234567890");
+  });
+});
+
+describe("mergeOcrFillEmpty", () => {
+  it("merges only into empty fields", () => {
+    const current = {
+      legalLastName: "LÊ",
+      legalFirstName: "THU VÂN",
+      idNumber: "001234567890",
+      issuedDate: "",
+    };
+    const result = mergeOcrFillEmpty(current, {
+      legalLastName: "NGUYỄN",
+      legalFirstName: "QUỐC HÙNG",
+      idNumber: "999999999999",
+      issuedDate: "2020-01-01",
+    });
+    expect(result.legalLastName).toBe("LÊ");
+    expect(result.legalFirstName).toBe("THU VÂN");
+    expect(result.idNumber).toBe("001234567890");
+    expect(result.issuedDate).toBe("2020-01-01");
+  });
+});
+
+describe("applyCccdParsedFillEmpty", () => {
+  const emptyForm = {
+    idNumber: "",
+    expirationDate: "",
+    residentialAddress: "",
+    issuedDate: "",
+    issuer: "",
+    legalFirstName: "",
+    legalLastName: "",
+    dateOfBirth: "",
+    gender: "",
+  };
+
+  it("fills all fields when form is empty", () => {
+    const result = applyCccdParsedFillEmpty(emptyForm, {
+      id: "001234567890",
+      name: "LÊ THỊ THU VÂN",
+      dob: "21/03/1989",
+      gender: "Nữ",
+      issued: "01/01/2020",
+      extra: "Cục Cảnh sát",
+    });
+    expect(result.legalLastName).toBe("LÊ");
+    expect(result.legalFirstName).toBe("THỊ THU VÂN");
+    expect(result.idNumber).toBe("001234567890");
+    expect(result.dateOfBirth).toBe("1989-03-21");
+    expect(result.gender).toBe("Nữ");
+    expect(result.issuedDate).toBe("2020-01-01");
+    expect(result.issuer).toBe("Cục Cảnh sát");
+  });
+
+  it("does not overwrite name/id from back OCR signer misread", () => {
+    const afterFront = applyCccdParsedFillEmpty(emptyForm, {
+      id: "001234567890",
+      name: "LÊ THỊ THU VÂN",
+      dob: "21/03/1989",
+      gender: "Nữ",
+    });
+    const afterBack = applyCccdParsedFillEmpty(afterFront, {
+      id: "999999999999",
+      name: "NGUYỄN QUỐC HÙNG",
+      issued: "01/01/2020",
+      extra: "Cục Cảnh sát",
+    });
+    expect(afterBack.legalLastName).toBe("LÊ");
+    expect(afterBack.legalFirstName).toBe("THỊ THU VÂN");
+    expect(afterBack.idNumber).toBe("001234567890");
+    expect(afterBack.issuedDate).toBe("2020-01-01");
+    expect(afterBack.issuer).toBe("Cục Cảnh sát");
+  });
+
+  it("maps gender to custom field name", () => {
+    const form = { ...emptyForm, gender: "", pronouns: "" };
+    delete (form as { gender?: string }).gender;
+    const result = applyCccdParsedFillEmpty(form, { gender: "Nam" }, "pronouns");
+    expect(result.pronouns).toBe("Nam");
+  });
+});
+
+describe("applyBhytParsedFillEmpty", () => {
+  it("fills empty insurance fields only", () => {
+    const current = {
+      provider: "Bệnh viện A",
+      memberId: "",
+      bhytName: "LÊ THỊ THU VÂN",
+      bhytDob: "",
+    };
+    const result = applyBhytParsedFillEmpty(current, {
+      id: "DN1234567890",
+      name: "NGUYỄN VĂN A",
+      dob: "21/03/1989",
+      kcb: "Bệnh viện B",
+    });
+    expect(result.provider).toBe("Bệnh viện A");
+    expect(result.memberId).toBe("DN1234567890");
+    expect(result.bhytName).toBe("LÊ THỊ THU VÂN");
+    expect(result.bhytDob).toBe("1989-03-21");
+  });
+});

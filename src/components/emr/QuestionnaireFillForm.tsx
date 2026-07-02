@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { fetchQuestionnaireById } from '@/lib/questionnaire-api';
 import {
   getAssignmentAnswers,
@@ -13,7 +14,9 @@ import {
 } from '@/lib/questionnaire-assignment-api';
 import {
   buildAnswerPayloads,
+  buildInitialAnswers,
   flattenQuestions,
+  getScaleBounds,
   parseStoredAnswer,
   type AnswerState,
 } from '@/lib/questionnaire-scoring';
@@ -50,7 +53,7 @@ export default function QuestionnaireFillForm({ assignment, onSubmitted }: Props
         const stored = await getAssignmentAnswers(assignment.id);
         setAnswers(stored);
       } else {
-        setAnswers({});
+        setAnswers(buildInitialAnswers(flattenQuestions(q.sections)));
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -165,7 +168,7 @@ function QuestionField({
         {index}. {question.text}
       </p>
 
-      {(question.type === 'SINGLE_CHOICE' || question.type === 'SCALE') && (
+      {question.type === 'SINGLE_CHOICE' && (
         <RadioGroup
           value={typeof parsed === 'string' ? parsed : ''}
           onValueChange={onChange}
@@ -181,6 +184,15 @@ function QuestionField({
             </div>
           ))}
         </RadioGroup>
+      )}
+
+      {question.type === 'SCALE' && (
+        <ScaleQuestionInput
+          question={question}
+          value={value}
+          readOnly={readOnly}
+          onChange={onChange}
+        />
       )}
 
       {question.type === 'MULTIPLE_CHOICE' && (
@@ -234,6 +246,58 @@ function QuestionField({
       {question.type === 'GRID_MATRIX' && (
         <p className="text-[11px] text-muted-foreground italic">Loại bảng matrix chưa hỗ trợ trên màn khám.</p>
       )}
+    </div>
+  );
+}
+
+function ScaleQuestionInput({
+  question,
+  value,
+  readOnly,
+  onChange,
+}: {
+  question: QuestionnaireQuestion;
+  value: string | string[] | number | undefined;
+  readOnly: boolean;
+  onChange: (v: number) => void;
+}) {
+  const { min, max } = getScaleBounds(question.config);
+  const scaleValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value !== '' && !Number.isNaN(Number(value))
+        ? Number(value)
+        : min;
+
+  return (
+    <div
+      className="space-y-2 pt-1"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">Thang {min}–{max}</span>
+        <span className="text-sm font-bold text-foreground">
+          {scaleValue}/{max}
+        </span>
+      </div>
+      <div className="py-1">
+        <Slider
+          value={[scaleValue]}
+          onValueChange={(vals) => {
+            const next = vals[0];
+            if (next !== undefined) onChange(next);
+          }}
+          min={min}
+          max={max}
+          step={1}
+          disabled={readOnly}
+          className="w-full cursor-pointer"
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
     </div>
   );
 }

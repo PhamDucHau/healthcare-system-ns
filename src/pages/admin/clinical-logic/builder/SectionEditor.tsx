@@ -66,16 +66,16 @@ export default function SectionEditor({
               value={section.title}
               disabled={disabled}
               onChange={(e) => patch({ title: e.target.value })}
-              placeholder={`Section ${sectionLabel}: Patient Self-Report`}
+              placeholder={`Phần ${sectionLabel}: Bệnh nhân tự khai báo`}
               className="w-full bg-transparent text-base font-bold text-foreground focus:outline-none disabled:opacity-60"
             />
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex rounded-md bg-teal-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700">
-                Role: {section.role}
+                Vai trò: {SECTION_ROLE_LABELS[section.role]}
               </span>
               {section.key ? (
                 <span className="text-[10px] font-mono text-muted-foreground">
-                  Internal ID: {section.key}
+                  Mã nội bộ: {section.key}
                 </span>
               ) : null}
             </div>
@@ -113,7 +113,7 @@ export default function SectionEditor({
               value={section.key}
               disabled={disabled}
               onChange={(e) => patch({ key: e.target.value })}
-              placeholder="Internal ID (VD: PHQ8_SEC_A)"
+              placeholder="Mã nội bộ (VD: PHQ8_PHAN_A)"
               className="flex-1 rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
             />
             <Select value={section.role} disabled={disabled} onValueChange={(v) => patch({ role: v as SectionRole })}>

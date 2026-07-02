@@ -11,7 +11,7 @@ const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 const OnboardingInsurance = () => {
   const navigate = useNavigate();
-  const { data, uploadFiles, updateInsurance, setCardFrontFile } = useOnboardingForm();
+  const { data, uploadFiles, updateInsurance, updateInsuranceFromOcr, setCardFrontFile } = useOnboardingForm();
   const [errorMessage, setErrorMessage] = useState("");
   const [isOcrRunning, setIsOcrRunning] = useState(false);
 
@@ -40,8 +40,7 @@ const OnboardingInsurance = () => {
       if (!json.parsed || typeof json.parsed !== "object") {
         throw new Error("BHYT OCR response did not include parsed data.");
       }
-      const updates = mapBhytParsedToInsuranceUpdates(json.parsed);
-      updateInsurance(updates);
+      updateInsuranceFromOcr(mapBhytParsedToInsuranceUpdates(json.parsed));
       toast.success("BHYT OCR complete", {
         description: "Suggested insurance values have been filled.",
       });

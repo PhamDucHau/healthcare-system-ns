@@ -8,6 +8,12 @@ export type QuestionnaireAnswerPayload = {
 
 export type AnswerState = Record<string, string | string[] | number>;
 
+export function getScaleBounds(config: Record<string, unknown>): { min: number; max: number } {
+  const min = Number(config.min ?? 0);
+  const max = Number(config.max ?? 10);
+  return { min, max: Math.max(min + 1, max) };
+}
+
 export function scoreForOption(question: QuestionnaireQuestion, optionId: string): number {
   const opt = question.options.find((o) => o.id === optionId);
   return opt?.score ?? 0;
@@ -28,9 +34,14 @@ export function buildAnswerPayloads(
       return [{ question_id: q.id, answer_value: raw, score_value: score }];
     }
 
-    if (q.type === 'SINGLE_CHOICE' || q.type === 'SCALE') {
+    if (q.type === 'SINGLE_CHOICE') {
       const optionId = String(raw);
       return [{ question_id: q.id, answer_value: optionId, score_value: scoreForOption(q, optionId) }];
+    }
+
+    if (q.type === 'SCALE') {
+      const num = Number(raw);
+      return [{ question_id: q.id, answer_value: num, score_value: num }];
     }
 
     if (q.type === 'NUMBER') {
@@ -66,6 +77,17 @@ export function flattenQuestions(
   sections: { questions: QuestionnaireQuestion[] }[],
 ): QuestionnaireQuestion[] {
   return sections.flatMap((s) => [...s.questions].sort((a, b) => a.sort_order - b.sort_order));
+}
+
+/** Default SCALE answers to min so the slider is controlled and submittable without an extra drag. */
+export function buildInitialAnswers(questions: QuestionnaireQuestion[]): AnswerState {
+  const initial: AnswerState = {};
+  for (const q of questions) {
+    if (q.type === 'SCALE') {
+      initial[q.id] = getScaleBounds(q.config).min;
+    }
+  }
+  return initial;
 }
 
 export function parseStoredAnswer(value: unknown): string | string[] | number {
