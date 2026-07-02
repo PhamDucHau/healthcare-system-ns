@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, Lock, Loader2, Shield } from 'lucide-react';
+import { AlertTriangle, Check, Eye, EyeOff, Lock, Loader2, Shield } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -28,6 +28,7 @@ export default function DoctorSignOffDialog({
   open, onClose, onSign, confirmedIcds, exam,
 }: DoctorSignOffDialogProps) {
   const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [ack, setAck] = useState(false);
   const [signing, setSigning] = useState(false);
   const [pinError, setPinError] = useState('');
@@ -35,6 +36,7 @@ export default function DoctorSignOffDialog({
   useEffect(() => {
     if (open) {
       setPin('');
+      setShowPin(false);
       setAck(false);
       setPinError('');
     }
@@ -50,6 +52,7 @@ export default function DoctorSignOffDialog({
       const ok = await onSign(pin.trim() || null, ack);
       if (ok) {
         setPin('');
+        setShowPin(false);
         setAck(false);
       }
     } catch {
@@ -62,6 +65,7 @@ export default function DoctorSignOffDialog({
   const handleClose = () => {
     if (signing) return;
     setPin('');
+    setShowPin(false);
     setAck(false);
     setPinError('');
     onClose();
@@ -145,27 +149,40 @@ export default function DoctorSignOffDialog({
             <Label htmlFor="sign-pin" className="text-sm font-medium">
               Mã PIN ký duyệt (6 chữ số)
             </Label>
-            <Input
-              id="sign-pin"
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              value={pin}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                setPin(val);
-                setPinError('');
-              }}
-              placeholder="••••••"
-              className="text-center text-xl tracking-[0.5em] font-mono h-12 opacity-80"
-              disabled={signing}
-              autoComplete="off"
-              aria-describedby="sign-pin-hint"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && canSign) void handleSign();
-              }}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="sign-pin"
+                type={showPin ? 'text' : 'password'}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={pin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setPin(val);
+                  setPinError('');
+                }}
+                placeholder="******"
+                className="text-center text-xl tracking-[0.5em] font-mono h-12 flex-1"
+                disabled={signing}
+                autoComplete="off"
+                aria-describedby="sign-pin-hint"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && canSign) void handleSign();
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 shrink-0"
+                disabled={signing}
+                onClick={() => setShowPin((v) => !v)}
+                aria-label={showPin ? 'Ẩn mã PIN' : 'Hiện mã PIN'}
+              >
+                {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
             <p id="sign-pin-hint" className="text-xs text-muted-foreground">
               Tạm thời bỏ qua xác thực PIN — chỉ cần tick xác nhận và bấm ký duyệt.
             </p>
