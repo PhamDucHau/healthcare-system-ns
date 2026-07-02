@@ -1,9 +1,5 @@
--- =============================================================================
--- Chạy TRÊN SUPABASE (Dashboard → SQL Editor) cho project remote.
--- Tạo / cập nhật bảng patient_medical_charts + RLS + RPC upsert_my_health_chart.
--- Idempotent: chạy lại an toàn.
--- Sau khi Run: đợi ~30s hoặc Settings → API → Reload schema nếu vẫn 404.
--- =============================================================================
+-- Patient health history: create table if missing + structured JSONB + tighter RLS
+-- Safe when 20260209140000 was never applied on remote.
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS trigger
@@ -47,14 +43,18 @@ CREATE TABLE IF NOT EXISTS public.patient_medical_charts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cột mới (nếu bảng đã tồn tại từ migration cũ)
+COMMENT ON TABLE public.patient_medical_charts IS 'Bệnh án / lịch sử sức khỏe bệnh nhân.';
+
+-- New columns for DBs that had the older table without health-history fields
 ALTER TABLE public.patient_medical_charts
   ADD COLUMN IF NOT EXISTS surgeries jsonb NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS immunizations jsonb NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS affirmations jsonb NOT NULL DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS preferred_language text NOT NULL DEFAULT 'vi';
 
-COMMENT ON TABLE public.patient_medical_charts IS 'Bệnh án / lịch sử sức khỏe bệnh nhân.';
+COMMENT ON COLUMN public.patient_medical_charts.surgeries IS 'Array of { id, name, year?, notes? }';
+COMMENT ON COLUMN public.patient_medical_charts.immunizations IS 'Array of { id, name, date }';
+COMMENT ON COLUMN public.patient_medical_charts.affirmations IS 'Patient self-reported flags: no_other_allergies, no_current_medications, etc.';
 
 CREATE INDEX IF NOT EXISTS patient_medical_charts_patient_user_id_idx
   ON public.patient_medical_charts (patient_user_id);
@@ -66,6 +66,54 @@ CREATE TRIGGER patient_medical_charts_set_updated_at
 
 ALTER TABLE public.patient_medical_charts ENABLE ROW LEVEL SECURITY;
 
+-- Migrate legacy string arrays to structured objects
+UPDATE public.patient_medical_charts
+SET allergies = (
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id', gen_random_uuid()::text,
+      'name', elem,
+      'reaction', ''
+    )
+  ), '[]'::jsonb)
+  FROM jsonb_array_elements_text(allergies) AS elem
+)
+WHERE jsonb_typeof(allergies) = 'array'
+  AND allergies != '[]'::jsonb
+  AND jsonb_typeof(allergies -> 0) = 'string';
+
+UPDATE public.patient_medical_charts
+SET medications = (
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id', gen_random_uuid()::text,
+      'name', elem,
+      'dose', '',
+      'frequency', ''
+    )
+  ), '[]'::jsonb)
+  FROM jsonb_array_elements_text(medications) AS elem
+)
+WHERE jsonb_typeof(medications) = 'array'
+  AND medications != '[]'::jsonb
+  AND jsonb_typeof(medications -> 0) = 'string';
+
+UPDATE public.patient_medical_charts
+SET diagnoses = (
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id', gen_random_uuid()::text,
+      'name', elem,
+      'status', 'Đang kiểm soát'
+    )
+  ), '[]'::jsonb)
+  FROM jsonb_array_elements_text(diagnoses) AS elem
+)
+WHERE jsonb_typeof(diagnoses) = 'array'
+  AND diagnoses != '[]'::jsonb
+  AND jsonb_typeof(diagnoses -> 0) = 'string';
+
+-- Replace permissive demo RLS with patient-owned writes + staff read
 DROP POLICY IF EXISTS "medical_charts_select_authenticated" ON public.patient_medical_charts;
 DROP POLICY IF EXISTS "medical_charts_insert_authenticated" ON public.patient_medical_charts;
 DROP POLICY IF EXISTS "medical_charts_update_authenticated" ON public.patient_medical_charts;
@@ -76,7 +124,8 @@ DROP POLICY IF EXISTS medical_charts_update_own ON public.patient_medical_charts
 DROP POLICY IF EXISTS medical_charts_delete_own ON public.patient_medical_charts;
 
 CREATE POLICY medical_charts_select_own_or_staff
-  ON public.patient_medical_charts FOR SELECT
+  ON public.patient_medical_charts
+  FOR SELECT
   TO authenticated
   USING (
     patient_user_id = auth.uid()
@@ -84,24 +133,28 @@ CREATE POLICY medical_charts_select_own_or_staff
   );
 
 CREATE POLICY medical_charts_insert_own
-  ON public.patient_medical_charts FOR INSERT
+  ON public.patient_medical_charts
+  FOR INSERT
   TO authenticated
   WITH CHECK (patient_user_id = auth.uid());
 
 CREATE POLICY medical_charts_update_own
-  ON public.patient_medical_charts FOR UPDATE
+  ON public.patient_medical_charts
+  FOR UPDATE
   TO authenticated
   USING (patient_user_id = auth.uid())
   WITH CHECK (patient_user_id = auth.uid());
 
 CREATE POLICY medical_charts_delete_own
-  ON public.patient_medical_charts FOR DELETE
+  ON public.patient_medical_charts
+  FOR DELETE
   TO authenticated
   USING (patient_user_id = auth.uid());
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.patient_medical_charts TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.patient_medical_charts TO service_role;
 
+-- Ensure patient has a chart row; sync name from onboarding profile
 CREATE OR REPLACE FUNCTION public.upsert_my_health_chart()
 RETURNS public.patient_medical_charts
 LANGUAGE plpgsql

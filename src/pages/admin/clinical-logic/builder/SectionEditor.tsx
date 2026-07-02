@@ -153,7 +153,7 @@ export default function SectionEditor({
         className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/80 py-4 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 disabled:opacity-40 transition-colors"
       >
         <Plus className="h-4 w-4" />
-        Add Next Question (Q{nextQIndex})
+        Thêm câu hỏi tiếp theo (Q{nextQIndex})
       </button>
     </div>
   );

@@ -157,7 +157,7 @@ export default function QuestionnaireBuilderPage() {
           </h1>
           {currentId && (
             <p className="text-xs text-muted-foreground mt-1.5">
-              {STATUS_LABELS[status]} · Phiên bản v{version}
+              {STATUS_LABELS[status]}
             </p>
           )}
         </div>
@@ -167,7 +167,7 @@ export default function QuestionnaireBuilderPage() {
             onClick={() => setPreviewOpen(true)}
             className="flex items-center gap-2 rounded-xl border-2 border-teal-500 bg-white px-5 py-2.5 text-sm font-semibold text-teal-600 hover:bg-teal-50"
           >
-            <Eye className="h-4 w-4" /> Preview
+            <Eye className="h-4 w-4" /> Xem trước
           </button>
           <button
             type="button"

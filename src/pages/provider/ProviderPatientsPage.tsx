@@ -29,6 +29,23 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import VitalSignsForm from "@/components/provider/VitalSignsForm";
 import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
 import PatientHealthRecordsPanel from "@/components/provider/PatientHealthRecordsPanel";
+import { fetchPatientHealthChartByUserId } from "@/lib/patient-health-history-api";
+import {
+  formatAllergyLabel,
+  formatConditionLabel,
+  formatImmunizationLabel,
+  formatMedicationLabel,
+  formatSurgeryLabel,
+  LANGUAGE_LABELS,
+} from "@/types/patient-health-history";
+
+const DEMO_DIAGNOSES = ["Type 2 Diabetes", "Mild Hypertension"];
+const DEMO_MEDICATIONS = ["Metformin 500mg", "Lisinopril 10mg"];
+const DEMO_ALLERGIES = ["Penicillin", "Peanuts"];
+const DEMO_LABS = [
+  { name: "Blood Panel", date: "2024-01-12" },
+  { name: "Chest X-Ray", date: "2023-12-28" },
+];
 
 const OVERVIEW_TABS = [
   { id: "overview", icon: SquareChartGantt, label: "Tổng quan" },
@@ -427,6 +444,14 @@ const ProviderPatientsPage = () => {
     enabled: Boolean(realPatientUserId),
   });
 
+  const isDemoSelection = isDemoPatientId(selectedId ?? "");
+
+  const { data: healthChart, isLoading: isHealthChartLoading } = useQuery({
+    queryKey: ["patient", "health-chart", realPatientUserId],
+    queryFn: () => fetchPatientHealthChartByUserId(realPatientUserId!),
+    enabled: Boolean(realPatientUserId),
+  });
+
   const { data: vitalHistory = [] } = useQuery({
     queryKey: ["vital_signs_history", "patient", realPatientUserId],
     queryFn: () => listAllVitalSignsForPatient(supabase, realPatientUserId!).then((r) => r.vitals),
@@ -469,9 +494,37 @@ const ProviderPatientsPage = () => {
       : "QC-DEMO-8842");
   const pronouns = patientDetail?.preferred_pronouns ?? draftPersonal.pronouns ?? "Not set";
 
-  const diagnoses = ["Type 2 Diabetes", "Mild Hypertension"];
-  const medications = ["Metformin 500mg", "Lisinopril 10mg"];
-  const allergies = ["Penicillin", "Peanuts"];
+  const diagnosisLabels = useMemo(() => {
+    if (isDemoSelection) return DEMO_DIAGNOSES;
+    return (healthChart?.diagnoses ?? []).map(formatConditionLabel);
+  }, [isDemoSelection, healthChart]);
+
+  const medicationLabels = useMemo(() => {
+    if (isDemoSelection) return DEMO_MEDICATIONS;
+    return (healthChart?.medications ?? []).map(formatMedicationLabel);
+  }, [isDemoSelection, healthChart]);
+
+  const allergyLabels = useMemo(() => {
+    if (isDemoSelection) return DEMO_ALLERGIES;
+    return (healthChart?.allergies ?? []).map(formatAllergyLabel);
+  }, [isDemoSelection, healthChart]);
+
+  const surgeryLabels = useMemo(() => {
+    if (isDemoSelection) return [];
+    return (healthChart?.surgeries ?? []).map(formatSurgeryLabel);
+  }, [isDemoSelection, healthChart]);
+
+  const immunizationLabels = useMemo(() => {
+    if (isDemoSelection) return [];
+    return (healthChart?.immunizations ?? []).map(formatImmunizationLabel);
+  }, [isDemoSelection, healthChart]);
+
+  const displayHeightCm = latestVitals?.height_cm ?? healthChart?.height_cm ?? null;
+  const displayWeightKg = latestVitals?.weight_kg ?? healthChart?.weight_kg ?? null;
+  const bloodTypeLabel = isDemoSelection ? "O+" : (healthChart?.blood_type ?? "—");
+  const preferredLanguageLabel = healthChart?.preferred_language
+    ? (LANGUAGE_LABELS[healthChart.preferred_language] ?? healthChart.preferred_language)
+    : null;
 
   const vitals = latestVitals
     ? [
@@ -497,14 +550,19 @@ const ProviderPatientsPage = () => {
         { label: "Nhiệt độ", value: "—" },
       ];
 
-  const recentLabs = [
-    { name: "Blood Panel", date: "2024-01-12" },
-    { name: "Chest X-Ray", date: "2023-12-28" },
-  ];
+  const recentLabs = useMemo(() => {
+    if (isDemoSelection) return DEMO_LABS;
+    return healthChart?.recent_labs ?? [];
+  }, [isDemoSelection, healthChart]);
 
-  const emergencyName = `${displayName.split(" ")[0] ?? "Patient"} Contact`;
+  const emergencyName =
+    healthChart?.emergency_contact_name?.trim()
+    || (isDemoSelection ? `${displayName.split(" ")[0] ?? "Patient"} Contact` : "—");
   const emergencyPhone =
-    patientDetail?.phone_number ?? selectedDemo?.phone ?? draftPersonal.email ?? "123-4567";
+    healthChart?.emergency_contact_phone?.trim()
+    || patientDetail?.phone_number
+    || selectedDemo?.phone
+    || "—";
 
   const handleSelectPatient = useCallback((id: string) => {
     setSelectedId(id);
@@ -638,13 +696,16 @@ const ProviderPatientsPage = () => {
               </button>
             </div>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-card/20 px-3 py-1">Nhóm máu: O+</span>
-              {latestVitals?.height_cm != null && (
-                <span className="rounded-full bg-card/20 px-3 py-1">Chiều cao: {latestVitals.height_cm}cm</span>
+              <span className="rounded-full bg-card/20 px-3 py-1">Nhóm máu: {bloodTypeLabel}</span>
+              {displayHeightCm != null && (
+                <span className="rounded-full bg-card/20 px-3 py-1">Chiều cao: {displayHeightCm}cm</span>
               )}
-              {latestVitals?.weight_kg != null && (
-                <span className="rounded-full bg-card/20 px-3 py-1">Cân nặng: {latestVitals.weight_kg}kg</span>
+              {displayWeightKg != null && (
+                <span className="rounded-full bg-card/20 px-3 py-1">Cân nặng: {displayWeightKg}kg</span>
               )}
+              {preferredLanguageLabel ? (
+                <span className="rounded-full bg-card/20 px-3 py-1">Ngôn ngữ: {preferredLanguageLabel}</span>
+              ) : null}
               {(patientDetail?.email_address ?? draftPersonal.email) ? (
                 <span className="rounded-full bg-card/20 px-3 py-1">
                   {patientDetail?.email_address ?? draftPersonal.email}
@@ -678,32 +739,76 @@ const ProviderPatientsPage = () => {
 
               {activeTab === "overview" ? (
                 <>
+                  {isHealthChartLoading && !isDemoSelection ? (
+                    <p className="mb-3 text-sm text-muted-foreground">Đang tải hồ sơ sức khỏe…</p>
+                  ) : null}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <article className="rounded-lg border bg-background p-3">
                       <h3 className="text-sm font-semibold">Chẩn đoán trước đây</h3>
-                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                        {diagnoses.map((item) => (
-                          <li key={item}>• {item}</li>
-                        ))}
-                      </ul>
+                      {diagnosisLabels.length === 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">Chưa có dữ liệu</p>
+                      ) : (
+                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          {diagnosisLabels.map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                      )}
                     </article>
                     <article className="rounded-lg border bg-background p-3">
                       <h3 className="text-sm font-semibold">Thuốc đang dùng</h3>
-                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                        {medications.map((item) => (
-                          <li key={item}>• {item}</li>
-                        ))}
-                      </ul>
+                      {medicationLabels.length === 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">Chưa có dữ liệu</p>
+                      ) : (
+                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          {medicationLabels.map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                      )}
                     </article>
                     <article className="rounded-lg border bg-background p-3">
                       <h3 className="text-sm font-semibold">Dị ứng</h3>
-                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                        {allergies.map((item) => (
-                          <li key={item}>• {item}</li>
-                        ))}
-                      </ul>
+                      {allergyLabels.length === 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">Chưa có dữ liệu</p>
+                      ) : (
+                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          {allergyLabels.map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                      )}
                     </article>
                   </div>
+
+                  {!isDemoSelection ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <article className="rounded-lg border bg-background p-3">
+                        <h3 className="text-sm font-semibold">Phẫu thuật</h3>
+                        {surgeryLabels.length === 0 ? (
+                          <p className="mt-2 text-sm text-muted-foreground">Chưa có dữ liệu</p>
+                        ) : (
+                          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                            {surgeryLabels.map((item) => (
+                              <li key={item}>• {item}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </article>
+                      <article className="rounded-lg border bg-background p-3">
+                        <h3 className="text-sm font-semibold">Tiêm chủng</h3>
+                        {immunizationLabels.length === 0 ? (
+                          <p className="mt-2 text-sm text-muted-foreground">Chưa có dữ liệu</p>
+                        ) : (
+                          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                            {immunizationLabels.map((item) => (
+                              <li key={item}>• {item}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </article>
+                    </div>
+                  ) : null}
 
                   <div className="mt-4 rounded-lg border bg-background p-4">
                     <h3 className="mb-2 text-lg font-semibold">Ghi chú lâm sàng</h3>
@@ -804,13 +909,17 @@ const ProviderPatientsPage = () => {
 
               <div className="rounded-xl border bg-card p-4">
                 <h3 className="mb-3 text-sm font-semibold">Xét nghiệm gần đây</h3>
-                <div className="space-y-2 text-sm">
-                  {recentLabs.map((lab) => (
-                    <p key={`${lab.name}-${lab.date}`} className="rounded-lg bg-muted px-3 py-2">
-                      {lab.name} · {lab.date}
-                    </p>
-                  ))}
-                </div>
+                {recentLabs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Chưa có dữ liệu</p>
+                ) : (
+                  <div className="space-y-2 text-sm">
+                    {recentLabs.map((lab) => (
+                      <p key={`${lab.name}-${lab.date}`} className="rounded-lg bg-muted px-3 py-2">
+                        {lab.name}{lab.date ? ` · ${lab.date}` : ""}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
@@ -859,7 +968,7 @@ const ProviderPatientsPage = () => {
             ) : (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Bệnh nhân chưa có lịch CHECKED_IN hoặc IN_PROGRESS để nhập sinh hiệu.
+                Bệnh nhân chưa có lịch ở trạng thái Đã tiếp nhận hoặc Đang khám để nhập sinh hiệu.
                 </p>
               </div>
             )}

@@ -120,7 +120,7 @@ export default function QuestionnaireAssignPanel({
     <div className="space-y-3">
       {questionnaires.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-2">
-          Chưa có bộ câu hỏi đã phát hành. Quản trị viên cần phát hành (PUBLISHED) bộ câu hỏi trong mục Bộ câu hỏi lâm sàng.
+          Chưa có bộ câu hỏi đã xuất bản. Quản trị viên cần xuất bản bộ câu hỏi trong mục Bộ câu hỏi lâm sàng.
         </p>
       ) : (
         <div className="flex gap-2">

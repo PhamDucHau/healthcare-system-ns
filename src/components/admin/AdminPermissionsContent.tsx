@@ -63,10 +63,10 @@ const AdminPermissionsContent = () => {
                       <Shield className="h-4 w-4 text-primary shrink-0" />
                       <div className="min-w-0">
                         <p className="font-medium text-foreground">{p.name}</p>
-                        <p className="text-xs font-mono text-muted-foreground truncate">{p.slug}</p>
+                        {/* <p className="text-xs font-mono text-muted-foreground truncate">{p.slug}</p> */}
                       </div>
                     </div>
-                    <Badge variant="secondary" className="shrink-0">Read-only</Badge>
+                    <Badge variant="secondary" className="shrink-0">Không chỉnh sửa</Badge>
                   </li>
                 ))}
               </ul>

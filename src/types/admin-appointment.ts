@@ -84,3 +84,5 @@ export const ADMIN_STATUS_DOT: Record<AdminAppointmentStatus, string> = {
   CANCELLED:  'bg-red-500',
   NO_SHOW:    'bg-orange-500',
 };
+
+export const WALK_IN_LABEL = 'Lịch hẹn trực tiếp';

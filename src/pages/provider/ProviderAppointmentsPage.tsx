@@ -30,7 +30,7 @@ import {
 } from "@/lib/appointment-readiness";
 import { toast } from "sonner";
 import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
-import { ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT, ADMIN_STATUS_COLOR } from "@/types/admin-appointment";
+import { ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT, ADMIN_STATUS_COLOR, WALK_IN_LABEL } from "@/types/admin-appointment";
 import AppointmentDetailSheet from "@/components/admin/appointments/AppointmentDetailSheet";
 import CancelDialog from "@/components/admin/appointments/CancelDialog";
 import RescheduleDialog from "@/components/admin/appointments/RescheduleDialog";
@@ -209,7 +209,7 @@ export default function ProviderAppointmentsPage() {
         <div className="flex items-center gap-2">
           <Button onClick={() => setWalkInOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
-            Walk-in
+            {WALK_IN_LABEL}
           </Button>
           <Button variant="outline" size="sm" disabled={isFetching} onClick={() => void refetch()}>
             {isFetching
@@ -335,7 +335,7 @@ export default function ProviderAppointmentsPage() {
                       <TableCell className="font-mono text-sm font-semibold">
                         {row.start_time
                           ? row.start_time.slice(0, 5)
-                          : <span className="font-sans text-orange-500 font-bold">Walk-in</span>}
+                          : <span className="font-sans text-orange-500 font-bold text-[11px] leading-tight">{WALK_IN_LABEL}</span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -382,7 +382,7 @@ export default function ProviderAppointmentsPage() {
                       <TableCell className="text-sm">
                         {row.slot_date
                           ? format(new Date(row.slot_date), "dd/MM/yyyy", { locale: vi })
-                          : "Walk-in"}
+                          : WALK_IN_LABEL}
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ADMIN_STATUS_COLOR[row.status]}`}>

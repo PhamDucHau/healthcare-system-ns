@@ -6,10 +6,11 @@ interface HealthSectionProps {
   iconColor?: string;
   title: string;
   action?: string;
+  onActionClick?: () => void;
   children: ReactNode;
 }
 
-const HealthSection = ({ icon: Icon, iconColor = "text-primary", title, action, children }: HealthSectionProps) => {
+const HealthSection = ({ icon: Icon, iconColor = "text-primary", title, action, onActionClick, children }: HealthSectionProps) => {
   return (
     <div className="rounded-xl bg-card p-5 shadow-sm border">
       <div className="flex items-center justify-between mb-4">
@@ -20,7 +21,11 @@ const HealthSection = ({ icon: Icon, iconColor = "text-primary", title, action, 
           <h3 className="text-base font-semibold text-foreground">{title}</h3>
         </div>
         {action && (
-          <button className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+          <button
+            type="button"
+            onClick={onActionClick}
+            className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+          >
             + {action}
           </button>
         )}

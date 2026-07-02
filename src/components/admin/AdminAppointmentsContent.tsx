@@ -27,7 +27,7 @@ import { fetchDoctors } from "@/lib/master-data-api";
 
 import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
 import {
-  ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR, ADMIN_STATUS_DOT,
+  ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR, ADMIN_STATUS_DOT, WALK_IN_LABEL,
 } from "@/types/admin-appointment";
 
 import WalkInDialog from "./appointments/WalkInDialog";
@@ -218,7 +218,7 @@ export default function AdminAppointmentsContent() {
 
           <Button onClick={() => setWalkInOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
-            Walk-in
+             Lịch hẹn trực tiếp
           </Button>
         </div>
       </div>
@@ -303,7 +303,7 @@ export default function AdminAppointmentsContent() {
         ) : (
           <>
             {/* Table header */}
-            <div className="grid grid-cols-[2.5rem_5rem_1fr_8rem_9rem_8rem_6rem] items-center gap-3 border-b px-4 py-3 bg-muted/40">
+            <div className="grid grid-cols-[2.5rem_7.5rem_1fr_8rem_9rem_8rem_6rem] items-center gap-3 border-b px-4 py-3 bg-muted/40">
               <Checkbox
                 checked={
                   appointments.length > 0 &&
@@ -325,7 +325,7 @@ export default function AdminAppointmentsContent() {
                 <p className="text-sm text-muted-foreground">Không có lịch hẹn nào.</p>
                 <Button className="mt-4" size="sm" onClick={() => setWalkInOpen(true)}>
                   <Plus className="mr-1.5 h-4 w-4" />
-                  Tạo Walk-in
+                  Tạo lịch hẹn trực tiếp
                 </Button>
               </div>
             ) : (
@@ -429,7 +429,7 @@ function AppointmentRow({
   const color    = avatarColor(appt.id);
 
   const timeDisplay = appt.walk_in && !appt.slot_id
-    ? "Walk-in"
+    ? WALK_IN_LABEL
     : appt.start_time?.slice(0, 5) ?? "—";
 
   const isSelectable = !["CANCELLED", "COMPLETED"].includes(appt.status);
@@ -443,7 +443,7 @@ function AppointmentRow({
 
   return (
     <div
-      className={`grid grid-cols-[2.5rem_5rem_1fr_8rem_9rem_8rem_6rem] items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5" : ""}`}
+      className={`grid grid-cols-[2.5rem_7.5rem_1fr_8rem_9rem_8rem_6rem] items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5" : ""}`}
       onClick={onClick}
     >
       {/* Checkbox */}
@@ -456,7 +456,7 @@ function AppointmentRow({
       </div>
 
       {/* Time */}
-      <span className={`text-base font-bold ${timeDisplay === "Walk-in" ? "text-orange-600 text-sm" : "text-foreground"}`}>
+      <span className={`font-bold ${timeDisplay === WALK_IN_LABEL ? "text-orange-600 text-[11px] leading-tight" : "text-base text-foreground"}`}>
         {timeDisplay}
       </span>
 
@@ -485,9 +485,9 @@ function AppointmentRow({
             )}
           </p>
           <p className="text-xs text-muted-foreground font-mono">
-            #{appt.id.slice(0, 6).toUpperCase()}
+            {/* #{appt.id.slice(0, 6).toUpperCase()} */}
             {appt.walk_in && (
-              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">Walk-in</Badge>
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 whitespace-nowrap">{WALK_IN_LABEL}</Badge>
             )}
           </p>
         </div>

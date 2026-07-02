@@ -75,7 +75,7 @@ export type QuestionnaireWithSections = Questionnaire & {
 
 export const STATUS_LABELS: Record<QuestionnaireStatus, string> = {
   DRAFT: 'Bản nháp',
-  ACTIVE: 'Đang hoạt động',
+  ACTIVE: 'Đã xuất bản',
   ARCHIVED: 'Lưu trữ',
 };
 

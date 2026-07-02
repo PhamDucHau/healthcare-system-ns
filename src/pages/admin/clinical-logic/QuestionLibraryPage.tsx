@@ -13,14 +13,15 @@ import {
   fetchQuestionnaires, deleteQuestionnaire, mapQuestionnaireError,
 } from "@/lib/questionnaire-api";
 import type { Questionnaire, QuestionnaireStatus } from "@/types/questionnaire";
+import { STATUS_LABELS } from "@/types/questionnaire";
 
 const PAGE_SIZE = 10;
 type SortKey = "updated_at" | "name" | "status";
 
 const STATUS_DISPLAY: Record<QuestionnaireStatus, { label: string; pill: string; dot: string }> = {
-  DRAFT:    { label: "DRAFT",     pill: "bg-orange-50 text-orange-600",  dot: "bg-orange-500" },
-  ACTIVE:   { label: "PUBLISHED", pill: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
-  ARCHIVED: { label: "ARCHIVED",  pill: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
+  DRAFT:    { label: STATUS_LABELS.DRAFT,    pill: "bg-orange-50 text-orange-600",  dot: "bg-orange-500" },
+  ACTIVE:   { label: STATUS_LABELS.ACTIVE,   pill: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  ARCHIVED: { label: STATUS_LABELS.ARCHIVED, pill: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
 };
 
 const ICON_BG = ["bg-accent text-primary", "bg-muted text-muted-foreground"] as const;
@@ -28,7 +29,7 @@ const ICON_BG = ["bg-accent text-primary", "bg-muted text-muted-foreground"] as 
 function StatusBadge({ status }: { status: QuestionnaireStatus }) {
   const cfg = STATUS_DISPLAY[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${cfg.pill}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide whitespace-nowrap ${cfg.pill}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
@@ -122,7 +123,7 @@ export default function QuestionLibraryPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -240,7 +241,7 @@ export default function QuestionLibraryPage() {
                     <th className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24">
                       Phiên bản
                     </th>
-                    <th className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-32">
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-40">
                       Trạng thái
                     </th>
                     <th className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-24">

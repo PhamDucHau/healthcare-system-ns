@@ -66,7 +66,7 @@ const BookAppointment = () => {
             {/* Progress bar */}
             <div className="mb-2">
               <p className="text-xs text-primary font-bold uppercase tracking-widest mb-1">
-                BOOKING PROCESS
+                QUY TRÌNH ĐẶT LỊCH KHÁM
               </p>
               <h1 className="text-2xl font-bold text-foreground mb-3">
                 {step === 1 && 'Chọn chuyên khoa'}
