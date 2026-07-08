@@ -85,7 +85,7 @@ const Landing = () => {
               <span className="text-primary">PrEP trao quyền cho bạn.</span>
             </h1>
             <p className="text-muted-foreground text-base md:text-lg max-w-md mb-8">
-              Bỏ qua phòng chờ. Tiếp cận dịch vụ chăm sóc sức khỏe tình dục chuyên biệt, toàn diện ngay tại nhà. An toàn, kín đáo và được thiết kế cho cộng đồng của chúng ta.
+              Bỏ qua phòng chờ. Tiếp cận dịch vụ chăm sóc sức khỏe chuyên biệt, toàn diện ngay tại nhà. An toàn, kín đáo và được thiết kế cho cộng đồng của chúng ta.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link to="/signup" className="rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity">
