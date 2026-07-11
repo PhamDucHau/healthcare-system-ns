@@ -1,5 +1,6 @@
 import { clientIp, clientUserAgent, writeAuditLog } from "../_shared/audit.ts";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
+import { clearPatientDobSession, getRedis } from "../_shared/redis.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 
 /** AC7: invalidate refresh token on logout */
@@ -46,6 +47,14 @@ Deno.serve(async (req) => {
         if (!res.ok) {
           console.error("[portal-logout] auth logout", res.status);
         }
+      }
+    }
+
+    if (userId) {
+      try {
+        await clearPatientDobSession(getRedis(), userId);
+      } catch {
+        /* best-effort */
       }
     }
 

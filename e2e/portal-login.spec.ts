@@ -19,7 +19,7 @@ test.describe("Unified login", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("patient redirects to /home", async ({ page }) => {
+  test("patient login requires DOB step on login page", async ({ page }) => {
     await mockUnifiedLoginApis(page);
     await page.goto("/login");
 
@@ -27,7 +27,7 @@ test.describe("Unified login", () => {
     await page.locator("#password").fill(portalLoginTestData.patient.password);
     await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-    await expect(page).toHaveURL(/\/home/);
+    await expect(page.getByRole("heading", { name: "Xác nhận ngày sinh" })).toBeVisible();
   });
 
   test("doctor redirects to provider portal", async ({ page }) => {

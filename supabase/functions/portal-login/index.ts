@@ -8,11 +8,19 @@ import {
   portalLoginMessage,
   REFRESH_TTL_SECONDS,
 } from "../_shared/portal.ts";
+import { getAdminClient } from "../_shared/supabase-admin.ts";
+import { fetchPatientDob, dobValuesMatch, isValidIsoDate } from "../_shared/patient-dob.ts";
 import {
+  dobAttemptKey,
+  dobLockKey,
+  dobVerifiedKey,
+  DOB_LOCK_TTL_SECONDS,
+  DOB_VERIFIED_TTL_SECONDS,
   getRedis,
   loginAttemptKey,
   loginLockKey,
   LOGIN_LOCK_TTL_SECONDS,
+  MAX_DOB_ATTEMPTS,
   MAX_LOGIN_ATTEMPTS,
 } from "../_shared/redis.ts";
 import {
@@ -22,7 +30,6 @@ import {
   syncRoleToAppMetadata,
 } from "../_shared/user-profile.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
-import { getAdminClient } from "../_shared/supabase-admin.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ADMIN_MFA_TTL_SECONDS = 300;
@@ -78,9 +85,13 @@ Deno.serve(async (req) => {
       email?: string;
       password?: string;
       portal?: string;
+      date_of_birth?: string;
     };
     const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const submittedDob = typeof body.date_of_birth === "string"
+      ? body.date_of_birth.trim()
+      : "";
     const portalRaw = typeof body.portal === "string" ? body.portal.trim() : "";
     const unifiedMode = !portalRaw || portalRaw === "auto";
     const requestedPortal = unifiedMode ? null : portalRaw;
@@ -333,6 +344,153 @@ Deno.serve(async (req) => {
         mfaToken,
         expiresIn: ADMIN_MFA_TTL_SECONDS,
         message: "Vui lòng nhập mã OTP đã gửi tới email của bạn",
+      });
+    }
+
+    // Bệnh nhân phải xác nhận DOB trước khi nhận session
+    if (userRole === "patient") {
+      const patientRecord = await fetchPatientDob(admin, userId);
+
+      if (!patientRecord?.date_of_birth) {
+        await writeAuditLog(admin, {
+          eventType: "LOGIN_SUCCESS",
+          userId,
+          email,
+          ipAddress: ip,
+          userAgent,
+          metadata: {
+            portal: unifiedMode ? "unified" : requestedPortal,
+            role: userRole,
+            dobSkipped: true,
+            reason: "onboarding_required",
+          },
+        });
+
+        return jsonResponse({
+          message: "Đăng nhập thành công",
+          portal: userRole,
+          role: userRole,
+          accessExpiresIn: ACCESS_TTL_BY_ROLE[userRole],
+          refreshExpiresIn: REFRESH_TTL_SECONDS,
+          session: {
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+            expires_in: session.expires_in,
+            expires_at: session.expires_at,
+            token_type: session.token_type,
+          },
+        });
+      }
+
+      if (!submittedDob) {
+        await revokeSession(session.access_token, session.refresh_token);
+        return jsonResponse({
+          requiresDob: true,
+          message: "Vui lòng nhập ngày sinh để hoàn tất đăng nhập",
+        });
+      }
+
+      if (!isValidIsoDate(submittedDob)) {
+        await revokeSession(session.access_token, session.refresh_token);
+        return jsonResponse({
+          error: "INVALID_DOB",
+          message: "Vui lòng nhập ngày sinh hợp lệ",
+        }, 422);
+      }
+
+      const dobLock = await redis.get(dobLockKey(userId));
+      if (dobLock) {
+        await revokeSession(session.access_token, session.refresh_token);
+        const retryAfter = await redis.ttl(dobLockKey(userId));
+        return jsonResponse({
+          error: "DOB_LOCKED",
+          message: "Tạm khóa do nhập sai quá nhiều lần",
+          retryAfter: retryAfter > 0 ? retryAfter : DOB_LOCK_TTL_SECONDS,
+        }, 429);
+      }
+
+      if (!dobValuesMatch(patientRecord.date_of_birth, submittedDob)) {
+        await revokeSession(session.access_token, session.refresh_token);
+
+        const attempts = await redis.incr(dobAttemptKey(userId));
+        if (attempts === 1) {
+          await redis.expire(dobAttemptKey(userId), DOB_LOCK_TTL_SECONDS);
+        }
+
+        const attemptsLeft = Math.max(0, MAX_DOB_ATTEMPTS - attempts);
+
+        await writeAuditLog(admin, {
+          eventType: "DOB_VERIFY_FAILED",
+          userId,
+          email,
+          ipAddress: ip,
+          userAgent,
+          metadata: { reason: "DOB_MISMATCH", attemptsLeft, phase: "login" },
+        });
+
+        if (attempts >= MAX_DOB_ATTEMPTS) {
+          await redis.set(dobLockKey(userId), "1", { ex: DOB_LOCK_TTL_SECONDS });
+          await redis.del(dobAttemptKey(userId));
+          await writeAuditLog(admin, {
+            eventType: "DOB_VERIFY_LOCKED",
+            userId,
+            email,
+            ipAddress: ip,
+            userAgent,
+            metadata: { phase: "login" },
+          });
+          return jsonResponse({
+            error: "DOB_LOCKED",
+            message: "Nhập sai ngày sinh quá nhiều lần. Vui lòng thử lại sau.",
+            retryAfter: DOB_LOCK_TTL_SECONDS,
+          }, 429);
+        }
+
+        return jsonResponse({
+          error: "DOB_MISMATCH",
+          message: "Ngày sinh không khớp với hồ sơ. Vui lòng thử lại.",
+          attemptsLeft,
+        }, 401);
+      }
+
+      await redis.set(dobVerifiedKey(userId), "1", { ex: DOB_VERIFIED_TTL_SECONDS });
+      await redis.del(dobAttemptKey(userId));
+
+      await writeAuditLog(admin, {
+        eventType: "DOB_VERIFY_SUCCESS",
+        userId,
+        email,
+        ipAddress: ip,
+        userAgent,
+        metadata: { phase: "login" },
+      });
+
+      await writeAuditLog(admin, {
+        eventType: "LOGIN_SUCCESS",
+        userId,
+        email,
+        ipAddress: ip,
+        userAgent,
+        metadata: {
+          portal: unifiedMode ? "unified" : requestedPortal,
+          role: userRole,
+          dobVerified: true,
+        },
+      });
+
+      return jsonResponse({
+        message: "Đăng nhập thành công",
+        portal: userRole,
+        role: userRole,
+        accessExpiresIn: ACCESS_TTL_BY_ROLE[userRole],
+        refreshExpiresIn: REFRESH_TTL_SECONDS,
+        session: {
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_in: session.expires_in,
+          expires_at: session.expires_at,
+          token_type: session.token_type,
+        },
       });
     }
 

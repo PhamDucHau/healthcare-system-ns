@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -30,10 +31,12 @@ import AdminAppointmentsContent from "./components/admin/AdminAppointmentsConten
 import PatientRecordsManagement from "./components/patient-records/PatientRecordsManagement.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { AuthProvider } from "./hooks/use-auth.tsx";
+import { PatientDobProvider } from "./hooks/usePatientDobVerification.tsx";
 import { OnboardingFormProvider } from "./hooks/useOnboardingForm";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import OnboardingLayout from "./components/onboarding/OnboardingLayout";
 import OnboardingFormPage from "./pages/OnboardingFormPage.tsx";
+import VerifyDob from "./pages/VerifyDob.tsx";
 import ProviderPortal from "./pages/ProviderPortal";
 import ProviderDashboard from "./components/provider/ProviderDashboard";
 import ProviderPatientsPage from "./pages/provider/ProviderPatientsPage";
@@ -53,6 +56,10 @@ import { PermissionsProvider } from "./hooks/use-permissions.tsx";
 
 const queryClient = new QueryClient();
 
+function PatientRoute({ children }: { children: ReactNode }) {
+  return <ProtectedRoute requiredPortal="patient">{children}</ProtectedRoute>;
+}
+
 function RedirectClinicalLogicQuestionnaire() {
   const { id } = useParams();
   return <Navigate to={`/admin/question-library/${id}`} replace />;
@@ -61,6 +68,7 @@ function RedirectClinicalLogicQuestionnaire() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <PatientDobProvider>
       <PermissionsProvider>
       <TooltipProvider>
         <Toaster />
@@ -72,64 +80,72 @@ const App = () => (
             <Route
               path="/home"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <Home />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/account"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <Index />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/labs"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <Labs />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/appointments"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <Appointments />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/appointments/book"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <BookAppointment />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/appointments/:appointmentId/pre-consultation"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <PreConsultation />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/support"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <Support />
-                </ProtectedRoute>
+                </PatientRoute>
               }
             />
             <Route
               path="/messages"
               element={
-                <ProtectedRoute requiredPortal="patient">
+                <PatientRoute>
                   <Messages />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/verify-dob"
+              element={
+                <ProtectedRoute requiredPortal="patient">
+                  <VerifyDob />
                 </ProtectedRoute>
               }
             />
@@ -242,6 +258,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
       </PermissionsProvider>
+      </PatientDobProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

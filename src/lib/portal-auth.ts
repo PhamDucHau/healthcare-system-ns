@@ -42,6 +42,8 @@ export function loginPathForRole(role: PortalType | null): string {
 }
 
 const AUTH_RETURN_KEY = "auth_return_to";
+export const DOB_RETURN_KEY = "dob_return_to";
+export const VERIFY_DOB_PATH = "/verify-dob";
 
 /** Persist intended destination when redirecting unauthenticated users to login. */
 export function stashAuthReturnTo(path: string): void {
@@ -94,4 +96,43 @@ export function resolvePostLoginPath(
   }
 
   return target;
+}
+
+export function stashDobReturnTo(path: string): void {
+  if (!path || path === VERIFY_DOB_PATH || path.startsWith("/login")) return;
+  try {
+    sessionStorage.setItem(DOB_RETURN_KEY, path);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function peekDobReturnTo(): string | null {
+  try {
+    const value = sessionStorage.getItem(DOB_RETURN_KEY);
+    return value && isSafeReturnPath(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function consumeDobReturnTo(fallback = PORTAL_CONFIG.patient.homePath): string {
+  const value = peekDobReturnTo();
+  try {
+    sessionStorage.removeItem(DOB_RETURN_KEY);
+  } catch {
+    /* ignore */
+  }
+  return value ?? fallback;
+}
+
+/** Patient must verify DOB before entering the portal; stash intended destination first. */
+export function resolvePostLoginPathForPatient(
+  from?: { pathname: string; search?: string; hash?: string } | null,
+): string {
+  const destination = resolvePostLoginPath("patient", from);
+  if (destination !== VERIFY_DOB_PATH) {
+    stashDobReturnTo(destination);
+  }
+  return VERIFY_DOB_PATH;
 }

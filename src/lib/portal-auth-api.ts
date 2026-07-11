@@ -88,7 +88,12 @@ export type AdminMfaRequired = {
   message: string;
 };
 
-export type LoginResponse = PortalLoginResult | AdminMfaRequired;
+export type PatientDobRequired = {
+  requiresDob: true;
+  message: string;
+};
+
+export type LoginResponse = PortalLoginResult | AdminMfaRequired | PatientDobRequired;
 
 async function applyLoginSession(result: PortalLoginResult): Promise<PortalLoginResult> {
   const { error } = await supabase.auth.setSession({
@@ -104,16 +109,41 @@ async function applyLoginSession(result: PortalLoginResult): Promise<PortalLogin
 export async function unifiedLogin(
   email: string,
   password: string,
+  dateOfBirth?: string,
 ): Promise<LoginResponse> {
   const result = await postJson<LoginResponse>("portal-login", {
     email,
     password,
     portal: "auto",
+    ...(dateOfBirth ? { date_of_birth: dateOfBirth } : {}),
   });
   if ("requiresMfa" in result && result.requiresMfa) {
     return result;
   }
+  if ("requiresDob" in result && result.requiresDob) {
+    return result;
+  }
   return applyLoginSession(result as PortalLoginResult);
+}
+
+/** @deprecated Gọi unifiedLogin(email, password, dateOfBirth) thay thế */
+export async function verifyPatientDobLogin(
+  _dobToken: string,
+  dateOfBirth: string,
+  email?: string,
+  password?: string,
+): Promise<PortalLoginResult> {
+  if (!email || !password) {
+    throw new PortalAuthError(422, {
+      error: "MISSING_CREDENTIALS",
+      message: "Vui lòng đăng nhập lại",
+    });
+  }
+  const result = await unifiedLogin(email, password, dateOfBirth);
+  if ("requiresDob" in result || "requiresMfa" in result) {
+    throw new PortalAuthError(500, { message: "Xác thực thất bại" });
+  }
+  return result;
 }
 
 export async function verifyAdminMfa(

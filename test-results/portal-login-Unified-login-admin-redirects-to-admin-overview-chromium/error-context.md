@@ -6,13 +6,13 @@
 
 # Test info
 
-- Name: portal-login.spec.ts >> FR-002 Multi-portal login >> AC1: patient portal login URL works
-- Location: e2e/portal-login.spec.ts:8:3
+- Name: portal-login.spec.ts >> Unified login >> admin redirects to admin overview
+- Location: e2e/portal-login.spec.ts:46:3
 
 # Error details
 
 ```
-Error: browserType.launch: Executable doesn't exist at /var/folders/4p/f_gc2dnd55d56vdrxz_h3jm00000gn/T/cursor-sandbox-cache/445fbf294c5f55ca51b4a969cf0eafb5/playwright/chromium_headless_shell-1217/chrome-headless-shell-mac-arm64/chrome-headless-shell
+Error: browserType.launch: Executable doesn't exist at /var/folders/4p/f_gc2dnd55d56vdrxz_h3jm00000gn/T/cursor-sandbox-cache/9fec05d2e7e2b93cc48ac9d2aaa6ea8a/playwright/chromium_headless_shell-1217/chrome-headless-shell-mac-arm64/chrome-headless-shell
 ╔════════════════════════════════════════════════════════════╗
 ║ Looks like Playwright was just installed or updated.       ║
 ║ Please run the following command to download new browsers: ║

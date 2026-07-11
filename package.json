@@ -17,7 +17,7 @@
     "test:e2e:integration": "SIGNUP_E2E=true playwright test e2e/signup.integration.spec.ts",
     "supabase:start": "supabase start",
     "supabase:functions": "supabase functions serve --env-file .env --no-verify-jwt",
-    "supabase:deploy-functions": "supabase functions deploy signup-send-otp signup-verify-otp signup-complete forgot-password-send-otp forgot-password-verify-otp reset-password-complete portal-login portal-logout admin-users admin-roles --no-verify-jwt",
+    "supabase:deploy-functions": "supabase functions deploy signup-send-otp signup-verify-otp signup-complete forgot-password-send-otp forgot-password-verify-otp reset-password-complete portal-login portal-logout admin-mfa-verify patient-dob-login patient-dob-verify patient-dob-status admin-users admin-roles --no-verify-jwt",
     "supabase:db-push": "supabase db push",
     "supabase:stop": "supabase stop"
   },

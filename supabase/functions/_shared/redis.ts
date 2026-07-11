@@ -1,6 +1,6 @@
 /** Redis via Upstash REST API (Edge-compatible). Falls back to in-memory when unset (local dev only). */
 
-type RedisLike = {
+export type RedisLike = {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, opts?: { ex?: number }): Promise<void>;
   del(key: string): Promise<void>;
@@ -194,4 +194,42 @@ export const ADMIN_MFA_COOLDOWN_SECONDS = 60;
 
 export function adminMfaCooldownKey(email: string) {
   return `admin:mfa:cooldown:${email.toLowerCase()}`;
+}
+
+/** Patient DOB step-up verification */
+export const MAX_DOB_ATTEMPTS = 5;
+export const DOB_LOCK_TTL_SECONDS = 900;
+export const DOB_VERIFIED_TTL_SECONDS = 3600;
+
+export function dobAttemptKey(userId: string) {
+  return `dob:attempt:${userId}`;
+}
+
+export function dobLockKey(userId: string) {
+  return `dob:lock:${userId}`;
+}
+
+export function dobVerifiedKey(userId: string) {
+  return `dob:verified:${userId}`;
+}
+
+export async function clearPatientDobSession(
+  redis: RedisLike,
+  userId: string,
+): Promise<void> {
+  await redis.del(dobVerifiedKey(userId));
+  await redis.del(dobAttemptKey(userId));
+  await redis.del(dobLockKey(userId));
+}
+
+/** Pending patient login — DOB required before session is issued */
+export const PATIENT_DOB_LOGIN_TTL_SECONDS = 300;
+export const MAX_PATIENT_DOB_LOGIN_ATTEMPTS = 5;
+
+export function patientDobLoginSessionKey(dobToken: string) {
+  return `patient:dob:login:session:${dobToken}`;
+}
+
+export function patientDobLoginAttemptKey(dobToken: string) {
+  return `patient:dob:login:attempt:${dobToken}`;
 }

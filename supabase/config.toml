@@ -110,3 +110,12 @@ verify_jwt = true
 
 [functions.scan-pre-consult-reminders]
 verify_jwt = false
+
+[functions.patient-dob-verify]
+verify_jwt = true
+
+[functions.patient-dob-status]
+verify_jwt = true
+
+[functions.patient-dob-login]
+verify_jwt = false

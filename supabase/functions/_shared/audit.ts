@@ -19,7 +19,10 @@ export type AuditEventType =
   | "ROLE_DELETED"
   | "ADMIN_MFA_SENT"
   | "ADMIN_MFA_SUCCESS"
-  | "ADMIN_MFA_FAILED";
+  | "ADMIN_MFA_FAILED"
+  | "DOB_VERIFY_SUCCESS"
+  | "DOB_VERIFY_FAILED"
+  | "DOB_VERIFY_LOCKED";
 
 type AuditParams = {
   eventType: AuditEventType;

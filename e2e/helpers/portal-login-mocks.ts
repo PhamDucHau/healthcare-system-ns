@@ -10,10 +10,16 @@ export const portalLoginTestData = {
   admin: { email: "admin@example.com", password: "Secret12", role: "admin" },
 };
 
+export const patientDobTestData = {
+  correctDob: "1990-05-15",
+  wrongDob: "2000-01-01",
+};
+
 type MockOptions = {
   invalidCredentials?: boolean;
   locked?: boolean;
   noProfile?: boolean;
+  skipPatientDob?: boolean;
 };
 
 function roleFromEmail(email: string): "patient" | "doctor" | "admin" {
@@ -30,6 +36,7 @@ export async function mockUnifiedLoginApis(
     const payload = route.request().postDataJSON() as {
       portal?: string;
       email?: string;
+      date_of_birth?: string;
     };
 
     if (options.locked) {
@@ -72,6 +79,33 @@ export async function mockUnifiedLoginApis(
 
     const role = roleFromEmail(payload.email ?? "");
 
+    if (role === "patient" && !options.skipPatientDob) {
+      if (!payload.date_of_birth) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            requiresDob: true,
+            message: "Vui lòng nhập ngày sinh để hoàn tất đăng nhập",
+          }),
+        });
+        return;
+      }
+
+      if (payload.date_of_birth !== patientDobTestData.correctDob) {
+        await route.fulfill({
+          status: 401,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: "DOB_MISMATCH",
+            message: "Ngày sinh không khớp với hồ sơ. Vui lòng thử lại.",
+            attemptsLeft: 2,
+          }),
+        });
+        return;
+      }
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -96,6 +130,19 @@ export async function mockUnifiedLoginApis(
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ message: "OK" }),
+    });
+  });
+
+  await page.route("**/functions/v1/patient-dob-status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        verified: true,
+        locked: false,
+        retryAfter: null,
+        requiresOnboarding: false,
+      }),
     });
   });
 

@@ -4,9 +4,15 @@ import { ArrowRight, Globe, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { resolvePostLoginPath } from "@/lib/portal-auth";
-import { unifiedLogin, verifyAdminMfa, PortalAuthError } from "@/lib/portal-auth-api";
+import {
+  unifiedLogin,
+  verifyAdminMfa,
+  PortalAuthError,
+} from "@/lib/portal-auth-api";
+import { isValidIsoDate, normalizeDobValue } from "@/lib/patient-dob-validation";
 import type { PortalType } from "@/types/portal";
 import OtpStep from "@/components/auth/OtpStep";
+import DobStep from "@/components/auth/DobStep";
 
 const RESEND_COOLDOWN = 60;
 
@@ -26,16 +32,26 @@ const UnifiedLoginPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [lockSeconds, setLockSeconds] = useState(0);
 
-  // MFA state
+  // Admin MFA state
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
   const [mfaExpiresAt, setMfaExpiresAt] = useState<number | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [mfaAttemptsLeft, setMfaAttemptsLeft] = useState<number | null>(null);
 
+  // Patient DOB step (credentials already verified; DOB sent in same API)
+  const [showDobStep, setShowDobStep] = useState(false);
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [dobFieldError, setDobFieldError] = useState("");
+  const [dobAttemptsLeft, setDobAttemptsLeft] = useState<number | null>(null);
+
   useEffect(() => {
     if (isLoading || !session || !role) return;
     if (location.pathname !== "/login") return;
+    if (role === "patient") {
+      navigate("/home", { replace: true });
+      return;
+    }
     redirectAfterLogin(role);
   }, [isLoading, session, role, location.pathname, location.state]);
 
@@ -76,7 +92,21 @@ const UnifiedLoginPage = () => {
         return;
       }
 
+      if ("requiresDob" in result && result.requiresDob) {
+        setShowDobStep(true);
+        setDateOfBirth("");
+        setDobFieldError("");
+        setErrorMessage("");
+        setDobAttemptsLeft(null);
+        toast.info(result.message);
+        return;
+      }
+
       toast.success("Đăng nhập thành công");
+      if (result.role === "patient") {
+        navigate("/home", { replace: true });
+        return;
+      }
       redirectAfterLogin(result.role);
     } catch (err) {
       if (err instanceof PortalAuthError) {
@@ -87,6 +117,48 @@ const UnifiedLoginPage = () => {
         toast.error(err.message);
       } else {
         const message = err instanceof Error ? err.message : "Đăng nhập thất bại";
+        setErrorMessage(message);
+        toast.error(message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDobSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!showDobStep) return;
+
+    setDobFieldError("");
+    setErrorMessage("");
+
+    if (!dateOfBirth) {
+      setDobFieldError("Vui lòng nhập ngày sinh");
+      return;
+    }
+    if (!isValidIsoDate(dateOfBirth)) {
+      setDobFieldError("Vui lòng nhập ngày sinh hợp lệ");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await unifiedLogin(email.trim(), password, normalizeDobValue(dateOfBirth) ?? dateOfBirth);
+      toast.success("Đăng nhập thành công");
+      navigate("/home", { replace: true });
+    } catch (err) {
+      if (err instanceof PortalAuthError) {
+        if (err.code === "DOB_LOCKED") {
+          setShowDobStep(false);
+          setDateOfBirth("");
+          setDobAttemptsLeft(null);
+        }
+        if (err.attemptsLeft != null) setDobAttemptsLeft(err.attemptsLeft);
+        if (err.retryAfterSeconds) setLockSeconds(err.retryAfterSeconds);
+        setErrorMessage(err.message);
+        toast.error(err.message);
+      } else {
+        const message = err instanceof Error ? err.message : "Xác thực ngày sinh thất bại";
         setErrorMessage(message);
         toast.error(message);
       }
@@ -208,6 +280,39 @@ const UnifiedLoginPage = () => {
                       setErrorMessage("");
                     }}
                     onResend={handleMfaResend}
+                  />
+                </div>
+              </>
+            ) : showDobStep ? (
+              <>
+                <h1 className="mb-2 text-2xl font-bold leading-tight text-foreground md:text-3xl">
+                  Xác nhận ngày sinh
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Tài khoản Bệnh nhân yêu cầu xác nhận ngày sinh trước khi truy cập hồ sơ.
+                </p>
+                <div className="mt-8 rounded-xl border bg-card p-6 md:p-8">
+                  <DobStep
+                    dateOfBirth={dateOfBirth}
+                    isSubmitting={isSubmitting}
+                    errorMessage={errorMessage}
+                    fieldError={dobFieldError}
+                    lockSeconds={lockSeconds}
+                    dobExpiresAt={null}
+                    attemptsLeft={dobAttemptsLeft}
+                    onDateOfBirthChange={(value) => {
+                      setDateOfBirth(value);
+                      setDobFieldError("");
+                      setErrorMessage("");
+                    }}
+                    onSubmit={handleDobSubmit}
+                    onBack={() => {
+                      setShowDobStep(false);
+                      setDateOfBirth("");
+                      setDobFieldError("");
+                      setErrorMessage("");
+                      setDobAttemptsLeft(null);
+                    }}
                   />
                 </div>
               </>
