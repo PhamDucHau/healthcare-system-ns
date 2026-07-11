@@ -119,3 +119,12 @@ verify_jwt = true
 
 [functions.patient-dob-login]
 verify_jwt = false
+
+[functions.patient-change-password]
+verify_jwt = true
+
+[functions.patient-mfa-enroll]
+verify_jwt = true
+
+[functions.patient-mfa-verify]
+verify_jwt = true

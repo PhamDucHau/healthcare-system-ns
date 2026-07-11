@@ -213,7 +213,7 @@ const OnboardingFormPage = () => {
 
     toast.success("Hoàn tất đăng ký hồ sơ");
     resetForm();
-    navigate("/account");
+    navigate("/account/personal");
   };
 
   return (

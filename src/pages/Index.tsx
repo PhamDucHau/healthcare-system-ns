@@ -1,17 +1,5 @@
-import TopNav from "@/components/TopNav";
-import Sidebar from "@/components/Sidebar";
-import HealthHistory from "@/components/HealthHistory";
+import { Navigate } from "react-router-dom";
 
-const Index = () => {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <TopNav />
-      <div className="flex flex-1">
-        <Sidebar />
-        <HealthHistory />
-      </div>
-    </div>
-  );
-};
+const Index = () => <Navigate to="/account/personal" replace />;
 
 export default Index;

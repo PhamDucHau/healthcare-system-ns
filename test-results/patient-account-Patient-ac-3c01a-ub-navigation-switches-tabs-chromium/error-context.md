@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: patient-dob-verify.spec.ts >> Patient DOB verification >> direct /account redirects to verify-dob when unverified
-- Location: e2e/patient-dob-verify.spec.ts:66:3
+- Name: patient-account.spec.ts >> Patient account hub >> sub-navigation switches tabs
+- Location: e2e/patient-account.spec.ts:132:3
 
 # Error details
 

@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { hasPatientRecord, useMyPatientProfile } from "@/hooks/useMyPatientProfile";
 import { AlertTriangle, FileText, FileUser, Loader2, Pencil, UploadCloud, UserRound, X, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useDuplicateCheck } from "@/hooks/useDuplicateCheck";
 import { supabase } from "@/lib/supabase";
-import { mapPatientPortalRow, type PatientPortalDetail } from "@/types/patient-portal";
+import { type PatientPortalDetail } from "@/types/patient-portal";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
 type PatientProfileDialogProps = {
@@ -314,22 +315,15 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     bypassPhone, bypassNameDob, reset: resetDup,
   } = useDuplicateCheck(userId, "edit");
 
-  const { data: queryResult, isLoading, isError } = useQuery({
-    queryKey: ["patient", "my-profile", userId],
+  const { data, isLoading: profileLoading, isError: profileError } = useMyPatientProfile();
+
+  const idPath = data?.id_document_storage_path ?? null;
+  const idBackPath = data?.id_document_back_storage_path ?? null;
+  const cardPath = data?.card_front_storage_path ?? null;
+
+  const { data: imageUrls } = useQuery({
+    queryKey: ["patient", "my-profile-images", userId, idPath, idBackPath, cardPath],
     queryFn: async () => {
-      const { data: row, error } = await supabase
-        .from("patient")
-        .select("*")
-        .eq("user_id", userId as string)
-        .maybeSingle();
-      if (error) throw error;
-      if (!row) return null;
-
-      const profile = mapPatientPortalRow(row as Record<string, unknown>);
-      const idPath = profile.id_document_storage_path;
-      const idBackPath = profile.id_document_back_storage_path;
-      const cardPath = profile.card_front_storage_path;
-
       const [idResult, idBackResult, cardResult] = await Promise.all([
         idPath ? supabase.storage.from("identity-documents").createSignedUrl(idPath, 3600) : null,
         idBackPath ? supabase.storage.from("identity-documents").createSignedUrl(idBackPath, 3600) : null,
@@ -337,19 +331,19 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
       ]);
 
       return {
-        profile,
         idImageUrl: idResult?.data?.signedUrl ?? null,
         idBackImageUrl: idBackResult?.data?.signedUrl ?? null,
         cardImageUrl: cardResult?.data?.signedUrl ?? null,
       };
     },
-    enabled: open && Boolean(userId),
+    enabled: open && Boolean(userId) && hasPatientRecord(data),
   });
 
-  const data = queryResult?.profile ?? null;
-  const idImageUrl = queryResult?.idImageUrl ?? null;
-  const idBackImageUrl = queryResult?.idBackImageUrl ?? null;
-  const cardImageUrl = queryResult?.cardImageUrl ?? null;
+  const idImageUrl = imageUrls?.idImageUrl ?? null;
+  const idBackImageUrl = imageUrls?.idBackImageUrl ?? null;
+  const cardImageUrl = imageUrls?.cardImageUrl ?? null;
+  const isLoading = profileLoading && data === undefined;
+  const isError = profileError;
 
   const draftFallback = useMemo(() => readOnboardingDraft(), [open]);
 
@@ -513,6 +507,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     }
 
     await queryClient.invalidateQueries({ queryKey: ["patient", "my-profile", userId] });
+    await queryClient.invalidateQueries({ queryKey: ["patient", "my-profile-images", userId] });
     await queryClient.invalidateQueries({ queryKey: ["patient", "has-profile", userId] });
     setIsEditing(false);
     setEditData(null);
@@ -521,7 +516,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
   };
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(v) => {
         if (!isSaving) {
@@ -530,16 +525,16 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <FileUser className="h-5 w-5 text-primary" />
             Hồ sơ bệnh nhân
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Thông tin cá nhân, giấy tờ và bảo hiểm từ onboarding.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
@@ -796,9 +791,10 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
             ) : null}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 };
 
+export const PatientProfileSheet = PatientProfileDialog;
 export default PatientProfileDialog;

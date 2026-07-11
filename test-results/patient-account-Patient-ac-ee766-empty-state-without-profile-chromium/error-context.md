@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: patient-dob-verify.spec.ts >> Patient DOB verification >> correct DOB grants access to home
-- Location: e2e/patient-dob-verify.spec.ts:24:3
+- Name: patient-account.spec.ts >> Patient account hub >> personal tab shows empty state without profile
+- Location: e2e/patient-account.spec.ts:145:3
 
 # Error details
 

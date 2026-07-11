@@ -24,7 +24,9 @@ const Sidebar = () => {
 
       <nav className="flex flex-col gap-1">
         {menuItems.map(({ icon: Icon, label, path }) => {
-          const active = location.pathname === path;
+          const active = path === "/account"
+            ? location.pathname === path || location.pathname.startsWith("/account/")
+            : location.pathname === path;
           return (
             <Link
               key={label}

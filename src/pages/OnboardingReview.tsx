@@ -43,7 +43,7 @@ const OnboardingReview = () => {
       description: "Your patient profile has been submitted successfully.",
     });
     resetForm();
-    navigate("/account");
+    navigate("/account/personal");
   };
 
   return (

@@ -6,7 +6,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
 import Home from "./pages/Home.tsx";
-import Index from "./pages/Index.tsx";
+import AccountLayout from "./pages/account/AccountLayout.tsx";
+import AccountPersonalPage from "./pages/account/AccountPersonalPage.tsx";
+import AccountInsurancePage from "./pages/account/AccountInsurancePage.tsx";
+import AccountMedicalSupportPage from "./pages/account/AccountMedicalSupportPage.tsx";
+import AccountMedicalHistoryPage from "./pages/account/AccountMedicalHistoryPage.tsx";
+import AccountVitalsPage from "./pages/account/AccountVitalsPage.tsx";
+import AccountSexualHealthPage from "./pages/account/AccountSexualHealthPage.tsx";
+import AccountSettingsPage from "./pages/account/AccountSettingsPage.tsx";
 import Labs from "./pages/Labs.tsx";
 import Appointments from "./pages/Appointments.tsx";
 import BookAppointment from "./pages/BookAppointment.tsx";
@@ -89,10 +96,19 @@ const App = () => (
               path="/account"
               element={
                 <PatientRoute>
-                  <Index />
+                  <AccountLayout />
                 </PatientRoute>
               }
-            />
+            >
+              <Route index element={<Navigate to="personal" replace />} />
+              <Route path="personal" element={<AccountPersonalPage />} />
+              <Route path="insurance" element={<AccountInsurancePage />} />
+              <Route path="medical-support" element={<AccountMedicalSupportPage />} />
+              <Route path="medical-history" element={<AccountMedicalHistoryPage />} />
+              <Route path="vitals" element={<AccountVitalsPage />} />
+              <Route path="sexual-health" element={<AccountSexualHealthPage />} />
+              <Route path="settings" element={<AccountSettingsPage />} />
+            </Route>
             <Route
               path="/labs"
               element={

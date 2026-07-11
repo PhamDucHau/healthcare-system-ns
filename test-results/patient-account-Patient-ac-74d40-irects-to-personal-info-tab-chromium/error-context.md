@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: patient-dob-verify.spec.ts >> Patient DOB verification >> patient login redirects to verify-dob
-- Location: e2e/patient-dob-verify.spec.ts:12:3
+- Name: patient-account.spec.ts >> Patient account hub >> /account redirects to personal info tab
+- Location: e2e/patient-account.spec.ts:124:3
 
 # Error details
 
