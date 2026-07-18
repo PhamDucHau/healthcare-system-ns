@@ -28,7 +28,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { listPatientRecords } from "@/lib/patient-records";
 import { supabase } from "@/lib/supabase";
-import type { PatientRecordListRow } from "@/types/patient-portal";
+import {
+  formatCreatedByRole,
+  type PatientCreatedByRole,
+  type PatientRecordListRow,
+} from "@/types/patient-portal";
 
 const PATIENT_RECORDS_LIST_KEY = ["patient-records", "list"] as const;
 
@@ -52,6 +56,21 @@ function statusClass(status: PatientRecordListRow["status"]) {
   return status === "Đã nộp"
     ? "bg-emerald-100 text-emerald-800"
     : "bg-amber-100 text-amber-800";
+}
+
+function createdByRoleClass(role: PatientCreatedByRole | null) {
+  switch (role) {
+    case "patient":
+      return "bg-sky-100 text-sky-800";
+    case "doctor":
+      return "bg-violet-100 text-violet-800";
+    case "nurse":
+      return "bg-teal-100 text-teal-800";
+    case "admin":
+      return "bg-slate-100 text-slate-800";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
 }
 
 function matchesSearch(row: PatientRecordListRow, q: string): boolean {
@@ -226,6 +245,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                   <TableHead>Số CCCD</TableHead>
                   <TableHead>Mã BHYT</TableHead>
                   <TableHead>Trạng thái</TableHead>
+                  <TableHead>Nguồn tạo</TableHead>
                   <TableHead>Cập nhật</TableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
@@ -244,6 +264,13 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                     <TableCell>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(row.status)}`}>
                         {row.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex max-w-[11rem] rounded-full px-2 py-0.5 text-xs font-semibold ${createdByRoleClass(row.created_by_role)}`}
+                      >
+                        {formatCreatedByRole(row.created_by_role)}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">

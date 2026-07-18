@@ -35,6 +35,9 @@ export type PatientPortalDetail = {
   consent_accepted: boolean;
 };
 
+/** Who created the patient profile (DB `patient.created_by_role`). */
+export type PatientCreatedByRole = "patient" | "doctor" | "nurse" | "admin";
+
 /** Row for staff patient-records table */
 export type PatientRecordListRow = {
   id: string;
@@ -49,7 +52,30 @@ export type PatientRecordListRow = {
   submitted_at: string | null;
   updated_at: string | null;
   status: "Đã nộp" | "Bản nháp";
+  created_by_role: PatientCreatedByRole | null;
 };
+
+export function formatCreatedByRole(role: PatientCreatedByRole | null | undefined): string {
+  switch (role) {
+    case "patient":
+      return "Bệnh nhân tự đăng ký";
+    case "doctor":
+      return "Bác sĩ tạo";
+    case "nurse":
+      return "Điều dưỡng / Y tá tạo";
+    case "admin":
+      return "Admin tạo";
+    default:
+      return "Không xác định";
+  }
+}
+
+function parseCreatedByRole(value: unknown): PatientCreatedByRole | null {
+  if (value === "patient" || value === "doctor" || value === "nurse" || value === "admin") {
+    return value;
+  }
+  return null;
+}
 
 export type PatientListItem = {
   id: string;
@@ -141,6 +167,7 @@ export function mapPatientRecordListRow(row: Record<string, unknown>): PatientRe
     submitted_at,
     updated_at: row.updated_at != null ? String(row.updated_at) : null,
     status: submitted_at ? "Đã nộp" : "Bản nháp",
+    created_by_role: parseCreatedByRole(row.created_by_role),
   };
 }
 

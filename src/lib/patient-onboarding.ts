@@ -83,6 +83,8 @@ export async function submitPatientProfile(
     consent_accepted: form.acceptedPrivacy,
     submitted_at: submittedAt,
     status: "UNVERIFIED",
+    created_by: userId,
+    created_by_role: "patient" as const,
   };
 
   const { error } = await supabase.from("patient").upsert(row, { onConflict: "user_id" });

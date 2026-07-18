@@ -16,7 +16,7 @@ export async function listPatientRecords(
     const fallback = await supabase
       .from("patient")
       .select(
-        "id, user_id, legal_first_name, legal_last_name, date_of_birth, phone_number, email_address, id_number, member_id, insurance_provider, submitted_at, updated_at",
+        "id, user_id, legal_first_name, legal_last_name, date_of_birth, phone_number, email_address, id_number, member_id, insurance_provider, submitted_at, updated_at, created_by_role",
       )
       .order("updated_at", { ascending: false });
 
