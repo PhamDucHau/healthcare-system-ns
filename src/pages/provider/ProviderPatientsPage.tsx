@@ -158,6 +158,7 @@ function demoToDetail(demo: DemoPatient): PatientPortalDetail {
     id_document_storage_path: null,
     id_document_back_storage_path: null,
     card_front_storage_path: null,
+    avatar_storage_path: null,
     bhyt_name: null,
     bhyt_dob: null,
     bhyt_gender: null,

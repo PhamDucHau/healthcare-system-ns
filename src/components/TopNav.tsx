@@ -2,8 +2,11 @@ import { User, Menu, Home, Calendar } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyPatientProfile } from "@/hooks/useMyPatientProfile";
+import { createAvatarSignedUrl } from "@/lib/patient-avatar-api";
 import { portalLogout } from "@/lib/portal-auth-api";
 import { loginPathForRole } from "@/lib/portal-auth";
 
@@ -13,11 +16,41 @@ const menuItems = [
   { icon: Calendar, label: "Lịch hẹn", path: "/appointments" },
 ];
 
+function UserAvatarBubble({
+  avatarUrl,
+  className,
+  iconClassName,
+}: {
+  avatarUrl: string | null | undefined;
+  className: string;
+  iconClassName: string;
+}) {
+  return (
+    <div className={`overflow-hidden ${className}`}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <User className={iconClassName} />
+      )}
+    </div>
+  );
+}
+
 const TopNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const { session, role } = useAuth();
+  const userId = session?.user?.id;
+  const { data: profile } = useMyPatientProfile();
+  const avatarPath = profile?.avatar_storage_path ?? null;
+
+  const { data: avatarUrl } = useQuery({
+    queryKey: ["patient", "my-avatar-url", userId, avatarPath],
+    queryFn: () => createAvatarSignedUrl(avatarPath),
+    enabled: Boolean(userId && avatarPath),
+    staleTime: 30 * 60 * 1000,
+  });
 
   const handleSignOut = async () => {
     try {
@@ -46,9 +79,11 @@ const TopNav = () => {
             </div>
             <div className="p-4">
               <div className="flex items-center gap-3 p-3 mb-2">
-                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                </div>
+                <UserAvatarBubble
+                  avatarUrl={avatarUrl}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted"
+                  iconClassName="h-5 w-5 text-muted-foreground"
+                />
                 <div>
                   <p className="text-sm font-semibold text-foreground">Chào mừng trở lại</p>
                   <p className="text-xs text-muted-foreground truncate max-w-44">
@@ -107,9 +142,17 @@ const TopNav = () => {
         >
           Đăng xuất
         </button>
-        <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center">
-          <User className="h-4 w-4 text-primary-foreground" />
-        </div>
+        <Link
+          to="/account/personal"
+          aria-label="Thông tin cá nhân"
+          className="block"
+        >
+          <UserAvatarBubble
+            avatarUrl={avatarUrl}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary"
+            iconClassName="h-4 w-4 text-primary-foreground"
+          />
+        </Link>
       </div>
     </header>
   );

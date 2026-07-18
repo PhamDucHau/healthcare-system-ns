@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
+  Camera,
   CheckCircle2,
   FileClock,
   IdCard,
@@ -12,21 +14,70 @@ import {
   UploadCloud,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 import PatientProfileSheet from "@/components/patient/PatientProfileDialog";
 import {
   formatDob,
   ProfileDetailField,
   profileInitials,
 } from "@/components/account/ProfileDetailField";
+import { useAuth } from "@/hooks/use-auth";
 import { hasPatientRecord, useMyPatientProfile } from "@/hooks/useMyPatientProfile";
+import {
+  createAvatarSignedUrl,
+  uploadPatientAvatar,
+  validateAvatarFile,
+} from "@/lib/patient-avatar-api";
 import { Button } from "@/components/ui/button";
 
 const AccountPersonalPage = () => {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const userId = session?.user?.id;
   const { data: profile, isLoading, isError, error } = useMyPatientProfile();
+
+  const avatarPath = profile?.avatar_storage_path ?? null;
+  const { data: avatarUrl } = useQuery({
+    queryKey: ["patient", "my-avatar-url", userId, avatarPath],
+    queryFn: () => createAvatarSignedUrl(avatarPath),
+    enabled: Boolean(userId && avatarPath),
+    staleTime: 30 * 60 * 1000,
+  });
 
   const recordExists = hasPatientRecord(profile);
   const waitingForProfile = isLoading && profile === undefined;
+
+  const handleAvatarPick = () => {
+    if (isUploadingAvatar) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (file: File | null) => {
+    if (!file || !userId) return;
+    const validationError = validateAvatarFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      await uploadPatientAvatar(userId, file);
+      await queryClient.invalidateQueries({ queryKey: ["patient", "my-profile", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["patient", "my-avatar-url", userId] });
+      toast.success("Đã cập nhật ảnh đại diện");
+    } catch (e) {
+      toast.error("Không tải được ảnh đại diện", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   return (
     <section>
@@ -63,9 +114,39 @@ const AccountPersonalPage = () => {
             <div className="pointer-events-none absolute -bottom-12 right-24 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl font-bold ring-1 ring-white/30 backdrop-blur">
-                  {profileInitials(profile.full_name)}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleAvatarPick}
+                  disabled={isUploadingAvatar}
+                  aria-label="Cập nhật ảnh đại diện"
+                  className="group relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/15 text-xl font-bold ring-1 ring-white/30 backdrop-blur transition hover:ring-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-70"
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    profileInitials(profile.full_name)
+                  )}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/35">
+                    {isUploadingAvatar ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-white opacity-100" />
+                    ) : (
+                      <Camera className="h-5 w-5 text-white opacity-0 transition group-hover:opacity-100" />
+                    )}
+                  </span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    void handleAvatarChange(e.target.files?.[0] ?? null);
+                  }}
+                />
                 <div className="min-w-0">
                   <p className="text-xl font-bold uppercase tracking-wide">
                     {profile.full_name || "Bệnh nhân"}
@@ -84,6 +165,9 @@ const AccountPersonalPage = () => {
                       </span>
                     ) : null}
                   </div>
+                  <p className="mt-1 text-[11px] text-primary-foreground/70">
+                    Nhấn ảnh để đổi ảnh đại diện
+                  </p>
                 </div>
               </div>
               <span
