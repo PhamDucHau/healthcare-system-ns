@@ -1,4 +1,4 @@
-import { Globe, User, Menu, Home, Calendar } from "lucide-react";
+import { User, Menu, Home, Calendar } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -6,11 +6,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { portalLogout } from "@/lib/portal-auth-api";
 import { loginPathForRole } from "@/lib/portal-auth";
-
-const navItems = [
-  { label: "Trang chủ", path: "/home" },
-  { label: "Lịch hẹn", path: "/appointments" },
-];
 
 const menuItems = [
   { icon: Home, label: "Trang chủ", path: "/home" },
@@ -100,32 +95,11 @@ const TopNav = () => {
         </Sheet>
 
         <Link to="/" className="text-lg font-bold text-primary">Rcare Plus</Link>
-        <nav className="hidden md:flex items-center gap-6">
-          {navItems.map(({ label, path }) => {
-            const isActive = location.pathname === path;
-            return (
-              <Link
-                key={label}
-                to={path}
-                className={`text-sm font-medium transition-colors ${
-                  isActive
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
       </div>
       <div className="flex items-center gap-3">
         <span className="hidden md:block text-xs text-muted-foreground max-w-40 truncate">
           {session?.user.email}
         </span>
-        {/* <button className="p-2 rounded-lg hover:bg-muted transition-colors">
-          <Globe className="h-5 w-5 text-muted-foreground" />
-        </button> */}
         <button
           type="button"
           onClick={handleSignOut}
