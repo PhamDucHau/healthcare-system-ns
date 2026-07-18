@@ -48,7 +48,7 @@ const LabOrders = () => {
         {/* Hero Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-accent to-accent/40 p-6 md:p-8 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
-            Your Lab Results & <span className="italic text-primary">Tracking</span>
+            Your Lab Results & <span className="text-primary">Tracking</span>
           </h1>
           <p className="text-muted-foreground text-sm md:text-base max-w-lg">
             Stay updated on your health journey. Monitor active orders and securely upload external records.

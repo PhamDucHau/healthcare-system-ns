@@ -280,7 +280,7 @@ const Signup = () => {
             </span>
             <h1 className="mb-4 text-3xl font-bold leading-tight text-foreground md:text-4xl">
               A clinical sanctuary built around{" "}
-              <span className="italic text-primary">you</span>.
+              <span className="text-primary">you</span>.
             </h1>
             <p className="mb-8 max-w-sm text-sm leading-relaxed text-muted-foreground">
               Đăng ký 3 bước: Email → OTP → Mật khẩu.

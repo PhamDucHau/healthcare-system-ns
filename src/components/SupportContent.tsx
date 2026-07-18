@@ -46,7 +46,7 @@ const SupportContent = () => {
         {/* Hero Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-accent to-accent/40 p-6 md:p-10 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
-            How can we <span className="italic text-primary">help you</span> today?
+            How can we <span className="text-primary">help you</span> today?
           </h1>
           <div className="mt-5 max-w-xl">
             <div className="flex items-center gap-3 rounded-xl bg-card px-4 py-3 shadow-sm">
