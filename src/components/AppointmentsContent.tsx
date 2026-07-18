@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
-  Calendar, Plus, Loader2, QrCode, XCircle, ChevronRight, Stethoscope, ClipboardList, CheckCircle2,
+  Calendar, Plus, Loader2, QrCode, XCircle, Stethoscope, ClipboardList, CheckCircle2,
 } from 'lucide-react';
 import CheckinButton from '@/components/patient/booking/CheckinButton';
 import QrCodeDisplay from '@/components/common/QrCodeDisplay';
@@ -112,7 +112,6 @@ export default function AppointmentsContent() {
                           <Th>Chuyên khoa</Th>
                           <Th>Ghi chú</Th>
                           <Th>Trạng thái</Th>
-                          <Th right>Chi tiết</Th>
                         </tr>
                       </thead>
                       <tbody>
@@ -269,12 +268,6 @@ function PastRow({ apt }: { apt: Appointment }) {
       </td>
       <td className="px-5 py-4">
         <StatusBadge status={apt.status} />
-      </td>
-      <td className="px-5 py-4 text-right">
-        <button className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-          Xem
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
       </td>
     </tr>
   );
