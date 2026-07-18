@@ -9,6 +9,7 @@ import CheckinButton from '@/components/patient/booking/CheckinButton';
 import QrCodeDisplay from '@/components/common/QrCodeDisplay';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { fetchMyAppointments, cancelAppointment, mapBookingError } from '@/lib/appointment-api';
 import {
   STATUS_LABELS, STATUS_COLORS, formatSlotTime,
@@ -61,13 +62,15 @@ export default function AppointmentsContent() {
               Quản lý lịch khám sắp tới và xem lịch sử khám.
             </p>
           </div>
-          <button
-            onClick={() => navigate('/appointments/book')}
-            className="mt-4 sm:mt-0 flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            <Plus className="h-4 w-4" />
-            Đặt lịch khám
-          </button>
+          {!loading && upcoming.length > 0 && (
+            <Button
+              onClick={() => navigate('/appointments/book')}
+              className="mt-4 sm:mt-0"
+            >
+              <Plus className="h-4 w-4" />
+              Đặt lịch khám
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -299,12 +302,9 @@ function EmptyState({ message, action }: { message: string; action?: { label: st
       <Calendar className="h-10 w-10 text-muted-foreground/40" />
       <p className="text-sm text-muted-foreground">{message}</p>
       {action && (
-        <button
-          onClick={action.onClick}
-          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-        >
+        <Button onClick={action.onClick}>
           {action.label}
-        </button>
+        </Button>
       )}
     </div>
   );
