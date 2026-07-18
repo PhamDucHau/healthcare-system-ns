@@ -1,11 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { hasPatientRecord, useMyPatientProfile } from "@/hooks/useMyPatientProfile";
-import { AlertTriangle, FileText, FileUser, Loader2, Pencil, UploadCloud, UserRound, X, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  FileUser,
+  Loader2,
+  Pencil,
+  ScanSearch,
+  UploadCloud,
+  UserRound,
+  X,
+  XCircle,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useDuplicateCheck } from "@/hooks/useDuplicateCheck";
+import {
+  fetchOcrSingle,
+  mapBhytParsedToInsuranceUpdates,
+  mapCccdParsedToFormUpdates,
+  type BhytParsed,
+  type CccdParsed,
+} from "@/lib/cccd-ocr";
 import { supabase } from "@/lib/supabase";
 import { type PatientPortalDetail } from "@/types/patient-portal";
 import {
@@ -46,6 +64,55 @@ type EditFiles = {
 };
 
 const emptyEditFiles: EditFiles = { idFile: null, idBackFile: null, cardFile: null };
+
+type OcrSlot = "all" | "front" | "back" | "bhyt";
+
+async function fileFromUrl(url: string, name: string): Promise<File> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Không tải được ảnh để OCR");
+  const blob = await res.blob();
+  return new File([blob], name, { type: blob.type || "image/jpeg" });
+}
+
+async function resolveOcrFile(
+  newFile: File | null,
+  url: string | null,
+  fallbackName: string,
+): Promise<File> {
+  if (newFile) return newFile;
+  if (!url) throw new Error("Chưa có ảnh để OCR");
+  return fileFromUrl(url, fallbackName);
+}
+
+function overwriteIfPresent(current: string, incoming: string | undefined): string {
+  const trimmed = incoming?.trim();
+  return trimmed ? trimmed : current;
+}
+
+function applyCccdOcrOverwrite(edit: EditData, parsed: CccdParsed): EditData {
+  const { identity, personal, gender } = mapCccdParsedToFormUpdates(parsed);
+  return {
+    ...edit,
+    legalFirstName: overwriteIfPresent(edit.legalFirstName, personal.legalFirstName),
+    legalLastName: overwriteIfPresent(edit.legalLastName, personal.legalLastName),
+    dateOfBirth: overwriteIfPresent(edit.dateOfBirth, personal.dateOfBirth),
+    idNumber: overwriteIfPresent(edit.idNumber, identity.idNumber),
+    idIssuer: overwriteIfPresent(edit.idIssuer, identity.issuer),
+    idIssuedDate: overwriteIfPresent(edit.idIssuedDate, identity.issuedDate),
+    idExpirationDate: overwriteIfPresent(edit.idExpirationDate, identity.expirationDate),
+    residentialAddress: overwriteIfPresent(edit.residentialAddress, identity.residentialAddress),
+    pronouns: overwriteIfPresent(edit.pronouns, gender),
+  };
+}
+
+function applyBhytOcrOverwrite(edit: EditData, parsed: BhytParsed): EditData {
+  const updates = mapBhytParsedToInsuranceUpdates(parsed);
+  return {
+    ...edit,
+    insuranceProvider: overwriteIfPresent(edit.insuranceProvider, updates.provider),
+    memberId: overwriteIfPresent(edit.memberId, updates.memberId),
+  };
+}
 
 function sanitizeStorageSegment(fileName: string): string {
   const ascii = fileName.trim().replace(/[^\w.\-]+/g, "_");
@@ -213,6 +280,9 @@ function EditableDocPreview({
   existingPath,
   newFile,
   onFileSelect,
+  onOcr,
+  ocrLoading,
+  ocrDisabled,
 }: {
   inputId: string;
   label: string;
@@ -220,6 +290,9 @@ function EditableDocPreview({
   existingPath: string | null;
   newFile: File | null;
   onFileSelect: (f: File | null) => void;
+  onOcr?: () => void;
+  ocrLoading?: boolean;
+  ocrDisabled?: boolean;
 }) {
   const [previewUrl, setPreviewUrl] = useState("");
 
@@ -237,6 +310,7 @@ function EditableDocPreview({
     !newFile && existingUrl && (existingPath ?? "").toLowerCase().endsWith(".pdf");
   const showNewPdf = newFile && !newFile.type.startsWith("image/");
   const displayImageUrl = previewUrl || (!newFile ? existingUrl : null);
+  const hasImage = Boolean(newFile || existingUrl);
 
   return (
     <div className="overflow-hidden rounded-lg border border-primary/30">
@@ -272,9 +346,28 @@ function EditableDocPreview({
             Thay ảnh
           </span>
         </label>
+        {onOcr && hasImage ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onOcr();
+            }}
+            disabled={ocrLoading || ocrDisabled}
+            className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-primary shadow hover:bg-white disabled:opacity-50"
+          >
+            {ocrLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <ScanSearch className="h-3 w-3" aria-hidden="true" />
+            )}
+            {ocrLoading ? "OCR…" : "OCR lại"}
+          </button>
+        ) : null}
         <label
           htmlFor={inputId}
-          className="absolute bottom-2 right-2 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-foreground shadow hover:bg-white"
+          className="absolute bottom-2 right-2 z-10 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-foreground shadow hover:bg-white"
         >
           <UploadCloud className="h-3 w-3" />
           Thay ảnh
@@ -307,6 +400,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState<EditData | null>(null);
   const [editFiles, setEditFiles] = useState<EditFiles>(emptyEditFiles);
+  const [ocrSlot, setOcrSlot] = useState<OcrSlot | null>(null);
 
   const {
     dupState, bypassed,
@@ -392,6 +486,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     if (!data) return;
     setEditData(profileToEditData(data));
     setEditFiles(emptyEditFiles);
+    setOcrSlot(null);
     setIsEditing(true);
   };
 
@@ -399,7 +494,105 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     setIsEditing(false);
     setEditData(null);
     setEditFiles(emptyEditFiles);
+    setOcrSlot(null);
     resetDup();
+  };
+
+  const runSlotOcr = async (slot: "front" | "back" | "bhyt"): Promise<boolean> => {
+    const file =
+      slot === "front"
+        ? await resolveOcrFile(editFiles.idFile, idImageUrl, "cccd-front.jpg")
+        : slot === "back"
+          ? await resolveOcrFile(editFiles.idBackFile, idBackImageUrl, "cccd-back.jpg")
+          : await resolveOcrFile(editFiles.cardFile, cardImageUrl, "bhyt.jpg");
+
+    if (slot === "bhyt") {
+      const json = await fetchOcrSingle(file, "bhyt", "front");
+      if (!json.parsed || typeof json.parsed !== "object") {
+        throw new Error("OCR không trả về dữ liệu.");
+      }
+      setEditData((prev) => (prev ? applyBhytOcrOverwrite(prev, json.parsed as BhytParsed) : prev));
+      return true;
+    }
+
+    const json = await fetchOcrSingle(file, "cccd", "front");
+    if (!json.parsed || typeof json.parsed !== "object") {
+      throw new Error("OCR không trả về dữ liệu.");
+    }
+    setEditData((prev) => (prev ? applyCccdOcrOverwrite(prev, json.parsed as CccdParsed) : prev));
+    return true;
+  };
+
+  const handleOcrSlot = async (slot: "front" | "back" | "bhyt") => {
+    if (!editData || ocrSlot) return;
+    const hasSource =
+      slot === "front"
+        ? Boolean(editFiles.idFile || idImageUrl)
+        : slot === "back"
+          ? Boolean(editFiles.idBackFile || idBackImageUrl)
+          : Boolean(editFiles.cardFile || cardImageUrl);
+    if (!hasSource) {
+      toast.info("Chưa có ảnh để OCR");
+      return;
+    }
+
+    setOcrSlot(slot);
+    try {
+      await runSlotOcr(slot);
+      const label =
+        slot === "front" ? "CCCD mặt trước" : slot === "back" ? "CCCD mặt sau" : "BHYT";
+      toast.success(`OCR lại ${label} hoàn tất`);
+    } catch (e) {
+      toast.error("OCR thất bại", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setOcrSlot(null);
+    }
+  };
+
+  const handleOcrAll = async () => {
+    if (!editData || ocrSlot) return;
+
+    const slots = (
+      [
+        editFiles.idFile || idImageUrl ? "front" : null,
+        editFiles.idBackFile || idBackImageUrl ? "back" : null,
+        editFiles.cardFile || cardImageUrl ? "bhyt" : null,
+      ] as const
+    ).filter((s): s is "front" | "back" | "bhyt" => s != null);
+
+    if (slots.length === 0) {
+      toast.info("Chưa có ảnh giấy tờ để OCR");
+      return;
+    }
+
+    setOcrSlot("all");
+    let ok = 0;
+    const errors: string[] = [];
+    for (const slot of slots) {
+      try {
+        await runSlotOcr(slot);
+        ok += 1;
+      } catch (e) {
+        const label =
+          slot === "front" ? "mặt trước" : slot === "back" ? "mặt sau" : "BHYT";
+        errors.push(`${label}: ${e instanceof Error ? e.message : "lỗi"}`);
+      }
+    }
+    setOcrSlot(null);
+
+    if (ok === slots.length) {
+      toast.success(`OCR lại tất cả hoàn tất (${ok}/${slots.length})`);
+    } else if (ok > 0) {
+      toast.warning(`OCR một phần (${ok}/${slots.length})`, {
+        description: errors.join("; "),
+      });
+    } else {
+      toast.error("OCR lại tất cả thất bại", {
+        description: errors.join("; "),
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -678,7 +871,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
               <section>
                 <h3 className="mb-2 text-sm font-semibold text-foreground">Ảnh giấy tờ đã tải lên</h3>
                 <p className="mb-3 text-xs text-muted-foreground">
-                  Hover vào ảnh và nhấn <strong>Thay ảnh</strong> để cập nhật.
+                  Hover vào ảnh và nhấn <strong>Thay ảnh</strong> để cập nhật, hoặc <strong>OCR lại</strong> để nhận diện từ ảnh hiện có.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <EditableDocPreview
@@ -688,6 +881,9 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                     existingPath={profile.id_document_storage_path}
                     newFile={editFiles.idFile}
                     onFileSelect={(f) => setEditFiles((prev) => ({ ...prev, idFile: f }))}
+                    onOcr={() => void handleOcrSlot("front")}
+                    ocrLoading={ocrSlot === "front" || ocrSlot === "all"}
+                    ocrDisabled={Boolean(ocrSlot)}
                   />
                   <EditableDocPreview
                     inputId="edit-id-back"
@@ -696,6 +892,9 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                     existingPath={profile.id_document_back_storage_path}
                     newFile={editFiles.idBackFile}
                     onFileSelect={(f) => setEditFiles((prev) => ({ ...prev, idBackFile: f }))}
+                    onOcr={() => void handleOcrSlot("back")}
+                    ocrLoading={ocrSlot === "back" || ocrSlot === "all"}
+                    ocrDisabled={Boolean(ocrSlot)}
                   />
                   <EditableDocPreview
                     inputId="edit-card-front"
@@ -704,7 +903,35 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                     existingPath={profile.card_front_storage_path}
                     newFile={editFiles.cardFile}
                     onFileSelect={(f) => setEditFiles((prev) => ({ ...prev, cardFile: f }))}
+                    onOcr={() => void handleOcrSlot("bhyt")}
+                    ocrLoading={ocrSlot === "bhyt" || ocrSlot === "all"}
+                    ocrDisabled={Boolean(ocrSlot)}
                   />
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    className="gap-1.5"
+                    disabled={
+                      Boolean(ocrSlot) ||
+                      !(
+                        editFiles.idFile ||
+                        idImageUrl ||
+                        editFiles.idBackFile ||
+                        idBackImageUrl ||
+                        editFiles.cardFile ||
+                        cardImageUrl
+                      )
+                    }
+                    onClick={() => void handleOcrAll()}
+                  >
+                    {ocrSlot === "all" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ScanSearch className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {ocrSlot === "all" ? "Đang OCR…" : "OCR lại tất cả"}
+                  </Button>
                 </div>
               </section>
             ) : (idImageUrl || idBackImageUrl || cardImageUrl) ? (
@@ -781,7 +1008,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                 <Button
                   type="button"
                   onClick={() => void handleSave()}
-                  disabled={isSaving || dupIsBlocked}
+                  disabled={isSaving || dupIsBlocked || Boolean(ocrSlot)}
                   className="gap-2"
                 >
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

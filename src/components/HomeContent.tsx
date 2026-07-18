@@ -1,5 +1,7 @@
 import { User, Calendar, ClipboardCheck, Heart, Activity, Moon, Brain } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
+import { useMyPatientProfile } from "@/hooks/useMyPatientProfile";
 
 const dashboardItems = [
   { icon: User, title: "Tài khoản", subtitle: "Hồ sơ & Bảo mật", path: "/account", iconBg: "bg-accent", iconColor: "text-primary" },
@@ -13,14 +15,49 @@ const wellnessStats = [
   { label: "Tập trung", value: "Tốt", sub: "Chỉ số sinh hiệu", icon: Brain },
 ];
 
+function greetingForHour(hour: number): string {
+  if (hour < 12) return "Chào buổi sáng";
+  if (hour < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
+}
+
+function displayNameFromSources(
+  profileName: string | null | undefined,
+  metadataName: string | null | undefined,
+  email: string | null | undefined,
+): string {
+  const fromProfile = profileName?.trim();
+  if (fromProfile) return fromProfile;
+
+  const fromMeta = metadataName?.trim();
+  if (fromMeta) return fromMeta;
+
+  const fromEmail = email?.split("@")[0]?.trim();
+  if (fromEmail) return fromEmail;
+
+  return "bạn";
+}
+
 const HomeContent = () => {
+  const { session } = useAuth();
+  const { data: profile } = useMyPatientProfile();
+
+  const patientName = displayNameFromSources(
+    profile?.full_name,
+    typeof session?.user?.user_metadata?.full_name === "string"
+      ? session.user.user_metadata.full_name
+      : null,
+    session?.user?.email,
+  );
+  const greeting = greetingForHour(new Date().getHours());
+
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
         {/* Hero */}
         <div className="rounded-2xl bg-gradient-to-r from-accent to-accent/40 p-6 md:p-10 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
-            Chào buổi sáng, <span className="text-primary">Timmy!</span>
+            {greeting}, <span className="text-primary">{patientName}!</span>
           </h1>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl">
             Hồ sơ sức khỏe của bạn đã được cập nhật. Khám phá các tính năng cá nhân hóa hoặc đặt lịch tư vấn với đội ngũ chăm sóc của chúng tôi.
