@@ -175,6 +175,31 @@ export async function searchPatientRecords(
   };
 }
 
+/** Lấy N hồ sơ mới cập nhật cho dashboard (fallback bảng patient nếu RPC lỗi). */
+export async function fetchRecentPatientRecords(
+  supabase: SupabaseClient,
+  limit = 5,
+): Promise<PatientRecordsListResult> {
+  const params: PatientRecordsListParams = {
+    page: 1,
+    limit,
+    sortBy: "updated_at",
+    sortDir: "desc",
+  };
+
+  const primary = await searchPatientRecords(supabase, params);
+  if (!primary.error && primary.rows.length > 0) {
+    return primary;
+  }
+
+  const fallback = await searchPatientRecordsFallback(supabase, params);
+  if (fallback.rows.length > 0) {
+    return fallback;
+  }
+
+  return primary.error ? primary : fallback;
+}
+
 /** @deprecated Dùng `searchPatientRecords`. */
 export async function listPatientRecords(
   supabase: SupabaseClient,

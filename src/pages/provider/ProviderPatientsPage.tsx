@@ -12,12 +12,15 @@ import {
   Siren,
   Activity,
   Plus,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import {
-  mapPatientListRowBase,
   mapPatientPortalRow,
   type PatientListItem,
   type PatientPortalDetail,
@@ -40,6 +43,10 @@ import {
   LANGUAGE_LABELS,
 } from "@/types/patient-health-history";
 import { translatePatientStatus, UI_FALLBACK } from "@/config/ui-labels";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { searchPatientRecords } from "@/lib/patient-records";
+import type { PatientRecordListRow } from "@/types/patient-portal";
 
 const DEMO_DIAGNOSES = ["Đái tháo đường type 2", "Tăng huyết áp nhẹ"];
 const DEMO_MEDICATIONS = ["Metformin 500mg", "Lisinopril 10mg"];
@@ -129,6 +136,31 @@ function statusBadgeClass(status: string | null | undefined) {
 function translateStatus(status: string | null | undefined): string {
   return translatePatientStatus(status);
 }
+
+const PATIENT_LIST_PAGE_SIZE = 5;
+const SEARCH_DEBOUNCE_MS = 300;
+
+function mapRecordToListItem(row: PatientRecordListRow): PatientListItem {
+  const activity = row.updated_at ?? row.submitted_at;
+  let last_visit_label = "—";
+  if (activity) {
+    try {
+      last_visit_label = formatDistanceToNow(new Date(activity), { locale: vi, addSuffix: true });
+    } catch {
+      last_visit_label = activity.slice(0, 10);
+    }
+  }
+  return {
+    id: row.id,
+    full_name: row.full_name,
+    date_of_birth: row.date_of_birth,
+    last_visit_label,
+    status: row.submitted_at ? "Active" : "Draft",
+  };
+}
+
+const STATUS_BADGE_CLASS =
+  "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium";
 
 function demoToDetail(demo: DemoPatient): PatientPortalDetail {
   const parts = demo.name.split(" ");
@@ -342,40 +374,59 @@ const ProviderPatientsPage = () => {
   const [vitalHistoryOpen, setVitalHistoryOpen] = useState(false);
   const [editingVital, setEditingVital] = useState<VitalSignsRow | null>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
   const queryClient = useQueryClient();
 
-  const { data: patientSummaries = [], isLoading: isListLoading, isError, error } = useQuery({
-    queryKey: PATIENT_LIST_QUERY_KEY,
-    queryFn: async (): Promise<PatientListItem[]> => {
-      const { data: rpcData, error: rpcError } = await supabase.rpc("list_patients_for_staff");
-      let data = rpcData;
-      let fetchError = rpcError;
-      if (rpcError) {
-        const fallback = await supabase
-          .from("patient")
-          .select("id, legal_first_name, legal_last_name, date_of_birth, submitted_at, id_number, email_address")
-          .order("created_at", { ascending: false });
-        data = fallback.data;
-        fetchError = fallback.error;
-      }
-      if (fetchError) throw fetchError;
-      const rows = (data ?? []) as Record<string, unknown>[];
-      return rows.map((row) => {
-        const base = mapPatientListRowBase(row);
-        const { submitted_at, ...core } = base;
-        let last_visit_label = "—";
-        if (submitted_at) {
-          try {
-            last_visit_label = formatDistanceToNow(new Date(submitted_at), { locale: vi, addSuffix: true });
-          } catch {
-            last_visit_label = submitted_at.slice(0, 10);
-          }
-        }
-        const status = submitted_at ? "Active" : "Draft";
-        return { ...core, last_visit_label, status };
-      });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [debouncedSearch]);
+
+  const listQueryParams = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      page: listPage,
+      limit: PATIENT_LIST_PAGE_SIZE,
+      sortBy: "updated_at" as const,
+      sortDir: "desc" as const,
+    }),
+    [debouncedSearch, listPage],
+  );
+
+  const {
+    data: patientListData,
+    isLoading: isListLoading,
+    isError,
+    error,
+    isFetching: isListFetching,
+  } = useQuery({
+    queryKey: [...PATIENT_LIST_QUERY_KEY, listQueryParams],
+    queryFn: async () => {
+      const { rows, total, error: listError } = await searchPatientRecords(supabase, listQueryParams);
+      if (listError) throw listError;
+      return {
+        items: rows.map(mapRecordToListItem),
+        total,
+      };
     },
+    placeholderData: (previous) => previous,
   });
+
+  const patientSummaries = patientListData?.items ?? [];
+  const patientListTotal = patientListData?.total ?? 0;
+  const patientListTotalPages = Math.max(1, Math.ceil(patientListTotal / PATIENT_LIST_PAGE_SIZE));
+  const patientListFrom =
+    patientListTotal === 0 ? 0 : (listPage - 1) * PATIENT_LIST_PAGE_SIZE + 1;
+  const patientListTo =
+    patientListTotal === 0 ? 0 : Math.min(listPage * PATIENT_LIST_PAGE_SIZE, patientListTotal);
 
   useEffect(() => {
     if (patientSummaries.length > 0) {
@@ -599,10 +650,26 @@ const ProviderPatientsPage = () => {
         <section className="rounded-xl border bg-card p-4">
           <div className="mb-4 flex flex-col items-start gap-2">
             <h2 className="text-xl font-semibold">Danh sách bệnh nhân</h2>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {(patientSummaries.length || demoPatients.length)} đang hoạt động
+            <span className="whitespace-nowrap rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              {patientListTotal > 0 ? patientListTotal : demoPatients.length} đang hoạt động
             </span>
           </div>
+
+          <div className="relative mb-3">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Tìm theo tên, SĐT, email…"
+              className="pl-9"
+              aria-label="Tìm bệnh nhân"
+            />
+          </div>
+
           <div className="space-y-3">
             {patientSummaries.length > 0
               ? patientSummaries.map((row) => (
@@ -615,8 +682,10 @@ const ProviderPatientsPage = () => {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold">{row.full_name ?? UI_FALLBACK.patient}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">
+                          {row.full_name ?? UI_FALLBACK.patient}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Ngày sinh: {formatDob(row.date_of_birth, "—")}
                         </p>
@@ -625,14 +694,15 @@ const ProviderPatientsPage = () => {
                         </p>
                       </div>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(row.status)}`}
+                        className={`${STATUS_BADGE_CLASS} ${statusBadgeClass(row.status)}`}
                       >
                         {translateStatus(row.status ?? "Active")}
                       </span>
                     </div>
                   </button>
                 ))
-              : demoPatients.map((patient) => {
+              : !isListBusy && !debouncedSearch
+                ? demoPatients.map((patient) => {
                   const id = demoPatientId(patient.key);
                   return (
                     <button
@@ -644,25 +714,75 @@ const ProviderPatientsPage = () => {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold">{patient.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{patient.name}</p>
                           <p className="text-xs text-muted-foreground">Ngày sinh: {patient.dob}</p>
                           <p className="mt-1 text-xs text-muted-foreground">Lần khám: {patient.last}</p>
                         </div>
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass(patient.status)}`}
+                          className={`${STATUS_BADGE_CLASS} ${statusBadgeClass(patient.status)}`}
                         >
                           {translateStatus(patient.status)}
                         </span>
                       </div>
                     </button>
                   );
-                })}
+                })
+                : null}
           </div>
+
+          {patientListTotal > 0 ? (
+            <div className="mt-4 flex flex-col gap-2 border-t pt-3">
+              <p className="text-xs text-muted-foreground">
+                Hiển thị{" "}
+                <span className="font-semibold text-foreground">
+                  {patientListFrom}–{patientListTo}
+                </span>{" "}
+                / {patientListTotal} bệnh nhân
+                {isListFetching && !isListLoading ? (
+                  <Loader2 className="ml-1 inline h-3 w-3 animate-spin" aria-hidden="true" />
+                ) : null}
+              </p>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 flex-1"
+                  disabled={listPage <= 1 || isListFetching}
+                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Trước
+                </Button>
+                <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                  {listPage}/{patientListTotalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 flex-1"
+                  disabled={listPage >= patientListTotalPages || isListFetching}
+                  onClick={() => setListPage((p) => Math.min(patientListTotalPages, p + 1))}
+                >
+                  Sau
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {patientSummaries.length === 0 && !isListBusy ? (
             <p className="mt-3 text-xs text-muted-foreground">
-              Đang dùng <strong>bệnh nhân demo</strong> (có thể bấm chọn). Để load dữ liệu thật: hoàn tất onboarding
-              patient hoặc chạy migration RLS cho role doctor.
+              {debouncedSearch ? (
+                <>Không tìm thấy bệnh nhân phù hợp.</>
+              ) : (
+                <>
+                  Đang dùng <strong>bệnh nhân demo</strong> (có thể bấm chọn). Để load dữ liệu thật: hoàn tất
+                  onboarding patient hoặc chạy migration RLS cho role doctor.
+                </>
+              )}
             </p>
           ) : null}
         </section>
@@ -933,7 +1053,7 @@ const ProviderPatientsPage = () => {
         </section>
       </div>
 
-      <div className="mt-6">
+      {/* <div className="mt-6">
         <Link
           to="/onboarding/profile"
           className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm hover:bg-muted"
@@ -941,7 +1061,7 @@ const ProviderPatientsPage = () => {
           <Stethoscope className="mr-2 h-4 w-4" aria-hidden="true" />
           Cập nhật từ dữ liệu đăng ký
         </Link>
-      </div>
+      </div> */}
 
       {/* ── Vital signs sheet (doctor enters vitals directly) ─────────────────── */}
       <Sheet open={vitalSheetOpen} onOpenChange={(o) => { if (!o) setVitalSheetOpen(false); }}>

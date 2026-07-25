@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   addDays, endOfMonth, endOfWeek,
@@ -22,7 +22,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { fetchDoctorAppointments, fetchDoctorSpecialtyId, sendPreConsultReminder } from "@/lib/doctor-appointment-api";
+import {
+  fetchDoctorSpecialtyId,
+  searchDoctorAppointments,
+  sendPreConsultReminder,
+} from "@/lib/doctor-appointment-api";
 import { supabase } from "@/lib/supabase";
 import {
   getAppointmentReadiness,
@@ -39,6 +43,10 @@ import VitalSignsSheet from "@/components/admin/appointments/VitalSignsSheet";
 import WalkInDialog from "@/components/admin/appointments/WalkInDialog";
 
 type DateMode = "all" | "day" | "week" | "month";
+
+const APPOINTMENT_LIST_PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 300;
+const DOCTOR_APPOINTMENTS_QUERY_KEY = ["doctor-appointments"] as const;
 
 const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string }[] = [
   { value: "__all__",     label: "Tất cả trạng thái" },
@@ -99,7 +107,9 @@ function stepAnchor(mode: DateMode, anchor: Date, dir: 1 | -1): Date {
 export default function ProviderAppointmentsPage() {
   const [mode, setMode] = useState<DateMode>("all");
   const [anchor, setAnchor] = useState(() => new Date());
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
   const [status, setStatus] = useState<string>("__all__");
   const [selected, setSelected] = useState<AdminAppointment | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -115,28 +125,62 @@ export default function ProviderAppointmentsPage() {
     ? { dateFrom: undefined, dateTo: undefined, label: "Tất cả" }
     : dateRangeFor(mode, anchor);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [debouncedSearch, status, dateFrom, dateTo, mode]);
+
+  const listQueryParams = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      page: listPage,
+      limit: APPOINTMENT_LIST_PAGE_SIZE,
+      status: status === "__all__" ? undefined : status,
+      dateFrom,
+      dateTo,
+    }),
+    [debouncedSearch, listPage, status, dateFrom, dateTo],
+  );
+
   const { data: doctorSpecialtyId } = useQuery({
     queryKey: ["doctor-specialty-id"],
     queryFn: fetchDoctorSpecialtyId,
     staleTime: 60_000,
   });
 
-  const { data = [], isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["doctor-appointments", dateFrom ?? "all", dateTo ?? "all", status],
-    queryFn: () => fetchDoctorAppointments({
-      dateFrom, dateTo,
-      status: status === "__all__" ? undefined : status,
-    }),
+  const {
+    data: appointmentListData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: [...DOCTOR_APPOINTMENTS_QUERY_KEY, listQueryParams],
+    queryFn: async () => {
+      const { rows, total, error } = await searchDoctorAppointments(listQueryParams);
+      if (error) throw error;
+      return { rows, total };
+    },
+    placeholderData: (previous) => previous,
   });
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return data;
-    const q = search.toLowerCase();
-    return data.filter((r) =>
-      r.patient_name?.toLowerCase().includes(q) ||
-      r.patient_phone?.toLowerCase().includes(q)
-    );
-  }, [data, search]);
+  const filtered = appointmentListData?.rows ?? [];
+  const appointmentTotal = appointmentListData?.total ?? 0;
+  const appointmentTotalPages = Math.max(
+    1,
+    Math.ceil(appointmentTotal / APPOINTMENT_LIST_PAGE_SIZE),
+  );
+  const appointmentFrom =
+    appointmentTotal === 0 ? 0 : (listPage - 1) * APPOINTMENT_LIST_PAGE_SIZE + 1;
+  const appointmentTo =
+    appointmentTotal === 0
+      ? 0
+      : Math.min(listPage * APPOINTMENT_LIST_PAGE_SIZE, appointmentTotal);
 
   const goToday = () => setAnchor(new Date());
 
@@ -271,8 +315,8 @@ export default function ProviderAppointmentsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Tìm BN (tên, SĐT)..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9 h-9"
           />
         </div>
@@ -290,7 +334,10 @@ export default function ProviderAppointmentsPage() {
         </Select>
 
         <span className="text-xs text-muted-foreground ml-auto">
-          {filtered.length} lịch hẹn
+          {appointmentTotal} lịch hẹn
+          {isFetching && !isLoading ? (
+            <Loader2 className="ml-1 inline h-3 w-3 animate-spin" aria-hidden="true" />
+          ) : null}
         </span>
       </div>
 
@@ -303,7 +350,9 @@ export default function ProviderAppointmentsPage() {
           </div>
         ) : filtered.length === 0 ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
-            Không có lịch hẹn nào trong khoảng thời gian này.
+            {debouncedSearch
+              ? "Không tìm thấy lịch hẹn phù hợp."
+              : "Không có lịch hẹn nào trong khoảng thời gian này."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -470,6 +519,45 @@ export default function ProviderAppointmentsPage() {
           </div>
         )}
       </div>
+
+      {appointmentTotal > 0 ? (
+        <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Hiển thị{" "}
+            <span className="font-semibold text-foreground">
+              {appointmentFrom}–{appointmentTo}
+            </span>{" "}
+            / {appointmentTotal} lịch hẹn
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={listPage <= 1 || isFetching}
+              onClick={() => setListPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Trước
+            </Button>
+            <span className="min-w-[72px] text-center text-xs font-medium text-muted-foreground">
+              {listPage}/{appointmentTotalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={listPage >= appointmentTotalPages || isFetching}
+              onClick={() => setListPage((p) => Math.min(appointmentTotalPages, p + 1))}
+            >
+              Sau
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <AppointmentDetailSheet
         appointment={selected}

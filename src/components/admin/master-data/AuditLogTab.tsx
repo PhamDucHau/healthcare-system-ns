@@ -175,9 +175,9 @@ export default function AuditLogTab() {
           />
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-          <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+          {/* <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
             {total} bản ghi được tìm thấy
-          </span>
+          </span> */}
           <div className="flex items-center gap-2">
             <Popover open={filterOpen} onOpenChange={setFilterOpen}>
               <PopoverTrigger asChild>
