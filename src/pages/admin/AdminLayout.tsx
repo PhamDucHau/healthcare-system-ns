@@ -1,12 +1,14 @@
 import { useState } from "react";
 import {
   LayoutGrid, Users, Search,
-  User, Shield, LogOut, Menu, Loader2, FileUser, Database, CalendarDays, ClipboardList, Brain, KeyRound, UserRound,
+  LogOut, Menu, Loader2, FileUser, FolderOpen, CalendarDays, ClipboardList, Brain, KeyRound, UserRound, Stethoscope, Shield,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
+import { useAuth } from "@/hooks/use-auth";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NotificationPanel from "@/components/admin/NotificationPanel";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
@@ -15,7 +17,7 @@ const sidebarItems = [
   { icon: FileUser,      label: "Hồ sơ bệnh nhân",     path: "/admin/patient-records" },
   { icon: UserRound,     label: "Bệnh nhân",           path: "/admin/patients" },
   { icon: CalendarDays,  label: "Lịch hẹn",            path: "/admin/appointments" },
-  { icon: Database,      label: "Danh mục",            path: "/admin/master-data" },
+  { icon: FolderOpen,    label: "Danh mục",            path: "/admin/master-data" },
   { icon: ClipboardList, label: "Bộ câu hỏi lâm sàng", path: "/admin/question-library" },
   { icon: Users,         label: "Người dùng",          path: "/admin/users" },
   { icon: KeyRound,      label: "Danh sách quyền",     path: "/admin/permissions" },
@@ -24,10 +26,10 @@ const sidebarItems = [
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+  `flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors duration-200 ${
     isActive
-      ? "border-l-4 border-primary bg-[#FDECEE] pl-2 text-primary"
-      : "border-l-4 border-transparent text-muted-foreground hover:bg-muted"
+      ? "rounded-l-full bg-accent text-primary font-bold shadow-sm"
+      : "rounded-lg text-muted-foreground hover:bg-muted"
   }`;
 
 const AdminSidebarContent = ({
@@ -40,16 +42,16 @@ const AdminSidebarContent = ({
   isLoggingOut: boolean;
 }) => (
     <>
-      <div className="flex items-center gap-3 p-4 border-b">
-        <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-          <Shield className="h-5 w-5 text-primary-foreground" />
+      <div className="px-6 mb-8 flex items-center gap-3 pt-6">
+        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+          <Stethoscope className="h-5 w-5 text-primary-foreground" />
         </div>
         <div>
-          <p className="text-sm font-bold text-primary">Rcare Plus</p>
-          <p className="text-xs text-muted-foreground">Vận hành hệ thống</p>
+          <p className="text-xl font-black text-primary leading-tight">Rcare Plus</p>
+          <p className="text-[11px] font-medium text-muted-foreground">Vận hành hệ thống</p>
         </div>
       </div>
-      <nav className="flex flex-col gap-1 p-3 flex-1">
+      <nav className="flex flex-col gap-1 px-3 flex-1 overflow-y-auto">
         {sidebarItems.map(({ icon: Icon, label, path }) => (
           <NavLink
             key={path}
@@ -58,17 +60,17 @@ const AdminSidebarContent = ({
             onClick={onNavigate}
             end={path === "/admin/overview"}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
           </NavLink>
         ))}
       </nav>
-      <div className="p-3 mt-auto border-t space-y-1">
+      <div className="px-3 pt-6 mt-auto border-t">
         <button
           type="button"
           disabled={isLoggingOut}
           onClick={onLogout}
-          className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg w-full disabled:opacity-50"
+          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-lg w-full disabled:opacity-50 transition-colors"
         >
           {isLoggingOut ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -86,6 +88,19 @@ const AdminLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
   const { notifications, unreadCount, markAllAsRead, markAsRead, clearAll } = useAdminNotifications();
+  const { session } = useAuth();
+  const user = session?.user;
+  const avatarUrl =
+    (user?.user_metadata?.avatar_url as string | undefined) ??
+    (user?.user_metadata?.picture as string | undefined);
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ?? "Quản trị viên";
+  const initials = displayName
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   const handleLogout = () => {
     setIsLoggingOut(true);
@@ -96,14 +111,20 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="hidden lg:flex w-60 flex-col border-r bg-card h-screen sticky top-0">
+    <div className="flex h-screen overflow-hidden bg-background">
+      <aside className="hidden lg:flex w-[260px] flex-col border-r bg-card h-full shrink-0 z-30">
         <AdminSidebarContent onLogout={handleLogout} isLoggingOut={isLoggingOut} />
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
-          <div className="flex items-center gap-4">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {/* Ambient blur effects */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30 mix-blend-soft-light z-0">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary rounded-full blur-[120px] -translate-y-1/2 translate-x-1/4" />
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-success rounded-full blur-[100px] translate-y-1/3 -translate-x-1/4" />
+        </div>
+
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-card px-6 shrink-0">
+          <div className="flex items-center gap-4 flex-1">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <button type="button" className="lg:hidden p-2 rounded-lg hover:bg-muted">
@@ -121,15 +142,15 @@ const AdminLayout = () => {
                 />
               </SheetContent>
             </Sheet>
-            <div className="relative">
+            <div className="relative max-w-md w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 placeholder="Tìm kiếm các chỉ số vận hành..."
-                className="h-10 w-64 md:w-80 rounded-lg border bg-background pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full bg-muted border-none rounded-full py-1.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6">
             <NotificationPanel
               notifications={notifications}
               unreadCount={unreadCount}
@@ -137,22 +158,22 @@ const AdminLayout = () => {
               onMarkAsRead={markAsRead}
               onClearAll={clearAll}
             />
-            {/* <button type="button" className="p-2 rounded-lg hover:bg-muted">
-              <HelpCircle className="h-5 w-5 text-muted-foreground" />
-            </button> */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 border-l border-border pl-6">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-foreground">Quản trị viên</p>
-                {/* <p className="text-xs text-muted-foreground">Security Lead</p> */}
+                <p className="text-xs font-semibold text-foreground leading-tight">{displayName}</p>
+                <p className="text-[10px] text-muted-foreground">Admin Dashboard</p>
               </div>
-              <div className="h-9 w-9 rounded-full bg-foreground flex items-center justify-center">
-                <User className="h-4 w-4 text-background" />
-              </div>
+              <Avatar className="h-9 w-9 border border-border">
+                <AvatarImage src={avatarUrl} alt={displayName} />
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                  {initials || "AD"}
+                </AvatarFallback>
+              </Avatar>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8" key={location.pathname}>
+        <main className="flex-1 overflow-y-auto p-6 relative z-10" key={location.pathname}>
           <Outlet />
         </main>
       </div>

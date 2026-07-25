@@ -2,31 +2,31 @@ import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchServices, upsertService, deleteService, fetchSpecialtiesAdmin } from '@/lib/master-data-api';
+import { listServicesAdmin, upsertService, deleteService, fetchSpecialtiesAdmin } from '@/lib/master-data-api';
 import type { Service, Specialty } from '@/types/master-data';
 import { formatVND } from '@/types/master-data';
+import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
   EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
-  Field, FormActions, inputCls, useEntityDialog,
+  Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
 export default function ServicesTab() {
-  const [rows, setRows] = useState<Service[]>([]);
+  const {
+    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listServicesAdmin);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Service>();
 
-  const reload = () => {
-    setLoading(true);
-    Promise.all([fetchServices(), fetchSpecialtiesAdmin()])
-      .then(([s, sp]) => { setRows(s); setSpecialties(sp); })
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  };
+  useRegisterAddAction('services', 'Thêm Dịch vụ', openAdd);
 
-  useEffect(reload, []);
+  useEffect(() => {
+    fetchSpecialtiesAdmin()
+      .then(setSpecialties)
+      .catch((e: Error) => toast.error(e.message));
+  }, []);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -43,23 +43,45 @@ export default function ServicesTab() {
   return (
     <>
       <EntityTable
-        loading={loading}
+        entityLabel="dịch vụ"
         title="Dịch vụ"
-        onAdd={openAdd}
-        headers={['Tên dịch vụ', 'Chuyên khoa', 'Giá (VND)', 'Thời gian', 'Trạng thái', '']}
+        loading={loading}
+        exporting={exporting}
+        headers={['Tên dịch vụ', 'Chuyên khoa', 'Giá (VND)', 'Thời gian', 'Trạng thái', 'Thao tác']}
         rows={rows}
+        total={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        onExportFetch={fetchExportRows}
+        getRowKey={(r) => r.id}
+        hasActiveField
+        getIsActive={(r) => r.is_active}
+        exportColumns={[
+          { key: 'name', label: 'Tên dịch vụ' },
+          { key: 'specialty', label: 'Chuyên khoa' },
+          { key: 'price', label: 'Giá (VND)' },
+          { key: 'duration', label: 'Thời gian' },
+          { key: 'status', label: 'Trạng thái' },
+        ]}
+        getExportRow={(r) => ({
+          name: r.name,
+          specialty: r.specialty_name ?? '',
+          price: r.price_vnd != null ? String(r.price_vnd) : '',
+          duration: `${r.duration_minutes} phút`,
+          status: r.is_active ? 'Hoạt động' : 'Vô hiệu',
+        })}
         renderRow={(r) => (
           <>
-            <td className="px-4 py-3">
+            <td className={cellPrimaryCls}>
               <p className="font-semibold text-sm">{r.name}</p>
-              {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
+              {r.description && <p className="text-xs text-muted-foreground font-normal">{r.description}</p>}
             </td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.specialty_name}</td>
-            <td className="px-4 py-3 text-sm">{formatVND(r.price_vnd)}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.duration_minutes} phút</td>
-            <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex justify-end gap-2">
+            <td className={cellMutedCls}>{r.specialty_name}</td>
+            <td className={`${cellCls} text-sm`}>{formatVND(r.price_vnd)}</td>
+            <td className={cellMutedCls}>{r.duration_minutes} phút</td>
+            <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
+            <td className={`${cellCls} text-right`}>
+              <div className="flex justify-end items-center gap-4">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
                 <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>

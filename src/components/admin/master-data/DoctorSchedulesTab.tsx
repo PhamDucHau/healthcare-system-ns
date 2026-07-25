@@ -4,42 +4,41 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  fetchDoctorSchedules, upsertDoctorSchedule, deleteDoctorSchedule,
+  listDoctorSchedulesAdmin, upsertDoctorSchedule, deleteDoctorSchedule,
   fetchDoctors, fetchSpecialtiesAdmin, fetchFacilities, fetchRooms,
   triggerSlotGeneration,
 } from '@/lib/master-data-api';
 import type { DoctorSchedule, Doctor, Facility, Room } from '@/types/master-data';
 import type { Specialty } from '@/types/master-data';
 import { formatWorkDays, formatTime, DOW_LABELS } from '@/types/master-data';
-import { EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog, Field, FormActions, inputCls, useEntityDialog } from './shared';
+import { useRegisterAddAction } from './MasterDataActionsContext';
+import { EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog, Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls } from './shared';
 
 export default function DoctorSchedulesTab() {
-  const [rows, setRows]         = useState<DoctorSchedule[]>([]);
+  const {
+    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listDoctorSchedulesAdmin);
   const [doctors, setDoctors]   = useState<Doctor[]>([]);
   const [specialties, setSpec]  = useState<Specialty[]>([]);
   const [facilities, setFac]    = useState<Facility[]>([]);
   const [rooms, setRooms]       = useState<Room[]>([]);
-  const [loading, setLoading]   = useState(true);
   const [generating, setGen]    = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DoctorSchedule | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<DoctorSchedule>();
 
-  const reload = () => {
-    setLoading(true);
+  useRegisterAddAction('schedules', 'Thêm Lịch BS', openAdd);
+
+  useEffect(() => {
     Promise.all([
-      fetchDoctorSchedules(),
       fetchDoctors(),
       fetchSpecialtiesAdmin(),
       fetchFacilities(),
       fetchRooms(),
     ])
-      .then(([r, d, s, f, rm]) => { setRows(r); setDoctors(d); setSpec(s); setFac(f); setRooms(rm); })
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+      .then(([d, s, f, rm]) => { setDoctors(d); setSpec(s); setFac(f); setRooms(rm); })
+      .catch((e: Error) => toast.error(e.message));
+  }, []);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -64,40 +63,64 @@ export default function DoctorSchedulesTab() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-muted-foreground">
-          Khung giờ được sinh tự động hàng đêm lúc 00:00. Nhấn để chạy thủ công ngay.
-        </p>
-        <button
-          onClick={handleGenerateSlots}
-          disabled={generating}
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50"
-        >
-          {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Sinh khung giờ 30 ngày
-        </button>
-      </div>
-
       <EntityTable
+        entityLabel="lịch làm việc"
+        title="Lịch BS"
         loading={loading}
-        title="Lịch làm việc"
-        onAdd={openAdd}
-        headers={['Bác sĩ', 'Chuyên khoa', 'Cơ sở / Phòng', 'Ngày làm việc', 'Giờ', '(phút)', 'Trạng thái', '']}
+        exporting={exporting}
+        headers={['Bác sĩ', 'Chuyên khoa', 'Cơ sở / Phòng', 'Ngày làm việc', 'Giờ', '(phút)', 'Trạng thái', 'Thao tác']}
         rows={rows}
+        total={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        onExportFetch={fetchExportRows}
+        getRowKey={(r) => r.id}
+        hasActiveField
+        getIsActive={(r) => r.is_active}
+        exportColumns={[
+          { key: 'doctor', label: 'Bác sĩ' },
+          { key: 'specialty', label: 'Chuyên khoa' },
+          { key: 'facility', label: 'Cơ sở / Phòng' },
+          { key: 'work_days', label: 'Ngày làm việc' },
+          { key: 'hours', label: 'Giờ' },
+          { key: 'duration', label: 'Phút/slot' },
+          { key: 'status', label: 'Trạng thái' },
+        ]}
+        getExportRow={(r) => ({
+          doctor: r.doctor_name ?? '',
+          specialty: r.specialty_name ?? '',
+          facility: [r.facility_name, r.room_name].filter(Boolean).join(' / '),
+          work_days: formatWorkDays(r.work_days),
+          hours: `${formatTime(r.work_start_time)} – ${formatTime(r.work_end_time)}`,
+          duration: String(r.slot_duration_minutes),
+          status: r.is_active ? 'Hoạt động' : 'Vô hiệu',
+        })}
+        // toolbarExtra={
+        //   <button
+        //     type="button"
+        //     onClick={handleGenerateSlots}
+        //     disabled={generating}
+        //     className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+        //     title="Khung giờ được sinh tự động hàng đêm lúc 00:00"
+        //   >
+        //     {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+        //     Sinh slot
+        //   </button>
+        // }
         renderRow={(r) => (
           <>
-            <td className="px-4 py-3 text-sm font-semibold">{r.doctor_name}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.specialty_name}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">
+            <td className={cellPrimaryCls}>{r.doctor_name}</td>
+            <td className={cellMutedCls}>{r.specialty_name}</td>
+            <td className={cellMutedCls}>
               <p>{r.facility_name}</p>
               {r.room_name && <p className="text-xs">{r.room_name}</p>}
             </td>
-            <td className="px-4 py-3 text-sm">{formatWorkDays(r.work_days)}</td>
-            <td className="px-4 py-3 text-sm">{formatTime(r.work_start_time)} – {formatTime(r.work_end_time)}</td>
-            <td className="px-4 py-3 text-sm">{r.slot_duration_minutes}'</td>
-            <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex justify-end gap-2">
+            <td className={`${cellCls} text-sm`}>{formatWorkDays(r.work_days)}</td>
+            <td className={`${cellCls} text-sm`}>{formatTime(r.work_start_time)} – {formatTime(r.work_end_time)}</td>
+            <td className={`${cellCls} text-sm`}>{r.slot_duration_minutes}'</td>
+            <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
+            <td className={`${cellCls} text-right`}>
+              <div className="flex justify-end items-center gap-4">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
                 <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>

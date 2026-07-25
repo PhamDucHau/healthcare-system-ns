@@ -2,33 +2,33 @@ import { useEffect, useState } from 'react';
 import { Pencil, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchSpecialtiesAdmin, upsertSpecialty, deleteSpecialty } from '@/lib/master-data-api';
+import { listSpecialtiesAdmin, upsertSpecialty, deleteSpecialty } from '@/lib/master-data-api';
 import type { Specialty } from '@/types/master-data';
+import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
   EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
-  Field, inputCls, useEntityDialog,
+  Field, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
 const EMPTY: Omit<Specialty, 'id' | 'created_at'> = {
   name: '', description: '', icon: '', is_active: true,
 };
 
+const EXPORT_COLUMNS = [
+  { key: 'name', label: 'Tên chuyên khoa' },
+  { key: 'description', label: 'Mô tả' },
+  { key: 'status', label: 'Trạng thái' },
+];
+
 export default function SpecialtiesTab() {
-  const [rows, setRows] = useState<Specialty[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listSpecialtiesAdmin);
   const [deleteTarget, setDeleteTarget] = useState<Specialty | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Specialty>();
 
-  const reload = () => {
-    setLoading(true);
-    fetchSpecialtiesAdmin()
-      .then(setRows)
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  useRegisterAddAction('specialties', 'Thêm Chuyên khoa', openAdd);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -45,19 +45,32 @@ export default function SpecialtiesTab() {
   return (
     <>
       <EntityTable
-        loading={loading}
+        entityLabel="chuyên khoa"
         title="Chuyên khoa"
-        onAdd={openAdd}
-        headers={['Tên', 'Mô tả', 'Trạng thái', '']}
+        loading={loading}
+        exporting={exporting}
+        headers={['Tên chuyên khoa', 'Mô tả', 'Trạng thái', 'Thao tác']}
         rows={rows}
+        total={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        onExportFetch={fetchExportRows}
+        getRowKey={(r) => r.id}
+        hasActiveField
+        getIsActive={(r) => r.is_active}
+        exportColumns={EXPORT_COLUMNS}
+        getExportRow={(r) => ({
+          name: r.name,
+          description: r.description ?? '',
+          status: r.is_active ? 'Hoạt động' : 'Vô hiệu',
+        })}
         renderRow={(r) => (
           <>
-            <td className="px-4 py-3 font-semibold text-sm">{r.name}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.description ?? '—'}</td>
-            {/* <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{r.icon ?? '—'}</td> */}
-            <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex justify-end gap-2">
+            <td className={cellPrimaryCls}>{r.name}</td>
+            <td className={cellMutedCls}>{r.description ?? '—'}</td>
+            <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
+            <td className={`${cellCls} text-right`}>
+              <div className="flex justify-end items-center gap-4">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
                 <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>

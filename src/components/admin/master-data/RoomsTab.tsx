@@ -2,30 +2,30 @@ import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchRooms, upsertRoom, deleteRoom, fetchFacilities } from '@/lib/master-data-api';
+import { listRoomsAdmin, upsertRoom, deleteRoom, fetchFacilities } from '@/lib/master-data-api';
 import type { Room, Facility } from '@/types/master-data';
+import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
   EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
-  Field, FormActions, inputCls, useEntityDialog,
+  Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
 export default function RoomsTab() {
-  const [rows, setRows] = useState<Room[]>([]);
+  const {
+    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listRoomsAdmin);
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Room>();
 
-  const reload = () => {
-    setLoading(true);
-    Promise.all([fetchRooms(), fetchFacilities()])
-      .then(([r, f]) => { setRows(r); setFacilities(f); })
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  };
+  useRegisterAddAction('rooms', 'Thêm Phòng khám', openAdd);
 
-  useEffect(reload, []);
+  useEffect(() => {
+    fetchFacilities()
+      .then(setFacilities)
+      .catch((e: Error) => toast.error(e.message));
+  }, []);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -42,21 +42,45 @@ export default function RoomsTab() {
   return (
     <>
       <EntityTable
-        loading={loading}
+        entityLabel="phòng khám"
         title="Phòng khám"
-        onAdd={openAdd}
-        headers={['Phòng', 'Số phòng', 'Cơ sở', 'Sức chứa', 'Thiết bị', 'Trạng thái', '']}
+        loading={loading}
+        exporting={exporting}
+        headers={['Phòng', 'Số phòng', 'Cơ sở', 'Sức chứa', 'Thiết bị', 'Trạng thái', 'Thao tác']}
         rows={rows}
+        total={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        onExportFetch={fetchExportRows}
+        getRowKey={(r) => r.id}
+        hasActiveField
+        getIsActive={(r) => r.is_active}
+        exportColumns={[
+          { key: 'name', label: 'Phòng' },
+          { key: 'room_number', label: 'Số phòng' },
+          { key: 'facility', label: 'Cơ sở' },
+          { key: 'capacity', label: 'Sức chứa' },
+          { key: 'equipment', label: 'Thiết bị' },
+          { key: 'status', label: 'Trạng thái' },
+        ]}
+        getExportRow={(r) => ({
+          name: r.name,
+          room_number: r.room_number ?? '',
+          facility: r.facility_name ?? '',
+          capacity: String(r.capacity),
+          equipment: r.equipment ?? '',
+          status: r.is_active ? 'Hoạt động' : 'Vô hiệu',
+        })}
         renderRow={(r) => (
           <>
-            <td className="px-4 py-3 font-semibold text-sm">{r.name}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.room_number ?? '—'}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.facility_name}</td>
-            <td className="px-4 py-3 text-sm">{r.capacity}</td>
-            <td className="px-4 py-3 text-xs text-muted-foreground max-w-[180px] truncate">{r.equipment ?? '—'}</td>
-            <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex justify-end gap-2">
+            <td className={cellPrimaryCls}>{r.name}</td>
+            <td className={cellMutedCls}>{r.room_number ?? '—'}</td>
+            <td className={cellMutedCls}>{r.facility_name}</td>
+            <td className={`${cellCls} text-sm`}>{r.capacity}</td>
+            <td className={`${cellCls} text-xs text-muted-foreground max-w-[180px] truncate`}>{r.equipment ?? '—'}</td>
+            <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
+            <td className={`${cellCls} text-right`}>
+              <div className="flex justify-end items-center gap-4">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
                 <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>

@@ -2,29 +2,23 @@ import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchQuestionCategories, upsertQuestionCategory, deleteQuestionCategory } from '@/lib/master-data-api';
+import { listQuestionCategoriesAdmin, upsertQuestionCategory, deleteQuestionCategory } from '@/lib/master-data-api';
 import type { QuestionCategory } from '@/types/master-data';
+import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
   EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
-  Field, FormActions, inputCls, useEntityDialog,
+  Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
 export default function CategoriesTab() {
-  const [rows, setRows] = useState<QuestionCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listQuestionCategoriesAdmin);
   const [deleteTarget, setDeleteTarget] = useState<QuestionCategory | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<QuestionCategory>();
 
-  const reload = () => {
-    setLoading(true);
-    fetchQuestionCategories()
-      .then(setRows)
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  useRegisterAddAction('categories', 'Thêm Danh mục câu hỏi', openAdd);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -41,19 +35,39 @@ export default function CategoriesTab() {
   return (
     <>
       <EntityTable
+        entityLabel="danh mục câu hỏi"
+        title="Danh mục câu hỏi"
         loading={loading}
-        title="Danh mục"
-        onAdd={openAdd}
-        headers={['Tên', 'Mô tả', 'Thứ tự', 'Trạng thái', '']}
+        exporting={exporting}
+        headers={['Tên', 'Mô tả', 'Thứ tự', 'Trạng thái', 'Thao tác']}
         rows={rows}
+        total={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        onExportFetch={fetchExportRows}
+        getRowKey={(r) => r.id}
+        hasActiveField
+        getIsActive={(r) => r.is_active}
+        exportColumns={[
+          { key: 'name', label: 'Tên' },
+          { key: 'description', label: 'Mô tả' },
+          { key: 'sort_order', label: 'Thứ tự' },
+          { key: 'status', label: 'Trạng thái' },
+        ]}
+        getExportRow={(r) => ({
+          name: r.name,
+          description: r.description ?? '',
+          sort_order: String(r.sort_order),
+          status: r.is_active ? 'Hoạt động' : 'Vô hiệu',
+        })}
         renderRow={(r) => (
           <>
-            <td className="px-4 py-3 font-semibold text-sm">{r.name}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.description ?? '—'}</td>
-            <td className="px-4 py-3 text-sm">{r.sort_order}</td>
-            <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex justify-end gap-2">
+            <td className={cellPrimaryCls}>{r.name}</td>
+            <td className={cellMutedCls}>{r.description ?? '—'}</td>
+            <td className={`${cellCls} text-sm`}>{r.sort_order}</td>
+            <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
+            <td className={`${cellCls} text-right`}>
+              <div className="flex justify-end items-center gap-4">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
                 <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>

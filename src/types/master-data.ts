@@ -89,6 +89,25 @@ export type Doctor = {
   specialty: string | null;
 };
 
+export type MasterDataListParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  status?: 'all' | 'active' | 'inactive';
+};
+
+export type MasterDataListResult<T> = {
+  rows: T[];
+  total: number;
+};
+
+export type AuditLogListParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  tableName?: string;
+};
+
 export const DOW_LABELS: Record<number, string> = {
   0: 'CN', 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7',
 };

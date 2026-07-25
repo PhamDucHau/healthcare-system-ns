@@ -4,6 +4,9 @@ import type {
   Doctor,
   DoctorSchedule,
   Facility,
+  MasterDataListParams,
+  MasterDataListResult,
+  AuditLogListParams,
   QuestionCategory,
   Room,
   Service,
@@ -44,7 +47,38 @@ async function hardDelete(table: string, id: string): Promise<void> {
   if (error) throw new Error(mapDeleteError(error.message));
 }
 
+type RpcListPayload = { total?: number; rows?: unknown[] };
+
+function rpcStatusParam(status?: MasterDataListParams['status']): string | null {
+  if (!status || status === 'all') return null;
+  return status;
+}
+
+async function callMasterDataListRpc<T>(
+  rpc: string,
+  params: MasterDataListParams,
+): Promise<MasterDataListResult<T>> {
+  const { data, error } = await supabase.rpc(rpc, {
+    p_query: params.search?.trim() || null,
+    p_page: params.page ?? 1,
+    p_limit: params.limit ?? 6,
+    p_status: rpcStatusParam(params.status),
+  });
+  if (error) throw new Error(mapMasterDataError(error.message));
+  const payload = (data ?? { total: 0, rows: [] }) as RpcListPayload;
+  return {
+    total: Number(payload.total ?? 0),
+    rows: (payload.rows ?? []) as T[],
+  };
+}
+
 // ─── Specialties ─────────────────────────────────────────────────────────────
+
+export async function listSpecialtiesAdmin(
+  params: MasterDataListParams = {},
+): Promise<MasterDataListResult<Specialty>> {
+  return callMasterDataListRpc<Specialty>('list_specialties_admin', params);
+}
 
 export async function fetchSpecialtiesAdmin(): Promise<Specialty[]> {
   const { data, error } = await supabase
@@ -85,6 +119,26 @@ export async function deleteSpecialty(id: string): Promise<void> {
 }
 
 // ─── Services ────────────────────────────────────────────────────────────────
+
+export async function listServicesAdmin(
+  params: MasterDataListParams = {},
+): Promise<MasterDataListResult<Service>> {
+  const result = await callMasterDataListRpc<Record<string, unknown>>('list_services_admin', params);
+  return {
+    total: result.total,
+    rows: result.rows.map((r) => ({
+      id:               str(r.id),
+      name:             str(r.name),
+      description:      strNull(r.description),
+      specialty_id:     strNull(r.specialty_id),
+      specialty_name:   strNull(r.specialty_name) ?? '—',
+      price_vnd:        numNull(r.price_vnd),
+      duration_minutes: Number(r.duration_minutes ?? 30),
+      is_active:        bool(r.is_active),
+      created_at:       str(r.created_at),
+    })),
+  };
+}
 
 export async function fetchServices(): Promise<Service[]> {
   const { data, error } = await supabase
@@ -135,6 +189,24 @@ export async function deleteService(id: string): Promise<void> {
 
 // ─── Facilities ───────────────────────────────────────────────────────────────
 
+export async function listFacilitiesAdmin(
+  params: MasterDataListParams = {},
+): Promise<MasterDataListResult<Facility>> {
+  const result = await callMasterDataListRpc<Record<string, unknown>>('list_facilities_admin', params);
+  return {
+    total: result.total,
+    rows: result.rows.map((r) => ({
+      id:         str(r.id),
+      name:       str(r.name),
+      code:       strNull(r.code),
+      address:    strNull(r.address),
+      phone:      strNull(r.phone),
+      is_active:  bool(r.is_active ?? true),
+      created_at: str(r.created_at),
+    })),
+  };
+}
+
 export async function fetchFacilities(): Promise<Facility[]> {
   const { data, error } = await supabase
     .from('facilities')
@@ -183,6 +255,26 @@ export async function deleteFacility(id: string): Promise<void> {
 }
 
 // ─── Rooms ────────────────────────────────────────────────────────────────────
+
+export async function listRoomsAdmin(
+  params: MasterDataListParams = {},
+): Promise<MasterDataListResult<Room>> {
+  const result = await callMasterDataListRpc<Record<string, unknown>>('list_rooms_admin', params);
+  return {
+    total: result.total,
+    rows: result.rows.map((r) => ({
+      id:            str(r.id),
+      facility_id:   str(r.facility_id),
+      facility_name: strNull(r.facility_name) ?? '—',
+      name:          str(r.name),
+      room_number:   strNull(r.room_number),
+      capacity:      Number(r.capacity ?? 1),
+      equipment:     strNull(r.equipment),
+      is_active:     bool(r.is_active),
+      created_at:    str(r.created_at),
+    })),
+  };
+}
 
 export async function fetchRooms(): Promise<Room[]> {
   const { data, error } = await supabase
@@ -251,6 +343,38 @@ export async function fetchDoctors(): Promise<Doctor[]> {
     email:     str(r.email),
     specialty: strNull(r.specialty),
   }));
+}
+
+export async function listDoctorSchedulesAdmin(
+  params: MasterDataListParams = {},
+): Promise<MasterDataListResult<DoctorSchedule>> {
+  const result = await callMasterDataListRpc<Record<string, unknown>>('list_doctor_schedules_admin', params);
+  return {
+    total: result.total,
+    rows: result.rows.map((r) => {
+      const ex = Array.isArray(r.exceptions) ? (r.exceptions as string[]) : [];
+      return {
+        id:                    str(r.id),
+        doctor_id:             str(r.doctor_id),
+        doctor_name:           strNull(r.doctor_name) ?? '—',
+        specialty_id:          str(r.specialty_id),
+        specialty_name:        strNull(r.specialty_name) ?? '—',
+        facility_id:           str(r.facility_id),
+        facility_name:         strNull(r.facility_name) ?? '—',
+        room_id:               strNull(r.room_id),
+        room_name:             strNull(r.room_name),
+        work_days:             Array.isArray(r.work_days) ? (r.work_days as number[]) : [],
+        work_start_time:       str(r.work_start_time),
+        work_end_time:         str(r.work_end_time),
+        slot_duration_minutes: Number(r.slot_duration_minutes ?? 30),
+        exceptions:            ex,
+        valid_from:            str(r.valid_from),
+        valid_until:           strNull(r.valid_until),
+        is_active:             bool(r.is_active),
+        created_at:            str(r.created_at),
+      } satisfies DoctorSchedule;
+    }),
+  };
 }
 
 export async function fetchDoctorSchedules(): Promise<DoctorSchedule[]> {
@@ -329,6 +453,12 @@ export async function deleteDoctorSchedule(id: string): Promise<void> {
 
 // ─── Question Categories ─────────────────────────────────────────────────────
 
+export async function listQuestionCategoriesAdmin(
+  params: MasterDataListParams = {},
+): Promise<MasterDataListResult<QuestionCategory>> {
+  return callMasterDataListRpc<QuestionCategory>('list_question_categories_admin', params);
+}
+
 export async function fetchQuestionCategories(): Promise<QuestionCategory[]> {
   const { data, error } = await supabase
     .from('question_categories')
@@ -364,6 +494,23 @@ export async function deleteQuestionCategory(id: string): Promise<void> {
 }
 
 // ─── Audit Log ───────────────────────────────────────────────────────────────
+
+export async function listAuditLogAdmin(
+  params: AuditLogListParams = {},
+): Promise<MasterDataListResult<AuditLogEntry>> {
+  const { data, error } = await supabase.rpc('list_master_data_audit_log', {
+    p_query: params.search?.trim() || null,
+    p_page: params.page ?? 1,
+    p_limit: params.limit ?? 6,
+    p_table_name: params.tableName?.trim() || null,
+  });
+  if (error) throw new Error(mapMasterDataError(error.message));
+  const payload = (data ?? { total: 0, rows: [] }) as RpcListPayload;
+  return {
+    total: Number(payload.total ?? 0),
+    rows: (payload.rows ?? []) as AuditLogEntry[],
+  };
+}
 
 export async function fetchAuditLog(tableName?: string, limit = 50): Promise<AuditLogEntry[]> {
   let q = supabase

@@ -2,29 +2,23 @@ import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fetchFacilities, upsertFacility, deleteFacility } from '@/lib/master-data-api';
+import { listFacilitiesAdmin, upsertFacility, deleteFacility } from '@/lib/master-data-api';
 import type { Facility } from '@/types/master-data';
+import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
   EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
-  Field, FormActions, inputCls, useEntityDialog,
+  Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
 export default function FacilitiesTab() {
-  const [rows, setRows] = useState<Facility[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listFacilitiesAdmin);
   const [deleteTarget, setDeleteTarget] = useState<Facility | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Facility>();
 
-  const reload = () => {
-    setLoading(true);
-    fetchFacilities()
-      .then(setRows)
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
+  useRegisterAddAction('facilities', 'Thêm Cơ sở', openAdd);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -41,20 +35,42 @@ export default function FacilitiesTab() {
   return (
     <>
       <EntityTable
-        loading={loading}
+        entityLabel="cơ sở"
         title="Cơ sở"
-        onAdd={openAdd}
-        headers={['Tên cơ sở', 'Mã', 'Địa chỉ', 'SĐT', 'Trạng thái', '']}
+        loading={loading}
+        exporting={exporting}
+        headers={['Tên cơ sở', 'Mã', 'Địa chỉ', 'SĐT', 'Trạng thái', 'Thao tác']}
         rows={rows}
+        total={total}
+        query={query}
+        onQueryChange={onQueryChange}
+        onExportFetch={fetchExportRows}
+        getRowKey={(r) => r.id}
+        hasActiveField
+        getIsActive={(r) => r.is_active}
+        exportColumns={[
+          { key: 'name', label: 'Tên cơ sở' },
+          { key: 'code', label: 'Mã' },
+          { key: 'address', label: 'Địa chỉ' },
+          { key: 'phone', label: 'SĐT' },
+          { key: 'status', label: 'Trạng thái' },
+        ]}
+        getExportRow={(r) => ({
+          name: r.name,
+          code: r.code ?? '',
+          address: r.address ?? '',
+          phone: r.phone ?? '',
+          status: r.is_active ? 'Hoạt động' : 'Vô hiệu',
+        })}
         renderRow={(r) => (
           <>
-            <td className="px-4 py-3 font-semibold text-sm">{r.name}</td>
-            <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{r.code ?? '—'}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.address ?? '—'}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{r.phone ?? '—'}</td>
-            <td className="px-4 py-3"><ActiveBadge active={r.is_active} /></td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex justify-end gap-2">
+            <td className={cellPrimaryCls}>{r.name}</td>
+            <td className={`${cellCls} text-xs font-mono text-muted-foreground`}>{r.code ?? '—'}</td>
+            <td className={cellMutedCls}>{r.address ?? '—'}</td>
+            <td className={cellMutedCls}>{r.phone ?? '—'}</td>
+            <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
+            <td className={`${cellCls} text-right`}>
+              <div className="flex justify-end items-center gap-4">
                 <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
                 <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
               </div>
