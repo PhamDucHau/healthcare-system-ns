@@ -34,9 +34,14 @@ type ClinicalRecord = PreConsultation | DoctorPreConsultation;
 type Props = {
   record: ClinicalRecord | null;
   emptyMessage?: string;
+  columns?: 1 | 2;
 };
 
-export default function PreConsultationSectionCards({ record, emptyMessage }: Props) {
+export default function PreConsultationSectionCards({
+  record,
+  emptyMessage,
+  columns = 1,
+}: Props) {
   if (!record || !hasClinicalContent(record)) {
     return (
       <p className="text-sm text-muted-foreground italic py-2">
@@ -54,12 +59,14 @@ export default function PreConsultationSectionCards({ record, emptyMessage }: Pr
   const getConditionLabel = (condition: string) =>
     MEDICAL_CONDITION_OPTIONS.find((o) => o.value === condition)?.label ?? condition;
 
+  const gridClass = columns === 2 ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3';
+
   return (
     <div className="space-y-3">
       {(hasDrugAllergy || hasSeverePain) && (
-        <div className="grid grid-cols-1 gap-2">
+        <div className={`grid gap-2 ${columns === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {hasDrugAllergy && (
-            <Alert className="bg-red-50 border-red-200 py-2">
+            <Alert className={`bg-red-50 border-red-200 py-2 ${columns === 2 && hasSeverePain ? '' : columns === 2 ? 'col-span-2' : ''}`}>
               <AlertTriangle className="h-4 w-4 text-red-600" />
               <AlertTitle className="text-red-800 text-sm font-bold">CẢNH BÁO DỊ ỨNG</AlertTitle>
               <AlertDescription className="text-red-700 text-xs">
@@ -68,7 +75,7 @@ export default function PreConsultationSectionCards({ record, emptyMessage }: Pr
             </Alert>
           )}
           {hasSeverePain && (
-            <Alert className="bg-orange-50 border-orange-200 py-2">
+            <Alert className={`bg-orange-50 border-orange-200 py-2 ${columns === 2 && hasDrugAllergy ? '' : columns === 2 ? 'col-span-2' : ''}`}>
               <Activity className="h-4 w-4 text-orange-600" />
               <AlertTitle className="text-orange-800 text-sm font-bold">MỨC ĐỘ ĐAU</AlertTitle>
               <AlertDescription className="text-orange-700 text-xs">
@@ -79,7 +86,7 @@ export default function PreConsultationSectionCards({ record, emptyMessage }: Pr
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3">
+      <div className={gridClass}>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-primary">
@@ -222,7 +229,7 @@ export default function PreConsultationSectionCards({ record, emptyMessage }: Pr
         </Card>
 
         {(record.drug_allergies.length > 0 || record.food_allergies.length > 0) && (
-          <Card className="bg-amber-50/50 border-amber-100">
+          <Card className={`bg-amber-50/50 border-amber-100 ${columns === 2 ? 'col-span-2' : ''}`}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-amber-700">
                 <Apple className="h-4 w-4" />

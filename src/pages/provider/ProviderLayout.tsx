@@ -103,7 +103,7 @@ const ProviderLayout = () => {
         {UI_ACTION.skipToMain}
       </a>
 
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[250px_1fr]">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[280px_1fr]">
         <aside className="border-r bg-card px-4 py-5">
           <div className="mb-5 flex items-center gap-2.5 border-b pb-5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">

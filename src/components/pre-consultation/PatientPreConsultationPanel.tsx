@@ -65,7 +65,7 @@ export default function PatientPreConsultationPanel({
         )}
       </div>
 
-      <PreConsultationSectionCards record={record} />
+      <PreConsultationSectionCards record={record} columns={2} />
     </div>
   );
 }
