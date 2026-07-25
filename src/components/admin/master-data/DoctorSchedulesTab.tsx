@@ -57,7 +57,7 @@ export default function DoctorSchedulesTab() {
     setGen(true);
     try {
       const result = await triggerSlotGeneration();
-      toast.success(`Đã tạo ${result.slots_created} slot cho 30 ngày tới.`);
+      toast.success(`Đã tạo ${result.slots_created} khung giờ cho 30 ngày tới.`);
     } catch (e) { toast.error((e as Error).message); }
     finally { setGen(false); }
   }
@@ -66,7 +66,7 @@ export default function DoctorSchedulesTab() {
     <>
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-muted-foreground">
-          Slot được sinh tự động hàng đêm 00:00 (pg_cron). Nhấn để chạy thủ công ngay.
+          Khung giờ được sinh tự động hàng đêm lúc 00:00. Nhấn để chạy thủ công ngay.
         </p>
         <button
           onClick={handleGenerateSlots}
@@ -74,7 +74,7 @@ export default function DoctorSchedulesTab() {
           className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50"
         >
           {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Generate Slots 30d
+          Sinh khung giờ 30 ngày
         </button>
       </div>
 
@@ -288,7 +288,7 @@ function ScheduleDialog({
           </div>
 
           {/* Exception dates */}
-          <Field label="Ngày nghỉ (exception dates)">
+          <Field label="Ngày nghỉ">
             <div className="flex gap-2 mb-2">
               <input
                 type="date"

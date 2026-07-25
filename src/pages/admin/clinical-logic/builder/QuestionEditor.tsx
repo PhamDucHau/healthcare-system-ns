@@ -9,6 +9,10 @@ import { newId } from "./types";
 
 const CHOICE_TYPES: QuestionType[] = ["SINGLE_CHOICE", "MULTIPLE_CHOICE"];
 
+function optionDisplayLabel(label: string, index: number): string {
+  return label.trim() || `Lựa chọn ${index + 1}`;
+}
+
 type Props = {
   question: QuestionnaireQuestion;
   questionIndex: number;
@@ -150,8 +154,8 @@ export default function QuestionEditor({
                     placeholder="Nhãn lựa chọn"
                     className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none disabled:opacity-60"
                   />
-                  <span className="shrink-0 text-[10px] font-mono text-muted-foreground">
-                    ID: OPT_{oi}
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    Lựa chọn {oi + 1}
                   </span>
                   <div className="flex shrink-0 items-center gap-1.5 rounded-lg bg-muted/50 px-2 py-1">
                     <span className="text-[10px] font-medium text-muted-foreground">Điểm</span>
@@ -218,7 +222,7 @@ export default function QuestionEditor({
                 className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-teal-700"
               >
                 <span>
-                  Logic bỏ qua
+                  Quy tắc bỏ qua
                   {question.skip_logic.length > 0 && (
                     <span className="font-normal text-teal-600/80">
                       {" "}({question.skip_logic.length} quy tắc)
@@ -238,7 +242,7 @@ export default function QuestionEditor({
                         <SelectTrigger className="h-8 w-36 text-xs bg-white"><SelectValue placeholder="Lựa chọn" /></SelectTrigger>
                         <SelectContent>
                           {question.options.map((o, oi) => (
-                            <SelectItem key={o.id} value={o.id}>{o.label || `OPT_${oi}`}</SelectItem>
+                            <SelectItem key={o.id} value={o.id}>{optionDisplayLabel(o.label, oi)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

@@ -39,7 +39,7 @@ export default function TreeCoveragePanel({ sections }: Props) {
         />
       </div>
       <p className="text-[11px] leading-relaxed opacity-75">
-        Tính theo câu hỏi đã có nội dung, lựa chọn và logic bỏ qua hợp lệ.
+        Tính theo câu hỏi đã có nội dung, lựa chọn và quy tắc bỏ qua hợp lệ.
       </p>
     </div>
   );

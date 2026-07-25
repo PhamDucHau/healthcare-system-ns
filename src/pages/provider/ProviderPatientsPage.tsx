@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 import {
   NotebookPen,
   SquareChartGantt,
@@ -365,7 +366,7 @@ const ProviderPatientsPage = () => {
         let last_visit_label = "—";
         if (submitted_at) {
           try {
-            last_visit_label = formatDistanceToNow(new Date(submitted_at), { addSuffix: true });
+            last_visit_label = formatDistanceToNow(new Date(submitted_at), { locale: vi, addSuffix: true });
           } catch {
             last_visit_label = submitted_at.slice(0, 10);
           }

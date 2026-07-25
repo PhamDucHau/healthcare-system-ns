@@ -19,7 +19,7 @@ export default function ScoringPanel({ scoring, onChange, disabled }: Props) {
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100">
           <Sigma className="h-4 w-4 text-violet-600" strokeWidth={2.5} />
         </div>
-        <p className="text-sm font-bold text-foreground">Module chấm điểm</p>
+        <p className="text-sm font-bold text-foreground">Khối chấm điểm</p>
       </div>
 
       <div>

@@ -45,7 +45,7 @@ export default function RoomsTab() {
         loading={loading}
         title="Phòng khám"
         onAdd={openAdd}
-        headers={['Phòng', 'Số phòng', 'Cơ sở', 'Capacity', 'Thiết bị', 'Trạng thái', '']}
+        headers={['Phòng', 'Số phòng', 'Cơ sở', 'Sức chứa', 'Thiết bị', 'Trạng thái', '']}
         rows={rows}
         renderRow={(r) => (
           <>
@@ -126,7 +126,7 @@ function RoomDialog({ open, initial, facilities, onClose, onSaved }: {
             <Field label="Số phòng">
               <input value={form.room_number ?? ''} onChange={setStr('room_number')} className={inputCls} placeholder="101" />
             </Field>
-            <Field label="Capacity">
+            <Field label="Sức chứa">
               <input type="number" min={1} value={form.capacity ?? 1} onChange={setNum('capacity')} className={inputCls} />
             </Field>
           </div>

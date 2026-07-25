@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import RolePermissionsSummary from "@/components/admin/RolePermissionsSummary";
-import { getPermissionCategoryLabel, getPermissionDisplayName, groupPermissionsByCategory } from "@/config/rbac-permissions";
+import { getPermissionCategoryLabel, getPermissionDisplayName, getRoleDescriptionLabel, getRoleSlugLabel, groupPermissionsByCategory } from "@/config/rbac-permissions";
 
 type RoleForm = {
   name: string;
@@ -168,7 +168,7 @@ const AdminRolesContent = () => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quản lý Vai trò</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Tạo vai trò tùy chỉnh với quyền hạn tự chọn. Vai trò hệ thống (Bệnh nhân, Bác sĩ, Admin) không thể xóa.
+            Tạo vai trò tùy chỉnh với quyền hạn tự chọn. Vai trò hệ thống (Bệnh nhân, Bác sĩ, Quản trị) không thể xóa.
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2">
@@ -184,7 +184,9 @@ const AdminRolesContent = () => {
         </div>
       ) : (
         <div className="grid gap-4">
-          {roles.map((role) => (
+          {roles.map((role) => {
+            const roleDescription = getRoleDescriptionLabel(role.description, role.slug);
+            return (
             <div key={role.id} className="rounded-xl border bg-card p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
@@ -201,9 +203,13 @@ const AdminRolesContent = () => {
                       )}
                       <Badge variant="outline">{role.userCount} người dùng</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{role.slug}</p>
-                    {role.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{role.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Mã vai trò: <span className="font-medium text-foreground">{getRoleSlugLabel(role.slug)}</span>
+                    </p>
+                    {roleDescription && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {roleDescription}
+                      </p>
                     )}
                     <div className="mt-3">
                       <RolePermissionsSummary permissions={role.permissions} />
@@ -224,7 +230,8 @@ const AdminRolesContent = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -3,7 +3,7 @@
 export const PERMISSION_CATEGORY_LABELS: Record<string, string> = {
   admin: "Cổng quản trị",
   clinical: "Lâm sàng / Hồ sơ (Quản trị)",
-  provider: "Bệnh nhân (Module bác sĩ)",
+  provider: "Bệnh nhân (cổng bác sĩ)",
   appointments: "Lịch hẹn",
   master_data: "Danh mục hệ thống",
   users: "Người dùng",
@@ -34,8 +34,8 @@ export const PERMISSION_NAME_LABELS: Record<string, string> = {
   EDIT_SOAP: "Sửa ghi chú SOAP",
   SIGN_MEDICAL_RECORD: "Ký hồ sơ y tế",
   VIEW_APPOINTMENT: "Xem lịch hẹn",
-  VIEW_PROVIDER_PATIENTS: "Xem bệnh nhân (module bác sĩ)",
-  EDIT_PROVIDER_PATIENTS: "Sửa bệnh nhân (module bác sĩ)",
+  VIEW_PROVIDER_PATIENTS: "Xem bệnh nhân (cổng bác sĩ)",
+  EDIT_PROVIDER_PATIENTS: "Sửa bệnh nhân (cổng bác sĩ)",
   "appointments.read": "Xem lịch hẹn",
   "appointments.write": "Tạo / sửa lịch hẹn",
   "appointments.cancel": "Hủy lịch hẹn",
@@ -62,6 +62,47 @@ export const PERMISSION_CATEGORY_ORDER = [
   "audit",
 ] as const;
 
+/** Mã vai trò hệ thống → nhãn hiển thị (slug DB giữ nguyên). */
+export const ROLE_SLUG_LABELS: Record<string, string> = {
+  patient: "bệnh nhân",
+  doctor: "bác sĩ",
+  admin: "quản trị",
+  customer: "nhân viên",
+};
+
+/** Mô tả cổng theo slug vai trò hệ thống. */
+export const ROLE_PORTAL_DESCRIPTION: Record<string, string> = {
+  patient: "Cổng bệnh nhân",
+  doctor: "Cổng bác sĩ",
+  admin: "Cổng quản trị",
+  customer: "Cổng nhân viên",
+};
+
+/** Tên quyền trong DB (legacy EN) → nhãn VI. */
+export const PERMISSION_DB_NAME_LABELS: Record<string, string> = {
+  "Truy cập Admin portal": "Truy cập cổng quản trị",
+  "Xem Bệnh nhân (module BS)": "Xem bệnh nhân (cổng bác sĩ)",
+  "Sửa Bệnh nhân (module BS)": "Sửa bệnh nhân (cổng bác sĩ)",
+  "Portal bệnh nhân": "Cổng bệnh nhân",
+  "Portal bác sĩ": "Cổng bác sĩ",
+  "Portal admin": "Cổng quản trị",
+};
+
+export function getRoleSlugLabel(slug: string): string {
+  return ROLE_SLUG_LABELS[slug] ?? slug;
+}
+
+export function getRoleDescriptionLabel(
+  description: string | null | undefined,
+  slug?: string,
+): string | null {
+  if (slug && ROLE_PORTAL_DESCRIPTION[slug]) {
+    return ROLE_PORTAL_DESCRIPTION[slug];
+  }
+  if (!description?.trim()) return null;
+  return PERMISSION_DB_NAME_LABELS[description] ?? description.replace(/^Portal\s+/i, "Cổng ");
+}
+
 export function getPermissionCategoryLabel(category: string): string {
   return PERMISSION_CATEGORY_LABELS[category] ?? category;
 }
@@ -69,6 +110,8 @@ export function getPermissionCategoryLabel(category: string): string {
 export function getPermissionDisplayName(p: { name: string; slug: string }): string {
   const fromSlug = PERMISSION_NAME_LABELS[p.slug];
   if (fromSlug) return fromSlug;
+  const fromDbName = PERMISSION_DB_NAME_LABELS[p.name];
+  if (fromDbName) return fromDbName;
   return p.name?.trim() || p.slug;
 }
 
