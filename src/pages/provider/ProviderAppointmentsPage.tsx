@@ -31,6 +31,7 @@ import { supabase } from "@/lib/supabase";
 import {
   getAppointmentReadiness,
   getAppointmentReadinessMessage,
+  appointmentHasPreConsult,
 } from "@/lib/appointment-readiness";
 import { toast } from "sonner";
 import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
@@ -224,8 +225,8 @@ export default function ProviderAppointmentsPage() {
   };
 
   const handlePreConsultReminder = async (row: AdminAppointment) => {
-    if (row.pre_consult_status === "submitted") {
-      toast.info("Bệnh nhân đã hoàn thành khai báo trước khám.");
+    if (appointmentHasPreConsult(row)) {
+      toast.info("Đã có khai báo trước khám (bệnh nhân hoặc bác sĩ).");
       return;
     }
     setRemindingId(row.id);
@@ -374,7 +375,7 @@ export default function ProviderAppointmentsPage() {
                   const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(row.status) && !row.walk_in;
                   const canVitalSigns = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
                   const canRemindPreConsult =
-                    row.pre_consult_status !== "submitted" &&
+                    !appointmentHasPreConsult(row) &&
                     ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
                   return (
                     <TableRow
@@ -405,7 +406,7 @@ export default function ProviderAppointmentsPage() {
                                   <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
                                 </span>
                               )}
-                              {row.pre_consult_status === "submitted" && (
+                              {appointmentHasPreConsult(row) && (
                                 <span title="Đã khai báo y tế trước khám">
                                   <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                                 </span>

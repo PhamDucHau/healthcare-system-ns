@@ -51,6 +51,8 @@ interface Props {
   profileId: string;
   patientUserId: string;
   patientName?: string | null;
+  /** When opened inside Sheet/Dialog — skip second backdrop */
+  nested?: boolean;
 }
 
 const lc = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
@@ -70,7 +72,7 @@ function F({ label, value, onChange, type = "text", placeholder, col2 }: {
 }
 
 export default function AdminCreateProfileDialog({
-  open, onClose, onSuccess, profileId, patientUserId, patientName,
+  open, onClose, onSuccess, profileId, patientUserId, patientName, nested = false,
 }: Props) {
   const [form, setForm] = useState<FormData>(empty);
   const [idFile, setIdFile] = useState<File | null>(null);
@@ -193,7 +195,7 @@ export default function AdminCreateProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v && !saving) handleClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto" hideOverlay={nested}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserRoundPlus className="h-5 w-5 text-primary" />

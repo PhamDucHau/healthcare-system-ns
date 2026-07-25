@@ -33,6 +33,7 @@ export interface AdminAppointment {
   doctor_name: string | null;
   // FR-022: Pre-consultation indicators
   pre_consult_status: 'none' | 'draft' | 'submitted';
+  pre_consult_doctor_exists: boolean;
   pre_consult_drug_allergy: boolean;
   pre_consult_severe_pain: boolean;
   has_vital_signs: boolean;
@@ -57,6 +58,23 @@ export interface AdminAppointmentFilters {
   doctor_id?: string;
   search?: string;
 }
+
+export type AdminAppointmentsListParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  status?: AdminAppointmentStatus | string;
+  dateFrom?: string;
+  dateTo?: string;
+  specialtyId?: string;
+  doctorId?: string;
+};
+
+export type AdminAppointmentsListResult = {
+  rows: AdminAppointment[];
+  total: number;
+  error: Error | null;
+};
 
 export const ADMIN_STATUS_LABEL: Record<AdminAppointmentStatus, string> = {
   CONFIRMED:  'Chờ khám',

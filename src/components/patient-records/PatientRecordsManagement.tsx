@@ -419,7 +419,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
               disabled={!hasActiveFilters(filters, debouncedSearch)}
               onClick={resetFilters}
             >
-              Reset
+              Xóa bộ lọc
             </Button>
           </div>
         </div>

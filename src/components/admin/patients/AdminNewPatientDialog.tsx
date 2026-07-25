@@ -19,6 +19,7 @@ import {
   applyBhytParsedFillEmpty,
   applyCccdParsedFillEmpty,
 } from "@/lib/cccd-ocr";
+import type { PatientSearchResult } from "@/types/admin-appointment";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -51,8 +52,10 @@ const empty: FormData = {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (patient?: PatientSearchResult) => void;
   portal?: "admin" | "provider";
+  /** When opened inside another Dialog — skip second backdrop */
+  nested?: boolean;
 }
 
 const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
@@ -73,7 +76,7 @@ function F({ label, value, onChange, type = "text", placeholder, col2, required,
   );
 }
 
-export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal = "admin" }: Props) {
+export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal = "admin", nested = false }: Props) {
   const [form, setForm] = useState<FormData>(empty);
   const [idFile, setIdFile] = useState<File | null>(null);
   const [idBackFile, setIdBackFile] = useState<File | null>(null);
@@ -318,7 +321,15 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
 
       toast.success("Đã tạo hồ sơ bệnh nhân thành công");
       handleClose();
-      onSuccess();
+      onSuccess({
+        profile_id: profileId,
+        patient_id: userId ?? profileId,
+        patient_name: fullName,
+        phone_number: phone || null,
+        id_number: form.idNumber.trim() || null,
+        date_of_birth: form.dateOfBirth || null,
+        submitted_at: new Date().toISOString(),
+      });
     } catch (e) {
       toast.error("Tạo hồ sơ thất bại", { description: e instanceof Error ? e.message : undefined });
     } finally {
@@ -331,7 +342,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v && !saving) handleClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto" hideOverlay={nested}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserRoundPlus className="h-5 w-5 text-primary" />

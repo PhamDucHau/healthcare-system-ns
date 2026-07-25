@@ -1,12 +1,13 @@
 /**
  * Pre-consultation data read-only view in EMR context
- * Shows the submitted pre-consultation form for the doctor
+ * Prefers doctor version, falls back to patient submitted
  */
 
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Activity, Loader2 } from 'lucide-react';
-import { getPreConsultationByAppointment } from '@/lib/pre-consultation-api';
-import type { PreConsultation } from '@/types/pre-consultation';
+import { getPreConsultationBundle } from '@/lib/pre-consultation-api';
+import { hasClinicalContent } from '@/lib/pre-consultation-form-utils';
+import type { PreConsultation, DoctorPreConsultation } from '@/types/pre-consultation';
 import {
   SMOKING_LABELS, ALCOHOL_LABELS, EXERCISE_LABELS,
   DURATION_UNIT_LABELS, SYMPTOM_TAG_OPTIONS,
@@ -16,18 +17,39 @@ type PreConsultationReadOnlyProps = {
   appointmentId: string;
 };
 
+type DisplayRecord = PreConsultation | DoctorPreConsultation;
+
+function pickClinicalRecord(
+  doctor: DoctorPreConsultation | null,
+  patient: PreConsultation | null,
+): DisplayRecord | null {
+  if (doctor && hasClinicalContent(doctor)) return doctor;
+  if (patient?.status === 'SUBMITTED') return patient;
+  return null;
+}
+
 export default function PreConsultationReadOnly({ appointmentId }: PreConsultationReadOnlyProps) {
-  const [data, setData] = useState<PreConsultation | null>(null);
+  const [data, setData] = useState<DisplayRecord | null>(null);
+  const [source, setSource] = useState<'doctor' | 'patient' | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const result = await getPreConsultationByAppointment(appointmentId);
-        setData(result);
+        const bundle = await getPreConsultationBundle(appointmentId);
+        const picked = pickClinicalRecord(bundle.doctor, bundle.patient);
+        setData(picked);
+        if (bundle.doctor && hasClinicalContent(bundle.doctor)) {
+          setSource('doctor');
+        } else if (picked) {
+          setSource('patient');
+        } else {
+          setSource(null);
+        }
       } catch {
         setData(null);
+        setSource(null);
       } finally {
         setLoading(false);
       }
@@ -46,15 +68,7 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
   if (!data) {
     return (
       <p className="text-xs text-muted-foreground py-1">
-        Bệnh nhân chưa điền khai báo y tế trước khám.
-      </p>
-    );
-  }
-
-  if (data.status === 'DRAFT') {
-    return (
-      <p className="text-xs text-amber-600 py-1">
-        Bệnh nhân đang điền khai báo (chưa gửi).
+        Chưa có khai báo y tế trước khám.
       </p>
     );
   }
@@ -65,7 +79,12 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
 
   return (
     <div className="space-y-3 text-xs">
-      {/* Flags */}
+      {source === 'doctor' && (
+        <p className="text-[10px] uppercase tracking-wide text-blue-600 font-medium">
+          Nguồn: Bác sĩ cập nhật
+        </p>
+      )}
+
       {(data.flags.drug_allergy || data.flags.severe_pain) && (
         <div className="flex flex-wrap gap-1.5">
           {data.flags.drug_allergy && (
@@ -81,12 +100,10 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
         </div>
       )}
 
-      {/* Chief complaint */}
       {data.chief_complaint && (
         <Row label="Lý do khám" value={data.chief_complaint} />
       )}
 
-      {/* Duration */}
       {data.symptom_duration != null && (
         <Row
           label="Thời gian"
@@ -94,7 +111,6 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
         />
       )}
 
-      {/* Pain scale */}
       {data.pain_scale != null && (
         <Row
           label="Đau"
@@ -106,10 +122,8 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
         />
       )}
 
-      {/* Symptom tags */}
       {symptomLabel && <Row label="Triệu chứng" value={symptomLabel} />}
 
-      {/* Medical history */}
       {data.medical_history.length > 0 && (
         <Row
           label="Bệnh nền"
@@ -117,10 +131,8 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
         />
       )}
 
-      {/* Surgical history */}
       {data.surgical_history && <Row label="Phẫu thuật" value={data.surgical_history} />}
 
-      {/* Drug allergies */}
       {data.drug_allergies.length > 0 && (
         <Row
           label="Dị ứng thuốc"
@@ -132,7 +144,6 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
         />
       )}
 
-      {/* Current medications */}
       {data.current_medications.length > 0 && (
         <Row
           label="Thuốc đang dùng"
@@ -140,7 +151,6 @@ export default function PreConsultationReadOnly({ appointmentId }: PreConsultati
         />
       )}
 
-      {/* Lifestyle */}
       <div className="flex flex-wrap gap-3">
         {data.smoking && <Row label="Hút thuốc" value={SMOKING_LABELS[data.smoking]} inline />}
         {data.alcohol && <Row label="Rượu bia" value={ALCOHOL_LABELS[data.alcohol]} inline />}

@@ -93,9 +93,27 @@ export type PreConsultation = {
   // Computed
   flags: PreConsultationFlags;
   submitted_at: string | null;
+  submitted_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
+
+// ─── Doctor Pre-Consultation (editable by doctor/admin) ─────────────────────
+
+export type DoctorPreConsultation = Omit<PreConsultation, 'status' | 'submitted_at' | 'submitted_by_user_id'> & {
+  created_by_user_id: string;
+  updated_by_user_id: string;
+};
+
+export type PreConsultationBundle = {
+  patient: PreConsultation | null;
+  doctor: DoctorPreConsultation | null;
+  patientCreatorName: string | null;
+  doctorCreatorName: string | null;
+  doctorUpdaterName: string | null;
+};
+
+export type UpdateDoctorPreConsultationInput = UpdatePreConsultationInput;
 
 // ─── Form Data (for editing) ─────────────────────────────────────────────────
 

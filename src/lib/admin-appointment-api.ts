@@ -2,8 +2,119 @@ import { supabase } from "@/lib/supabase";
 import type {
   AdminAppointment,
   AdminAppointmentFilters,
+  AdminAppointmentsListParams,
+  AdminAppointmentsListResult,
   PatientSearchResult,
 } from "@/types/admin-appointment";
+
+type SearchAdminAppointmentsRpcPayload = {
+  total?: number;
+  rows?: Record<string, unknown>[] | null;
+};
+
+export function mapRpcAdminAppointmentRow(r: Record<string, unknown>): AdminAppointment {
+  const pcFlags = (r.pre_consult_flags as Record<string, unknown> | null) ?? {};
+  const dpcFlags = (r.pre_consult_doctor_flags as Record<string, unknown> | null) ?? {};
+  const preConsultRaw = r.pre_consult_status_raw as string | null;
+
+  return {
+    id: r.id as string,
+    patient_id: r.patient_id as string,
+    profile_id: r.profile_id as string,
+    specialty_id: r.specialty_id as string,
+    slot_id: (r.slot_id as string) ?? null,
+    status: r.status as AdminAppointment["status"],
+    note: (r.note as string) ?? null,
+    walk_in: Boolean(r.walk_in),
+    cancel_reason: (r.cancel_reason as string) ?? null,
+    cancelled_at: (r.cancelled_at as string) ?? null,
+    cancelled_by: (r.cancelled_by as "patient" | "admin") ?? null,
+    created_at: r.created_at as string,
+    updated_at: r.updated_at as string,
+    specialty_name: (r.specialty_name as string) ?? null,
+    specialty_icon: (r.specialty_icon as string) ?? null,
+    slot_date: (r.slot_date as string) ?? null,
+    start_time: (r.start_time as string) ?? null,
+    end_time: (r.end_time as string) ?? null,
+    doctor_id: (r.doctor_id as string) ?? null,
+    patient_name: (r.patient_name as string) ?? null,
+    patient_phone: (r.patient_phone as string) ?? null,
+    patient_dob: (r.patient_dob as string) ?? null,
+    doctor_name: (r.doctor_name as string) ?? null,
+    pre_consult_status: !preConsultRaw
+      ? "none"
+      : preConsultRaw === "SUBMITTED"
+        ? "submitted"
+        : "draft",
+    pre_consult_doctor_exists: Boolean(r.pre_consult_doctor_exists),
+    pre_consult_drug_allergy: Boolean(pcFlags.drug_allergy || dpcFlags.drug_allergy),
+    pre_consult_severe_pain: Boolean(pcFlags.severe_pain || dpcFlags.severe_pain),
+    has_vital_signs: Boolean(r.has_vital_signs),
+  };
+}
+
+async function searchAdminAppointmentsFallback(
+  params: AdminAppointmentsListParams,
+): Promise<AdminAppointmentsListResult> {
+  const page = Math.max(1, params.page ?? 1);
+  const limit = Math.min(100, Math.max(1, params.limit ?? 10));
+
+  const all = await fetchAdminAppointments({
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
+    specialty_id: params.specialtyId,
+    status: params.status as AdminAppointmentFilters["status"],
+    doctor_id: params.doctorId,
+    search: params.search,
+  });
+
+  const total = all.length;
+  const from = (page - 1) * limit;
+  const rows = all.slice(from, from + limit);
+
+  return { rows, total, error: null };
+}
+
+/** Tìm kiếm + lọc + phân trang lịch hẹn cho admin portal. */
+export async function searchAdminAppointments(
+  params: AdminAppointmentsListParams = {},
+): Promise<AdminAppointmentsListResult> {
+  const page = Math.max(1, params.page ?? 1);
+  const limit = Math.min(100, Math.max(1, params.limit ?? 10));
+  const search = params.search?.trim() || null;
+  const status =
+    params.status && params.status !== "__all__" ? params.status : null;
+
+  const { data, error } = await supabase.rpc("search_admin_appointments", {
+    p_query: search,
+    p_page: page,
+    p_limit: limit,
+    p_status: status,
+    p_date_from: params.dateFrom || null,
+    p_date_to: params.dateTo || null,
+    p_specialty_id: params.specialtyId || null,
+    p_doctor_id: params.doctorId || null,
+  });
+
+  if (error) {
+    if (
+      error.message.includes("search_admin_appointments") ||
+      error.code === "PGRST202"
+    ) {
+      return searchAdminAppointmentsFallback(params);
+    }
+    return { rows: [], total: 0, error: new Error(mapAdminError(error.message)) };
+  }
+
+  const payload = (data ?? {}) as SearchAdminAppointmentsRpcPayload;
+  const rows = (payload.rows ?? []).map((row) => mapRpcAdminAppointmentRow(row));
+
+  return {
+    rows,
+    total: Number(payload.total ?? 0),
+    error: null,
+  };
+}
 
 // ─── Fetch appointments (direct PostgREST — no custom RPC needed) ─────────────
 
@@ -20,6 +131,7 @@ export async function fetchAdminAppointments(
       ),
       patient ( legal_first_name, legal_last_name, phone_number, date_of_birth ),
       pre_consultations ( status, flags ),
+      doctor_pre_consultations ( id, flags ),
       vital_signs ( id )
     `)
     .order("created_at", { ascending: false })
@@ -73,7 +185,10 @@ export async function fetchAdminAppointments(
     const sp  = (r.specialties      as any) ?? null;
     const doc = sl?.user_profiles ?? null;
     const pc  = (Array.isArray(r.pre_consultations) ? r.pre_consultations[0] : r.pre_consultations) ?? null;
+    const dpc = (Array.isArray(r.doctor_pre_consultations) ? r.doctor_pre_consultations[0] : r.doctor_pre_consultations) ?? null;
     const vitalsRaw = r.vital_signs as unknown[] | null;
+    const pcFlags = (pc?.flags as Record<string, unknown> | undefined) ?? {};
+    const dpcFlags = (dpc?.flags as Record<string, unknown> | undefined) ?? {};
 
     return {
       id:            r.id,
@@ -100,8 +215,9 @@ export async function fetchAdminAppointments(
       patient_dob:   pt?.date_of_birth ?? null,
       doctor_name:   doc?.full_name    ?? null,
       pre_consult_status: !pc ? "none" : pc.status === "SUBMITTED" ? "submitted" : "draft",
-      pre_consult_drug_allergy: Boolean(pc?.flags?.drug_allergy),
-      pre_consult_severe_pain:  Boolean(pc?.flags?.severe_pain),
+      pre_consult_doctor_exists: Boolean(dpc?.id),
+      pre_consult_drug_allergy: Boolean(pcFlags.drug_allergy || dpcFlags.drug_allergy),
+      pre_consult_severe_pain:  Boolean(pcFlags.severe_pain || dpcFlags.severe_pain),
       has_vital_signs: Array.isArray(vitalsRaw) && vitalsRaw.length > 0,
     } as AdminAppointment;
   });

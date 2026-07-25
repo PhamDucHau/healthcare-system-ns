@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, subDays, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { vi } from "date-fns/locale";
 import {
@@ -20,7 +20,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { fetchAdminAppointments } from "@/lib/admin-appointment-api";
+import { searchAdminAppointments } from "@/lib/admin-appointment-api";
+import { appointmentHasPreConsult } from "@/lib/appointment-readiness";
 import { sendPreConsultReminder } from "@/lib/doctor-appointment-api";
 import { fetchSpecialties } from "@/lib/appointment-api";
 import { fetchDoctors } from "@/lib/master-data-api";
@@ -37,6 +38,10 @@ import AppointmentDetailSheet from "./appointments/AppointmentDetailSheet";
 import CancelDialog from "./appointments/CancelDialog";
 import RescheduleDialog from "./appointments/RescheduleDialog";
 import VitalSignsSheet from "./appointments/VitalSignsSheet";
+
+const APPOINTMENT_LIST_PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 300;
+const ADMIN_APPOINTMENTS_QUERY_KEY = ["admin-appointments"] as const;
 
 const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string }[] = [
   { value: "__all__",    label: "Tất cả trạng thái" },
@@ -76,7 +81,9 @@ export default function AdminAppointmentsContent() {
   const [specialtyFilter, setSpecialtyFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
   const [doctorFilter, setDoctorFilter] = useState<string>("__all__");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const [listPage, setListPage] = useState(1);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailAppt, setDetailAppt] = useState<AdminAppointment | null>(null);
@@ -94,23 +101,69 @@ export default function AdminAppointmentsContent() {
   const monthStart = format(startOfMonth(currentDate), "yyyy-MM-dd");
   const monthEnd   = format(endOfMonth(currentDate),   "yyyy-MM-dd");
 
-  const { data: appointments = [], isFetching, refetch } = useQuery({
-    queryKey: [
-      "admin-appointments",
-      viewMode, dateStr,
-      specialtyFilter, statusFilter, doctorFilter, searchQuery,
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setListPage(1);
+    setSelectedIds(new Set());
+  }, [
+    viewMode, dateStr, weekStart, weekEnd, monthStart, monthEnd,
+    specialtyFilter, statusFilter, doctorFilter, debouncedSearch,
+  ]);
+
+  const listQueryParams = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      page: listPage,
+      limit: APPOINTMENT_LIST_PAGE_SIZE,
+      status: statusFilter === "__all__" ? undefined : statusFilter,
+      dateFrom:
+        viewMode === "today" ? dateStr
+        : viewMode === "week" ? weekStart
+        : viewMode === "month" ? monthStart
+        : undefined,
+      dateTo:
+        viewMode === "today" ? dateStr
+        : viewMode === "week" ? weekEnd
+        : viewMode === "month" ? monthEnd
+        : undefined,
+      specialtyId: specialtyFilter === "__all__" ? undefined : specialtyFilter,
+      doctorId: doctorFilter === "__all__" ? undefined : doctorFilter,
+    }),
+    [
+      debouncedSearch, listPage, statusFilter,
+      viewMode, dateStr, weekStart, weekEnd, monthStart, monthEnd,
+      specialtyFilter, doctorFilter,
     ],
-    queryFn: () =>
-      fetchAdminAppointments({
-        date:      viewMode === "today" ? dateStr    : undefined,
-        date_from: viewMode === "week"  ? weekStart  : viewMode === "month" ? monthStart : undefined,
-        date_to:   viewMode === "week"  ? weekEnd    : viewMode === "month" ? monthEnd   : undefined,
-        specialty_id: specialtyFilter === "__all__" ? undefined : specialtyFilter,
-        status:       statusFilter     === "__all__" ? undefined : (statusFilter as AdminAppointmentStatus),
-        doctor_id:    doctorFilter     === "__all__" ? undefined : doctorFilter,
-        search:       searchQuery.trim() || undefined,
-      }),
+  );
+
+  const { data: appointmentListData, isFetching, refetch } = useQuery({
+    queryKey: [...ADMIN_APPOINTMENTS_QUERY_KEY, listQueryParams],
+    queryFn: async () => {
+      const { rows, total, error } = await searchAdminAppointments(listQueryParams);
+      if (error) throw error;
+      return { rows, total };
+    },
+    placeholderData: (previous) => previous,
   });
+
+  const appointments = appointmentListData?.rows ?? [];
+  const appointmentTotal = appointmentListData?.total ?? 0;
+  const appointmentTotalPages = Math.max(
+    1,
+    Math.ceil(appointmentTotal / APPOINTMENT_LIST_PAGE_SIZE),
+  );
+  const appointmentFrom =
+    appointmentTotal === 0 ? 0 : (listPage - 1) * APPOINTMENT_LIST_PAGE_SIZE + 1;
+  const appointmentTo =
+    appointmentTotal === 0
+      ? 0
+      : Math.min(listPage * APPOINTMENT_LIST_PAGE_SIZE, appointmentTotal);
 
   const { data: specialties = [] } = useQuery({
     queryKey: ["specialties"],
@@ -151,8 +204,8 @@ export default function AdminAppointmentsContent() {
   };
 
   async function handlePreConsultReminder(appt: AdminAppointment) {
-    if (appt.pre_consult_status === "submitted") {
-      toast.info("Bệnh nhân đã hoàn thành khai báo trước khám.");
+    if (appointmentHasPreConsult(appt)) {
+      toast.info("Đã có khai báo trước khám (bệnh nhân hoặc bác sĩ).");
       return;
     }
     setRemindingId(appt.id);
@@ -266,8 +319,8 @@ export default function AdminAppointmentsContent() {
           <Input
             className="pl-9"
             placeholder="Tìm BN (tên, SĐT, CCCD)…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
 
@@ -355,6 +408,45 @@ export default function AdminAppointmentsContent() {
         )}
       </div>
 
+      {appointmentTotal > 0 ? (
+        <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Hiển thị{" "}
+            <span className="font-semibold text-foreground">
+              {appointmentFrom}–{appointmentTo}
+            </span>{" "}
+            / {appointmentTotal} lịch hẹn
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={listPage <= 1 || isFetching}
+              onClick={() => setListPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Trước
+            </Button>
+            <span className="min-w-[72px] text-center text-xs font-medium text-muted-foreground">
+              {listPage}/{appointmentTotalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={listPage >= appointmentTotalPages || isFetching}
+              onClick={() => setListPage((p) => Math.min(appointmentTotalPages, p + 1))}
+            >
+              Sau
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {/* ── Walk-in dialog ───────────────────────────────────────────────────── */}
       <WalkInDialog
         open={walkInOpen}
@@ -439,7 +531,7 @@ function AppointmentRow({
   const canReschedule  = ["CONFIRMED", "CHECKED_IN"].includes(appt.status) && !appt.walk_in;
   const canVitalSigns  = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
   const canRemindPreConsult =
-    appt.pre_consult_status !== "submitted" &&
+    !appointmentHasPreConsult(appt) &&
     ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
 
   return (
@@ -479,7 +571,7 @@ function AppointmentRow({
                 <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
               </span>
             )}
-            {appt.pre_consult_status === "submitted" && (
+            {appointmentHasPreConsult(appt) && (
               <span title="Đã khai báo y tế trước khám">
                 <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
               </span>

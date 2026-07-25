@@ -9,7 +9,7 @@ import CancelDialog from "./CancelDialog";
 import RescheduleDialog from "./RescheduleDialog";
 import PatientRecordDialog from "./PatientRecordDialog";
 import AdminCreateProfileDialog from "./AdminCreateProfileDialog";
-import PreConsultationView from "@/components/pre-consultation/PreConsultationView";
+import PreConsultationDualView from "@/components/pre-consultation/PreConsultationDualView";
 import type { AdminAppointment } from "@/types/admin-appointment";
 import {
   ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT,
@@ -89,7 +89,11 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
   return (
     <>
       <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent
+          className={`w-full overflow-y-auto ${
+            activeTab === 'preconsult' ? 'sm:max-w-4xl' : 'sm:max-w-lg'
+          }`}
+        >
           <SheetHeader className="mb-4">
             <SheetTitle>Chi tiết lịch hẹn</SheetTitle>
           </SheetHeader>
@@ -246,12 +250,9 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
 
             {/* Pre-consultation Tab */}
             <TabsContent value="preconsult">
-              <PreConsultationView
+              <PreConsultationDualView
                 appointmentId={appointment.id}
-                onGenerateSOAP={(pc) => {
-                  // TODO: Integrate with SOAP generation (FR-024)
-                  toast.info("Chức năng tạo SOAP tự động đang được phát triển.");
-                }}
+                appointmentStatus={appointment.status}
               />
             </TabsContent>
           </Tabs>
@@ -263,6 +264,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
         onSuccess={() => { setCancelOpen(false); onRefresh(); onClose(); }}
+        nested
       />
 
       {rescheduleOpen && (
@@ -271,6 +273,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
           open={rescheduleOpen}
           onClose={() => setRescheduleOpen(false)}
           onSuccess={() => { setRescheduleOpen(false); onRefresh(); onClose(); }}
+          nested
         />
       )}
 
@@ -280,6 +283,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
         onClose={() => setProfileOpen(false)}
         onProfileResolved={setHasProfile}
         onCreateProfile={() => { setProfileOpen(false); setCreateProfileOpen(true); }}
+        nested
       />
 
       <AdminCreateProfileDialog
@@ -293,6 +297,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
         profileId={appointment.profile_id}
         patientUserId={appointment.patient_id}
         patientName={appointment.patient_name}
+        nested
       />
     </>
   );

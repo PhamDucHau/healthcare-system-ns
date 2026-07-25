@@ -22,9 +22,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  nested?: boolean;
 }
 
-export default function RescheduleDialog({ appointment, open, onClose, onSuccess }: Props) {
+export default function RescheduleDialog({ appointment, open, onClose, onSuccess, nested = false }: Props) {
   const [date, setDate] = useState<Date | undefined>(
     appointment.slot_date ? new Date(appointment.slot_date) : new Date()
   );
@@ -63,7 +64,7 @@ export default function RescheduleDialog({ appointment, open, onClose, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" hideOverlay={nested}>
         <DialogHeader>
           <DialogTitle>Đổi lịch hẹn</DialogTitle>
         </DialogHeader>

@@ -13,9 +13,10 @@ interface Props {
   onClose: () => void;
   onProfileResolved?: (hasProfile: boolean) => void;
   onCreateProfile?: () => void;
+  nested?: boolean;
 }
 
-export default function PatientRecordDialog({ profileId, open, onClose, onProfileResolved, onCreateProfile }: Props) {
+export default function PatientRecordDialog({ profileId, open, onClose, onProfileResolved, onCreateProfile, nested = false }: Props) {
   const [record, setRecord] = useState<PatientPortalDetail | null>(null);
   const [imageUrls, setImageUrls] = useState<PatientDocImageUrls>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +60,7 @@ export default function PatientRecordDialog({ profileId, open, onClose, onProfil
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" hideOverlay={nested}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileUser className="h-5 w-5 text-primary" />

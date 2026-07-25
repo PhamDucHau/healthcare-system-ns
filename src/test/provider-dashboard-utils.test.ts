@@ -37,6 +37,7 @@ function appt(partial: Partial<AdminAppointment>): AdminAppointment {
     patient_dob: null,
     doctor_name: "BS Test",
     pre_consult_status: "none",
+    pre_consult_doctor_exists: false,
     pre_consult_drug_allergy: false,
     pre_consult_severe_pain: false,
     has_vital_signs: false,

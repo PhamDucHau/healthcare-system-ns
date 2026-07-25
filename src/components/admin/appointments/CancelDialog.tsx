@@ -16,9 +16,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  nested?: boolean;
 }
 
-export default function CancelDialog({ appointment, open, onClose, onSuccess }: Props) {
+export default function CancelDialog({ appointment, open, onClose, onSuccess, nested = false }: Props) {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +55,7 @@ export default function CancelDialog({ appointment, open, onClose, onSuccess }: 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" hideOverlay={nested}>
         <DialogHeader>
           <DialogTitle>Hủy lịch hẹn</DialogTitle>
         </DialogHeader>

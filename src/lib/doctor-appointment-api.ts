@@ -37,7 +37,11 @@ function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
   const doc = sl?.user_profiles as Record<string, string> | null;
   const pcRaw = r.pre_consultations as Record<string, unknown> | Record<string, unknown>[] | null;
   const pc = (Array.isArray(pcRaw) ? pcRaw[0] : pcRaw) ?? null;
+  const dpcRaw = r.doctor_pre_consultations as Record<string, unknown> | Record<string, unknown>[] | null;
+  const dpc = (Array.isArray(dpcRaw) ? dpcRaw[0] : dpcRaw) ?? null;
   const vitalsRaw = r.vital_signs as unknown[] | null;
+  const pcFlags = (pc?.flags as Record<string, unknown> | undefined) ?? {};
+  const dpcFlags = (dpc?.flags as Record<string, unknown> | undefined) ?? {};
 
   return {
     id: r.id as string,
@@ -64,8 +68,9 @@ function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
     patient_dob: pt?.date_of_birth ?? null,
     doctor_name: doc?.full_name ?? null,
     pre_consult_status: !pc ? "none" : pc.status === "SUBMITTED" ? "submitted" : "draft",
-    pre_consult_drug_allergy: Boolean((pc?.flags as Record<string, unknown> | undefined)?.drug_allergy),
-    pre_consult_severe_pain: Boolean((pc?.flags as Record<string, unknown> | undefined)?.severe_pain),
+    pre_consult_doctor_exists: Boolean(dpc?.id),
+    pre_consult_drug_allergy: Boolean(pcFlags.drug_allergy || dpcFlags.drug_allergy),
+    pre_consult_severe_pain: Boolean(pcFlags.severe_pain || dpcFlags.severe_pain),
     has_vital_signs: Array.isArray(vitalsRaw) && vitalsRaw.length > 0,
   };
 }
@@ -73,6 +78,7 @@ function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
 export function mapRpcDoctorAppointmentRow(r: Record<string, unknown>): AdminAppointment {
   const flags = (r.pre_consult_flags as Record<string, unknown> | null) ?? null;
   const preConsultRaw = r.pre_consult_status_raw as string | null;
+  const doctorExists = Boolean(r.pre_consult_doctor_exists);
 
   return {
     id: r.id as string,
@@ -103,6 +109,7 @@ export function mapRpcDoctorAppointmentRow(r: Record<string, unknown>): AdminApp
       : preConsultRaw === "SUBMITTED"
         ? "submitted"
         : "draft",
+    pre_consult_doctor_exists: doctorExists,
     pre_consult_drug_allergy: Boolean(flags?.drug_allergy),
     pre_consult_severe_pain: Boolean(flags?.severe_pain),
     has_vital_signs: Boolean(r.has_vital_signs),
@@ -181,6 +188,7 @@ export async function fetchDoctorAppointments(
       ),
       patient ( legal_first_name, legal_last_name, phone_number, date_of_birth ),
       pre_consultations ( status, flags ),
+      doctor_pre_consultations ( id, flags ),
       vital_signs ( id )
     `)
     .order("created_at", { ascending: false })
