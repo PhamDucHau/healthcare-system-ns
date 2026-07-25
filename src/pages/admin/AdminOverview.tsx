@@ -11,37 +11,37 @@ const statsCards = [
   { icon: Users,         value: "1,402",   label: "Phiên hoạt động",    badge: "+12%",         badgeColor: "text-primary bg-accent" },
   { icon: Database,      value: "Tốt",     label: "Trạng thái máy chủ", badge: "99.9%",        badgeColor: "text-primary bg-accent" },
   { icon: ClipboardList, value: "42",      label: "Chờ xác nhận",       badge: "Ưu tiên cao",  badgeColor: "text-warning bg-warning/10" },
-  { icon: Shield,        value: "0",       label: "Cảnh báo hệ thống",  badge: "3 đang hoạt",  badgeColor: "text-destructive bg-destructive/10" },
+  { icon: Shield,        value: "0",       label: "Cảnh báo hệ thống",  badge: "3 đang hoạt động",  badgeColor: "text-destructive bg-destructive/10" },
 ];
 
 const chartData = [
-  { name: "T2", Traffic: 300, Capacity: 200 },
-  { name: "T3", Traffic: 450, Capacity: 280 },
-  { name: "T4", Traffic: 680, Capacity: 350 },
-  { name: "T5", Traffic: 520, Capacity: 400 },
-  { name: "T6", Traffic: 430, Capacity: 350 },
-  { name: "T7", Traffic: 580, Capacity: 420 },
-  { name: "CN", Traffic: 490, Capacity: 380 },
+  { name: "T2", traffic: 300, capacity: 200 },
+  { name: "T3", traffic: 450, capacity: 280 },
+  { name: "T4", traffic: 680, capacity: 350 },
+  { name: "T5", traffic: 520, capacity: 400 },
+  { name: "T6", traffic: 430, capacity: 350 },
+  { name: "T7", traffic: 580, capacity: 420 },
+  { name: "CN", traffic: 490, capacity: 380 },
 ];
 
 const quickActions = [
-  { icon: Trash2,    label: "Xóa Cache" },
-  { icon: Database,  label: "Sao lưu Cơ sở dữ liệu" },
-  { icon: Radio,     label: "Thông báo Hệ thống" },
+  { icon: Trash2,    label: "Xóa bộ nhớ đệm" },
+  { icon: Database,  label: "Sao lưu cơ sở dữ liệu" },
+  { icon: Radio,     label: "Thông báo hệ thống" },
 ];
 
 const activityLog = [
-  { icon: UserPlus,     label: "Người dùng mới đăng ký",    desc: "ID #99023 hoàn tất quy trình onboarding lâm sàng",        time: "2 phút trước",  color: "bg-success/20 text-success" },
-  { icon: FlaskConical, label: "Kết quả xét nghiệm đã tải", desc: "Nhập tự động từ Quest Diagnostics thành công",             time: "14 phút trước", color: "bg-primary/10 text-primary" },
-  { icon: Link2,        label: "Kết nối API được khôi phục", desc: "Dịch vụ 'Auth-Gateway-01' kết nối lại sau khi hết thời gian", time: "45 phút trước", color: "bg-accent text-accent-foreground" },
-  { icon: Shield,       label: "Thông tin xác thực Admin cập nhật", desc: "Xoay vòng khóa bảo mật bởi User: S. Miller",       time: "1 giờ trước",   color: "bg-warning/20 text-warning" },
+  { icon: UserPlus,     label: "Người dùng mới đăng ký",    desc: "Mã #99023 hoàn tất quy trình đăng ký lâm sàng",        time: "2 phút trước",  color: "bg-success/20 text-success" },
+  { icon: FlaskConical, label: "Kết quả xét nghiệm đã tải", desc: "Nhập tự động từ phòng xét nghiệm Quest Diagnostics thành công", time: "14 phút trước", color: "bg-primary/10 text-primary" },
+  { icon: Link2,        label: "Kết nối API được khôi phục", desc: "Dịch vụ xác thực Auth-Gateway-01 kết nối lại sau khi quá hạn", time: "45 phút trước", color: "bg-accent text-accent-foreground" },
+  { icon: Shield,       label: "Thông tin xác thực quản trị đã cập nhật", desc: "Xoay vòng khóa bảo mật bởi quản trị viên Nguyễn Văn Minh", time: "1 giờ trước", color: "bg-warning/20 text-warning" },
 ];
 
 const AdminOverview = () => (
   <div className="max-w-6xl mx-auto">
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Tổng quan Hệ thống</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Tổng quan hệ thống</h1>
         <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
           <span className="h-2 w-2 rounded-full bg-success" />
           Tất cả hệ thống hoạt động bình thường. Đồng bộ lần cuối: 2 phút trước.
@@ -81,7 +81,7 @@ const AdminOverview = () => (
       <div className="lg:col-span-2 rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-foreground">Sức khỏe Hệ thống</h3>
+            <h3 className="text-lg font-bold text-foreground">Sức khỏe hệ thống</h3>
             <p className="text-xs text-muted-foreground">Thông lượng API và xu hướng lưu lượng (24 giờ)</p>
           </div>
         </div>
@@ -91,8 +91,8 @@ const AdminOverview = () => (
             <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
             <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
             <Tooltip />
-            <Bar dataKey="Traffic" name="Lưu lượng" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Capacity" name="Công suất" fill="hsl(var(--primary) / 0.25)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="traffic" name="Lưu lượng" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="capacity" name="Công suất" fill="hsl(var(--primary) / 0.25)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -144,7 +144,7 @@ const AdminOverview = () => (
 
       <div className="space-y-6">
         <div className="rounded-xl border bg-card p-6">
-          <h3 className="text-lg font-bold text-foreground mb-4">Tài nguyên Máy chủ</h3>
+          <h3 className="text-lg font-bold text-foreground mb-4">Tài nguyên máy chủ</h3>
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1">
@@ -188,7 +188,7 @@ const AdminOverview = () => (
             Đội ngũ kỹ thuật sẵn sàng 24/7 cho các sự cố vận hành khẩn cấp.
           </p>
           <button type="button" className="w-full rounded-lg bg-foreground/80 border border-muted-foreground/30 py-2.5 text-sm font-semibold text-background hover:opacity-90 transition-opacity">
-            Bắt đầu Chat
+            Bắt đầu trò chuyện
           </button>
         </div>
       </div>
