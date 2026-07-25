@@ -60,7 +60,7 @@ export interface AdminAppointmentFilters {
 
 export const ADMIN_STATUS_LABEL: Record<AdminAppointmentStatus, string> = {
   CONFIRMED:  'Chờ khám',
-  CHECKED_IN: 'Đã check-in',
+  CHECKED_IN: 'Đã tiếp nhận',
   IN_PROGRESS:'Đang khám',
   COMPLETED:  'Hoàn thành',
   CANCELLED:  'Đã hủy',
@@ -85,4 +85,4 @@ export const ADMIN_STATUS_DOT: Record<AdminAppointmentStatus, string> = {
   NO_SHOW:    'bg-orange-500',
 };
 
-export const WALK_IN_LABEL = 'Lịch hẹn trực tiếp';
+export const WALK_IN_LABEL = 'Khám không hẹn';

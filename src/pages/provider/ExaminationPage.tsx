@@ -18,6 +18,7 @@ import {
 import type { AdminAppointment } from '@/types/admin-appointment';
 import SoapNoteEditor from '@/components/emr/SoapNoteEditor';
 import { format, parseISO } from 'date-fns';
+import { UI_WALK_IN } from "@/config/ui-labels";
 import { vi } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR } from '@/types/admin-appointment';
@@ -44,7 +45,7 @@ export default function ExaminationPage() {
           setError('Không tìm thấy lịch hẹn.');
         } else if (!['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(appt.status)) {
           setError(
-            `Lịch hẹn có trạng thái "${ADMIN_STATUS_LABEL[appt.status]}" — cần check-in trước khi khám.`
+            `Lịch hẹn có trạng thái "${ADMIN_STATUS_LABEL[appt.status]}" — cần tiếp nhận trước khi khám.`
           );
         } else if (appt.status !== 'COMPLETED' && !isAppointmentReadyForExam(appt)) {
           setError(getAppointmentReadinessMessage(getAppointmentReadiness(appt)));
@@ -61,7 +62,7 @@ export default function ExaminationPage() {
 
   const slotLabel = appointment?.slot_date
     ? format(parseISO(appointment.slot_date), 'dd/MM/yyyy', { locale: vi })
-    : 'Walk-in';
+    : UI_WALK_IN;
   const timeLabel = appointment?.start_time ? appointment.start_time.slice(0, 5) : '';
 
   const patientInfo = appointment

@@ -11,6 +11,13 @@ import {
 import { Link } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
 import {
+  UI_ACTION,
+  UI_BADGE,
+  UI_PAGE,
+  translatePatientStatus,
+} from "@/config/ui-labels";
+import { greetingNow } from "@/lib/greeting";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -47,7 +54,7 @@ const stats = [
     label: "Tin nhắn",
     value: "5",
     sub: "Chưa đọc",
-    badge: "Inbox",
+    badge: UI_BADGE.inbox,
     badgeClass: "bg-accent text-accent-foreground",
   },
   {
@@ -55,30 +62,30 @@ const stats = [
     label: "Bệnh nhân đang theo dõi",
     value: "24",
     sub: "+2 tuần này",
-    badge: "Active",
+    badge: UI_BADGE.active,
     badgeClass: "bg-success/10 text-success",
   },
 ];
 
 const todaySchedule = [
-  { time: "09:00", patient: "Alex Rivera", type: "Follow-up", mode: "Video" },
-  { time: "10:30", patient: "Jordan Smith", type: "Lab review", mode: "In-person" },
-  { time: "13:00", patient: "Marcus Chen", type: "New consult", mode: "Video" },
-  { time: "15:30", patient: "Sam Taylor", type: "PrEP refill", mode: "Video" },
+  { time: "09:00", patient: "Nguyễn Văn An", type: "Tái khám", mode: "Trực tuyến", isVideo: true },
+  { time: "10:30", patient: "Trần Thị Bình", type: "Xem xét xét nghiệm", mode: "Trực tiếp", isVideo: false },
+  { time: "13:00", patient: "Lê Minh Cường", type: "Khám mới", mode: "Trực tuyến", isVideo: true },
+  { time: "15:30", patient: "Phạm Thu Dung", type: "Cấp lại PrEP", mode: "Trực tuyến", isVideo: true },
 ];
 
 const recentPatients = [
-  { name: "Alex Rivera", last: "2 days ago", status: "Stable" },
-  { name: "Jordan Smith", last: "1 week ago", status: "Review" },
-  { name: "Marcus Chen", last: "3 weeks ago", status: "Routine" },
-  { name: "Sam Taylor", last: "Yesterday", status: "Stable" },
+  { name: "Nguyễn Văn An", last: "2 ngày trước", status: "Stable" },
+  { name: "Trần Thị Bình", last: "1 tuần trước", status: "Review" },
+  { name: "Lê Minh Cường", last: "3 tuần trước", status: "Routine" },
+  { name: "Phạm Thu Dung", last: "Hôm qua", status: "Stable" },
 ];
 
 const clinicalTasks = [
-  { title: "Review blood panel — Alex Rivera", due: "Today", done: 0 },
-  { title: "Sign PrEP prescription — Jordan Smith", due: "Today", done: 35 },
-  { title: "Complete chart note — Marcus Chen", due: "Tomorrow", done: 0 },
-  { title: "Respond to patient message — Sam Taylor", due: "Today", done: 70 },
+  { title: "Xem xét kết quả máu — Nguyễn Văn An", due: "Hôm nay", done: 0 },
+  { title: "Ký đơn PrEP — Trần Thị Bình", due: "Hôm nay", done: 35 },
+  { title: "Hoàn thiện ghi chú bệnh án — Lê Minh Cường", due: "Ngày mai", done: 0 },
+  { title: "Trả lời tin nhắn bệnh nhân — Phạm Thu Dung", due: "Hôm nay", done: 70 },
 ];
 
 const weeklyConsults = [
@@ -99,16 +106,15 @@ function statusPill(status: string) {
 
 const ProviderDashboard = ({ onOpenPatients }: ProviderDashboardProps) => {
   const now = new Date();
-  const greeting =
-    now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
+  const greeting = greetingNow(now);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground md:text-3xl">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground md:text-3xl">{UI_PAGE.dashboard}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {greeting}, <span className="font-semibold text-foreground">Dr. Sarah Chen</span> — tổng
+            {greeting}, <span className="font-semibold text-foreground">BS. Nguyễn Thị Lan</span> — tổng
             quan lịch khám và công việc lâm sàng hôm nay.
           </p>
         </div>
@@ -123,7 +129,7 @@ const ProviderDashboard = ({ onOpenPatients }: ProviderDashboardProps) => {
             to="/provider-portal/patients"
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
-            Mở Patients
+            {UI_ACTION.openPatients}
           </Link>
         </div>
       </div>
@@ -173,7 +179,7 @@ const ProviderDashboard = ({ onOpenPatients }: ProviderDashboardProps) => {
                   <p className="text-xs text-muted-foreground">{item.type}</p>
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium">
-                  {item.mode === "Video" ? (
+                  {item.isVideo ? (
                     <Video className="h-3 w-3" />
                   ) : (
                     <Users className="h-3 w-3" />
@@ -231,7 +237,7 @@ const ProviderDashboard = ({ onOpenPatients }: ProviderDashboardProps) => {
                       <span
                         className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusPill(row.status)}`}
                       >
-                        {row.status}
+                        {translatePatientStatus(row.status)}
                       </span>
                     </td>
                   </tr>

@@ -15,7 +15,7 @@ const OnboardingIdentity = () => {
   const handleIdentityFront = (file: File | null) => {
     if (!file) return;
     if (file.size > MAX_UPLOAD_SIZE) {
-      setErrorMessage("The ID file is too large. Please upload a file under 10MB.");
+      setErrorMessage("Tệp CCCD quá lớn. Vui lòng tải lên tệp dưới 10MB.");
       return;
     }
     setErrorMessage("");
@@ -26,7 +26,7 @@ const OnboardingIdentity = () => {
   const handleIdentityBack = (file: File | null) => {
     if (!file) return;
     if (file.size > MAX_UPLOAD_SIZE) {
-      setErrorMessage("The ID file is too large. Please upload a file under 10MB.");
+      setErrorMessage("Tệp CCCD quá lớn. Vui lòng tải lên tệp dưới 10MB.");
       return;
     }
     setErrorMessage("");
@@ -54,7 +54,7 @@ const OnboardingIdentity = () => {
       !issuedDate ||
       !issuer
     ) {
-      setErrorMessage("Please upload both sides of your ID and complete all identity fields.");
+      setErrorMessage("Vui lòng tải lên cả hai mặt CCCD và điền đầy đủ thông tin định danh.");
       return;
     }
     navigate("/onboarding/insurance");
@@ -62,24 +62,24 @@ const OnboardingIdentity = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-foreground">ID Verification</h1>
+      <h1 className="text-3xl font-bold text-foreground">Xác minh định danh</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        Upload a clear government-issued ID so we can verify your information securely.
+        Tải lên ảnh CCCD/CMND rõ nét để chúng tôi xác minh thông tin của bạn một cách an toàn.
       </p>
 
       <section className="mt-8">
         <div className="grid gap-4 md:grid-cols-2">
           <UploadCard
             id="identityUploadFront"
-            title="Click to upload or drag and drop"
-            hint="Government ID (front side)"
+            title="Nhấn để tải lên hoặc kéo thả"
+            hint="CCCD/CMND (mặt trước)"
             fileName={data.identity.idFileName}
             onFileSelect={handleIdentityFront}
           />
           <UploadCard
             id="identityUploadBack"
-            title="Click to upload or drag and drop"
-            hint="Government ID (back side)"
+            title="Nhấn để tải lên hoặc kéo thả"
+            hint="CCCD/CMND (mặt sau)"
             fileName={data.identity.idBackFileName}
             onFileSelect={handleIdentityBack}
           />
@@ -88,12 +88,12 @@ const OnboardingIdentity = () => {
 
       <section className="mt-6 rounded-xl bg-muted/40 p-5">
         <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Auto-filled details from ID
+          Thông tin tự điền từ CCCD
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label htmlFor="idNumber" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              ID Number
+              Số CCCD/CMND
             </label>
             <input
               id="idNumber"
@@ -101,12 +101,12 @@ const OnboardingIdentity = () => {
               value={data.identity.idNumber}
               onChange={(event) => updateIdentity({ idNumber: event.target.value })}
               className="min-h-11 w-full rounded-lg border bg-background px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="G-123-5678-9012"
+              placeholder="001234567890"
             />
           </div>
           <div>
             <label htmlFor="expirationDate" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Expiration Date
+              Ngày hết hạn
             </label>
             <input
               id="expirationDate"
@@ -118,7 +118,7 @@ const OnboardingIdentity = () => {
           </div>
           <div className="md:col-span-2">
             <label htmlFor="residentialAddress" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Residential Address
+              Địa chỉ thường trú
             </label>
             <input
               id="residentialAddress"
@@ -126,12 +126,12 @@ const OnboardingIdentity = () => {
               value={data.identity.residentialAddress}
               onChange={(event) => updateIdentity({ residentialAddress: event.target.value })}
               className="min-h-11 w-full rounded-lg border bg-background px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="123 Care Lane, Suite 400"
+              placeholder="123 Đường ABC, Quận 1, TP.HCM"
             />
           </div>
           <div>
             <label htmlFor="issuedDate" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Issued Date
+              Ngày cấp
             </label>
             <input
               id="issuedDate"
@@ -143,7 +143,7 @@ const OnboardingIdentity = () => {
           </div>
           <div>
             <label htmlFor="issuer" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Issuer
+              Nơi cấp
             </label>
             <input
               id="issuer"
@@ -151,7 +151,7 @@ const OnboardingIdentity = () => {
               value={data.identity.issuer}
               onChange={(event) => updateIdentity({ issuer: event.target.value })}
               className="min-h-11 w-full rounded-lg border bg-background px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="FL DHSMV"
+              placeholder="Cục Cảnh sát QLHC về TTXH"
             />
           </div>
         </div>
@@ -160,7 +160,7 @@ const OnboardingIdentity = () => {
       <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
         <p className="flex items-start gap-2">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          Your privacy is our priority. We use bank-level encryption and only share data with your licensed care team.
+          Quyền riêng tư của bạn là ưu tiên hàng đầu. Chúng tôi sử dụng mã hóa cấp ngân hàng và chỉ chia sẻ dữ liệu với đội ngũ chăm sóc được cấp phép của bạn.
         </p>
       </div>
 
@@ -172,7 +172,7 @@ const OnboardingIdentity = () => {
 
       <OnboardingActions
         previousPath="/onboarding/personal"
-        nextLabel="Continue to Insurance"
+        nextLabel="Tiếp tục: Bảo hiểm"
         onNext={handleNext}
       />
     </div>

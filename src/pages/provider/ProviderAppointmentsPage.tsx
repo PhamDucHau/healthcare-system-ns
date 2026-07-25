@@ -30,6 +30,7 @@ import {
 } from "@/lib/appointment-readiness";
 import { toast } from "sonner";
 import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
+import { UI_CHECKED_IN, UI_CHECK_IN } from "@/config/ui-labels";
 import { ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT, ADMIN_STATUS_COLOR, WALK_IN_LABEL } from "@/types/admin-appointment";
 import AppointmentDetailSheet from "@/components/admin/appointments/AppointmentDetailSheet";
 import CancelDialog from "@/components/admin/appointments/CancelDialog";
@@ -42,7 +43,7 @@ type DateMode = "all" | "day" | "week" | "month";
 const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string }[] = [
   { value: "__all__",     label: "Tất cả trạng thái" },
   { value: "CONFIRMED",   label: "Chờ khám" },
-  { value: "CHECKED_IN",  label: "Đã check-in" },
+  { value: "CHECKED_IN",  label: UI_CHECKED_IN },
   { value: "IN_PROGRESS", label: "Đang khám" },
   { value: "COMPLETED",   label: "Hoàn thành" },
   { value: "CANCELLED",   label: "Đã hủy" },
@@ -155,7 +156,7 @@ export default function ProviderAppointmentsPage() {
       void refetch();
       return true;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Check-in thất bại");
+      toast.error(e instanceof Error ? e.message : "Tiếp nhận thất bại");
       return false;
     } finally {
       setCheckingInId(null);
@@ -407,7 +408,7 @@ export default function ProviderAppointmentsPage() {
                                 {checkingInId === row.id
                                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   : <CalendarCheck className="mr-2 h-4 w-4 text-green-600" />}
-                                Check-in
+                                {UI_CHECK_IN}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={checkingInId === row.id}

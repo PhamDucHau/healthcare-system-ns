@@ -86,21 +86,21 @@ export default function SectionEditor({
             <button
               type="button"
               className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
-              aria-label="Tùy chọn section"
+              aria-label="Tùy chọn phần"
             >
               <MoreVertical className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setMetaOpen((v) => !v)}>
-              Cấu hình section
+              Cấu hình phần
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={disabled}
               className="text-destructive focus:text-destructive"
               onClick={onRemove}
             >
-              Xóa section
+              Xóa phần
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

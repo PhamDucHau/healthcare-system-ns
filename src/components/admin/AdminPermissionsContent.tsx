@@ -3,7 +3,7 @@ import { Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminApiError, listPermissions, type PermissionRow } from "@/lib/admin-api";
 import { Badge } from "@/components/ui/badge";
-import { getPermissionCategoryLabel, groupPermissionsByCategory } from "@/config/rbac-permissions";
+import { getPermissionCategoryLabel, getPermissionDisplayName, groupPermissionsByCategory } from "@/config/rbac-permissions";
 
 const AdminPermissionsContent = () => {
   const [permissions, setPermissions] = useState<PermissionRow[]>([]);
@@ -62,7 +62,7 @@ const AdminPermissionsContent = () => {
                     <div className="flex items-center gap-3 min-w-0">
                       <Shield className="h-4 w-4 text-primary shrink-0" />
                       <div className="min-w-0">
-                        <p className="font-medium text-foreground">{p.name}</p>
+                        <p className="font-medium text-foreground">{getPermissionDisplayName(p)}</p>
                         {/* <p className="text-xs font-mono text-muted-foreground truncate">{p.slug}</p> */}
                       </div>
                     </div>

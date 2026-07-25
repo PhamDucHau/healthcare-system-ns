@@ -18,7 +18,7 @@ const OnboardingInsurance = () => {
   const handleInsuranceFile = (file: File | null) => {
     if (!file) return;
     if (file.size > MAX_UPLOAD_SIZE) {
-      setErrorMessage("Insurance card upload must be under 10MB per file.");
+      setErrorMessage("Tệp thẻ BHYT phải dưới 10MB.");
       return;
     }
 
@@ -29,7 +29,7 @@ const OnboardingInsurance = () => {
 
   const handleRunBhytOcr = async () => {
     if (!uploadFiles.cardFrontFile) {
-      setErrorMessage("Please upload your insurance card image before OCR.");
+      setErrorMessage("Vui lòng tải lên ảnh thẻ BHYT trước khi chạy OCR.");
       return;
     }
 
@@ -38,16 +38,16 @@ const OnboardingInsurance = () => {
     try {
       const json = await fetchBhytOcr(uploadFiles.cardFrontFile);
       if (!json.parsed || typeof json.parsed !== "object") {
-        throw new Error("BHYT OCR response did not include parsed data.");
+        throw new Error("Phản hồi BHYT OCR không chứa dữ liệu đã phân tích.");
       }
       updateInsuranceFromOcr(mapBhytParsedToInsuranceUpdates(json.parsed));
-      toast.success("BHYT OCR complete", {
-        description: "Suggested insurance values have been filled.",
+      toast.success("OCR BHYT hoàn tất", {
+        description: "Các trường bảo hiểm gợi ý đã được điền.",
       });
     } catch (e) {
-      const message = e instanceof Error ? e.message : "BHYT OCR failed.";
+      const message = e instanceof Error ? e.message : "OCR BHYT thất bại.";
       setErrorMessage(message);
-      toast.error("BHYT OCR failed", { description: message });
+      toast.error("OCR BHYT thất bại", { description: message });
     } finally {
       setIsOcrRunning(false);
     }
@@ -57,7 +57,7 @@ const OnboardingInsurance = () => {
     setErrorMessage("");
     const { provider, memberId, groupNumber, cardFrontFileName } = data.insurance;
     if (!provider || !memberId || !groupNumber || !cardFrontFileName) {
-      setErrorMessage("Please complete insurance details and upload your insurance image.");
+      setErrorMessage("Vui lòng điền đầy đủ thông tin bảo hiểm và tải lên ảnh thẻ BHYT.");
       return;
     }
     navigate("/onboarding/review");
@@ -65,17 +65,17 @@ const OnboardingInsurance = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Coverage Details</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Thông tin bảo hiểm</h1>
       <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-        Provide your primary insurance information to support billing and eligibility checks.
+        Cung cấp thông tin bảo hiểm chính để hỗ trợ thanh toán và kiểm tra quyền lợi.
       </p>
 
       <section className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">Upload Insurance Card</h2>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Tải lên thẻ BHYT</h2>
         <UploadCard
           id="insuranceFrontUpload"
-          title="BHYT Image"
-          hint="Tap to capture or upload"
+          title="Ảnh BHYT"
+          hint="Chạm để chụp hoặc tải lên"
           fileName={data.insurance.cardFrontFileName}
           file={uploadFiles.cardFrontFile}
           onFileSelect={handleInsuranceFile}
@@ -88,7 +88,7 @@ const OnboardingInsurance = () => {
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />
-            {isOcrRunning ? "Reading BHYT..." : "Run BHYT OCR"}
+            {isOcrRunning ? "Đang đọc BHYT..." : "Quét OCR BHYT"}
           </button>
         </div>
       </section>
@@ -97,7 +97,7 @@ const OnboardingInsurance = () => {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <label htmlFor="insuranceProvider" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Insurance Provider
+              Nhà cung cấp bảo hiểm
             </label>
             <input
               id="insuranceProvider"
@@ -105,12 +105,12 @@ const OnboardingInsurance = () => {
               value={data.insurance.provider}
               onChange={(event) => updateInsurance({ provider: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="Search or select provider"
+              placeholder="Tìm hoặc chọn nhà cung cấp"
             />
           </div>
           <div>
             <label htmlFor="memberId" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Member ID
+              Mã thành viên
             </label>
             <input
               id="memberId"
@@ -123,7 +123,7 @@ const OnboardingInsurance = () => {
           </div>
           <div>
             <label htmlFor="groupNumber" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Group Number
+              Mã nhóm
             </label>
             <input
               id="groupNumber"
@@ -136,7 +136,7 @@ const OnboardingInsurance = () => {
           </div>
           <div>
             <label htmlFor="bhytName" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              BHYT Name
+              Họ tên BHYT
             </label>
             <input
               id="bhytName"
@@ -144,12 +144,12 @@ const OnboardingInsurance = () => {
               value={data.insurance.bhytName}
               onChange={(event) => updateInsurance({ bhytName: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="Name from BHYT card"
+              placeholder="Họ tên trên thẻ BHYT"
             />
           </div>
           <div>
             <label htmlFor="bhytDob" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              BHYT DOB
+              Ngày sinh BHYT
             </label>
             <input
               id="bhytDob"
@@ -161,7 +161,7 @@ const OnboardingInsurance = () => {
           </div>
           <div>
             <label htmlFor="bhytGender" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              BHYT Gender
+              Giới tính BHYT
             </label>
             <input
               id="bhytGender"
@@ -174,7 +174,7 @@ const OnboardingInsurance = () => {
           </div>
           <div>
             <label htmlFor="bhytKcbCode" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              KCB Code
+              Mã KCB
             </label>
             <input
               id="bhytKcbCode"
@@ -187,7 +187,7 @@ const OnboardingInsurance = () => {
           </div>
           <div className="md:col-span-2">
             <label htmlFor="bhytAddress" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              BHYT Address / Unit
+              Địa chỉ / Đơn vị BHYT
             </label>
             <input
               id="bhytAddress"
@@ -195,12 +195,12 @@ const OnboardingInsurance = () => {
               value={data.insurance.bhytAddress}
               onChange={(event) => updateInsurance({ bhytAddress: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="Address or organization on BHYT"
+              placeholder="Địa chỉ hoặc đơn vị trên thẻ BHYT"
             />
           </div>
           <div className="md:col-span-2">
             <label htmlFor="bhytKcb" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Registered KCB
+              Nơi đăng ký KCB
             </label>
             <input
               id="bhytKcb"
@@ -208,12 +208,12 @@ const OnboardingInsurance = () => {
               value={data.insurance.bhytKcb}
               onChange={(event) => updateInsurance({ bhytKcb: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="Primary health care facility"
+              placeholder="Cơ sở khám chữa bệnh ban đầu"
             />
           </div>
           <div>
             <label htmlFor="bhytValidFrom" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Valid From
+              Có hiệu lực từ
             </label>
             <input
               id="bhytValidFrom"
@@ -225,7 +225,7 @@ const OnboardingInsurance = () => {
           </div>
           <div>
             <label htmlFor="bhytFiveYear" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Five Year Date
+              Ngày 5 năm
             </label>
             <input
               id="bhytFiveYear"
@@ -241,7 +241,7 @@ const OnboardingInsurance = () => {
       <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
         <p className="flex items-start gap-2">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          HIPAA Secure Information: Data is protected by AES-256 encryption and never shared with unauthorized third parties.
+          Thông tin được bảo mật: Dữ liệu được mã hóa AES-256 và không bao giờ chia sẻ với bên thứ ba không được phép.
         </p>
       </div>
 
@@ -253,7 +253,7 @@ const OnboardingInsurance = () => {
 
       <OnboardingActions
         previousPath="/onboarding/personal"
-        nextLabel="Continue to Review"
+        nextLabel="Tiếp tục: Xác nhận"
         onNext={handleNext}
       />
     </div>

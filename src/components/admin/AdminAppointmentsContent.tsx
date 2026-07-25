@@ -25,9 +25,10 @@ import { sendPreConsultReminder } from "@/lib/doctor-appointment-api";
 import { fetchSpecialties } from "@/lib/appointment-api";
 import { fetchDoctors } from "@/lib/master-data-api";
 
-import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
+import { UI_WALK_IN, UI_CHECK_IN, UI_CHECKED_IN, DOCTOR_PREFIX } from "@/config/ui-labels";
 import {
   ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR, ADMIN_STATUS_DOT, WALK_IN_LABEL,
+  type AdminAppointment, type AdminAppointmentStatus,
 } from "@/types/admin-appointment";
 
 import WalkInDialog from "./appointments/WalkInDialog";
@@ -40,7 +41,7 @@ import VitalSignsSheet from "./appointments/VitalSignsSheet";
 const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string }[] = [
   { value: "__all__",    label: "Tất cả trạng thái" },
   { value: "CONFIRMED",  label: "Chờ khám" },
-  { value: "CHECKED_IN", label: "Đã check-in" },
+  { value: "CHECKED_IN", label: UI_CHECKED_IN },
   { value: "IN_PROGRESS",label: "Đang khám" },
   { value: "COMPLETED",  label: "Hoàn thành" },
   { value: "CANCELLED",  label: "Đã hủy" },
@@ -506,7 +507,7 @@ function AppointmentRow({
 
       {/* Doctor */}
       <p className="text-sm text-muted-foreground truncate hidden md:block">
-        {appt.doctor_name ? `Dr. ${appt.doctor_name.split(" ").pop()}` : "—"}
+        {appt.doctor_name ? `${DOCTOR_PREFIX} ${appt.doctor_name.split(" ").pop()}` : "—"}
       </p>
 
       {/* Status */}
@@ -530,7 +531,7 @@ function AppointmentRow({
             {canCheckin && (
               <DropdownMenuItem onClick={onCheckin}>
                 <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
-                Check-in
+                {UI_CHECK_IN}
               </DropdownMenuItem>
             )}
             {canVitalSigns && (

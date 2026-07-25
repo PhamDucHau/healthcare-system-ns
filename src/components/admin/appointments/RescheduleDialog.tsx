@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { WALK_IN_LABEL } from "@/types/admin-appointment";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -74,7 +75,7 @@ export default function RescheduleDialog({ appointment, open, onClose, onSuccess
               Hiện tại:{" "}
               {appointment.slot_date
                 ? `${appointment.start_time?.slice(0, 5)} · ${appointment.slot_date}`
-                : "Walk-in"}
+                : WALK_IN_LABEL}
             </p>
           </div>
 

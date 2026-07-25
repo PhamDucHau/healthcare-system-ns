@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet, useMatch, Link } from "react-router-dom";
 import { toast } from "sonner";
+import { UI_ACTION, UI_CHECKED_IN, UI_CHECK_IN, UI_WALK_IN } from "@/config/ui-labels";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { useDoctorNotifications } from "@/hooks/DoctorNotificationsContext";
 import NotificationPanel from "@/components/admin/NotificationPanel";
@@ -99,7 +100,7 @@ const ProviderLayout = () => {
         href="#provider-main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:text-sm"
       >
-        Skip to main content
+        {UI_ACTION.skipToMain}
       </a>
 
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[250px_1fr]">

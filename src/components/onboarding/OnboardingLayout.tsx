@@ -32,7 +32,7 @@ const OnboardingLayout = () => {
 
       <footer className="border-t bg-card">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 py-4 text-xs text-muted-foreground md:flex-row md:px-8">
-          <p>Rcare Plus Clinical Network</p>
+          <p>Rcare Plus — Mạng lâm sàng</p>
           <div className="flex items-center gap-4">
             <button className="hover:text-foreground">Chính sách bảo mật</button>
             <button className="hover:text-foreground">Điều khoản dịch vụ</button>

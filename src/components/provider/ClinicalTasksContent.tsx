@@ -100,7 +100,7 @@ export default function ClinicalTasksContent({ portal = 'doctor' }: ClinicalTask
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">Công việc lâm sàng (Clinical Tasks)</h1>
+          <h1 className="text-2xl font-bold text-slate-800 md:text-3xl">Công việc lâm sàng</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {portal === 'doctor'
               ? 'Theo dõi các công việc can thiệp y tế và tái khám rủi ro cao của Bác sĩ.'

@@ -381,7 +381,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                   <SelectItem value="patient">Bệnh nhân</SelectItem>
                   <SelectItem value="doctor">Bác sĩ</SelectItem>
                   <SelectItem value="nurse">Điều dưỡng</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="admin">Quản trị</SelectItem>
                 </SelectContent>
               </Select>
             </div>

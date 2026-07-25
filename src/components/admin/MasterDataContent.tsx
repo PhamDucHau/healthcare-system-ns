@@ -15,7 +15,7 @@ const TABS = [
   { value: 'rooms',        label: 'Phòng khám' },
   { value: 'schedules',    label: 'Lịch BS' },
   { value: 'categories',   label: 'Danh mục câu hỏi' },
-  { value: 'audit',        label: 'Audit Log' },
+  { value: 'audit',        label: 'Nhật ký thay đổi' },
 ];
 
 export default function MasterDataContent() {

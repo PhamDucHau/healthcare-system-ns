@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Loader2, UserPlus, CheckCircle2, ChevronRight, Search, User } from "lucide-react";
 import { toast } from "sonner";
+import { UI_WALK_IN } from "@/config/ui-labels";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -160,11 +161,11 @@ export default function WalkInDialog({
     setBooking(true);
     try {
       const apptId = await adminCreateWalkin(selectedPatient.profile_id, specialtyId, note.trim() || null);
-      toast.success("Đã tạo lịch Walk-in thành công.");
+      toast.success(`Đã tạo lịch ${UI_WALK_IN} thành công.`);
       onSuccess(apptId);
       handleClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Tạo Walk-in thất bại.");
+      toast.error(err instanceof Error ? err.message : `Tạo lịch ${UI_WALK_IN} thất bại.`);
     } finally {
       setBooking(false);
     }
@@ -184,7 +185,7 @@ export default function WalkInDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Tạo lịch Walk-in</DialogTitle>
+          <DialogTitle>Tạo lịch {UI_WALK_IN}</DialogTitle>
         </DialogHeader>
 
         {/* Step indicator */}
@@ -374,7 +375,7 @@ export default function WalkInDialog({
           {step === "book" && (
             <Button onClick={handleBook} disabled={booking || !specialtyId}>
               {booking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Tạo Walk-in
+              Tạo {UI_WALK_IN}
             </Button>
           )}
         </DialogFooter>

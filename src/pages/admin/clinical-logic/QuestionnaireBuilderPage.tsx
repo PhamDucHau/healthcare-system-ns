@@ -82,7 +82,7 @@ export default function QuestionnaireBuilderPage() {
 
   async function handleSave(): Promise<string | null> {
     if (!name.trim()) { toast.error("Tên bộ câu hỏi không được để trống."); return null; }
-    if (!categoryId) { toast.error("Vui lòng chọn phân loại (Category)."); return null; }
+    if (!categoryId) { toast.error("Vui lòng chọn phân loại."); return null; }
     setSaving(true);
     try {
       let qid = currentId;
@@ -127,7 +127,7 @@ export default function QuestionnaireBuilderPage() {
     setCloning(true);
     try {
       const newQid = await cloneQuestionnaire(currentId);
-      toast.success("Đã tạo phiên bản mới (DRAFT).");
+      toast.success("Đã tạo phiên bản mới (Bản nháp).");
       navigate(`/admin/question-library/${newQid}`);
     } catch (e) {
       toast.error(mapQuestionnaireError((e as Error).message));

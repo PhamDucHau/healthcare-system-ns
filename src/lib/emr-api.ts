@@ -455,7 +455,7 @@ function mapEmrError(message: string): string {
   if (message.includes('UNAUTHORIZED')) return 'Bạn không có quyền thực hiện thao tác này.';
   if (message.includes('APPOINTMENT_NOT_FOUND')) return 'Không tìm thấy lịch hẹn.';
   if (message.includes('INVALID_APPOINTMENT_STATUS'))
-    return 'Chỉ có thể mở hồ sơ khám cho BN đã check-in hoặc đang khám.';
+    return 'Chỉ có thể mở hồ sơ khám cho BN đã tiếp nhận hoặc đang khám.';
   if (message.includes('NOT_FOUND')) return 'Không tìm thấy hồ sơ khám.';
   if (message.includes('EXAM_LOCKED')) return 'Hồ sơ đã được ký, không thể chỉnh sửa.';
   if (message.includes('ALREADY_SIGNED')) return 'Hồ sơ này đã được ký trước đó.';

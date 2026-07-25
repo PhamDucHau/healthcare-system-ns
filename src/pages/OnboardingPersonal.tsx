@@ -7,7 +7,7 @@ import UploadCard from "@/components/onboarding/UploadCard";
 import { fetchCccdOcr, mapCccdParsedToFormUpdates } from "@/lib/cccd-ocr";
 import { useOnboardingForm } from "@/hooks/useOnboardingForm";
 
-const pronounOptions = ["He/Him", "She/Her", "They/Them", "Other"];
+const pronounOptions = ["Anh/Ông", "Chị/Bà", "Họ", "Khác"];
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 const OnboardingPersonal = () => {
@@ -20,7 +20,7 @@ const OnboardingPersonal = () => {
   const handleIdentityFront = (file: File | null) => {
     if (!file) return;
     if (file.size > MAX_UPLOAD_SIZE) {
-      setErrorMessage("The ID file is too large. Please upload a file under 10MB.");
+      setErrorMessage("Tệp CCCD quá lớn. Vui lòng tải lên tệp dưới 10MB.");
       return;
     }
     setErrorMessage("");
@@ -31,7 +31,7 @@ const OnboardingPersonal = () => {
   const handleIdentityBack = (file: File | null) => {
     if (!file) return;
     if (file.size > MAX_UPLOAD_SIZE) {
-      setErrorMessage("The ID file is too large. Please upload a file under 10MB.");
+      setErrorMessage("Tệp CCCD quá lớn. Vui lòng tải lên tệp dưới 10MB.");
       return;
     }
     setErrorMessage("");
@@ -41,7 +41,7 @@ const OnboardingPersonal = () => {
 
   const handleRunOcr = async () => {
     if (!uploadFiles.idFile || !uploadFiles.idBackFile) {
-      setErrorMessage("Upload both the front and back of your ID, then run OCR.");
+      setErrorMessage("Tải lên mặt trước và mặt sau CCCD, sau đó chạy OCR.");
       return;
     }
     setErrorMessage("");
@@ -50,16 +50,16 @@ const OnboardingPersonal = () => {
       const json = await fetchCccdOcr(uploadFiles.idFile, uploadFiles.idBackFile);
       const parsed = json.parsed;
       if (!parsed || typeof parsed !== "object") {
-        throw new Error("OCR response did not include parsed data.");
+        throw new Error("Phản hồi OCR không chứa dữ liệu đã phân tích.");
       }
       const { identity, personal } = mapCccdParsedToFormUpdates(parsed);
       updateIdentityFromOcr(identity);
       updatePersonalFromOcr(personal);
-      toast.success("OCR complete", { description: "Review and edit the suggested fields below." });
+      toast.success("OCR hoàn tất", { description: "Xem lại và chỉnh sửa các trường được gợi ý bên dưới." });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "OCR request failed.";
+      const msg = e instanceof Error ? e.message : "Yêu cầu OCR thất bại.";
       setErrorMessage(msg);
-      toast.error("OCR failed", { description: msg });
+      toast.error("OCR thất bại", { description: msg });
     } finally {
       setIsOcrRunning(false);
     }
@@ -88,12 +88,12 @@ const OnboardingPersonal = () => {
       !issuedDate ||
       !issuer
     ) {
-      setErrorMessage("Please upload both sides of your ID and complete all identity fields.");
+      setErrorMessage("Vui lòng tải lên cả hai mặt CCCD và điền đầy đủ thông tin định danh.");
       return;
     }
 
     if (!legalFirstName || !legalLastName || !dateOfBirth || !phoneNumber || !email) {
-      setErrorMessage("Please complete all required personal information fields.");
+      setErrorMessage("Vui lòng điền đầy đủ các trường thông tin cá nhân bắt buộc.");
       return;
     }
 
@@ -102,30 +102,30 @@ const OnboardingPersonal = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Welcome to Rcare Plus</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Chào mừng đến Rcare Plus</h1>
       <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-        Let&apos;s start with your identity and personal details to ensure safe and accurate care.
+        Hãy bắt đầu với thông tin định danh và cá nhân để đảm bảo chăm sóc an toàn và chính xác.
       </p>
 
       <section className="mt-8 rounded-2xl border bg-card p-5 md:p-6">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">ID Verification</h2>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Xác minh định danh</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Upload clear photos of both sides of your CCCD / government ID. Run OCR to suggest the
-          fields below, then review and correct as needed.
+          Tải lên ảnh rõ nét cả hai mặt CCCD/CMND. Chạy OCR để gợi ý các trường bên dưới, sau đó
+          xem lại và chỉnh sửa nếu cần.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
           <UploadCard
             id="identityUploadFront"
-            title="Click to upload or drag and drop"
-            hint="Government ID (front side)"
+            title="Nhấn để tải lên hoặc kéo thả"
+            hint="CCCD/CMND (mặt trước)"
             fileName={data.identity.idFileName}
             file={uploadFiles.idFile}
             onFileSelect={handleIdentityFront}
           />
           <UploadCard
             id="identityUploadBack"
-            title="Click to upload or drag and drop"
-            hint="Government ID (back side)"
+            title="Nhấn để tải lên hoặc kéo thả"
+            hint="CCCD/CMND (mặt sau)"
             fileName={data.identity.idBackFileName}
             file={uploadFiles.idBackFile}
             onFileSelect={handleIdentityBack}
@@ -133,10 +133,10 @@ const OnboardingPersonal = () => {
         </div>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            OCR uses your local service{" "}
+            OCR sử dụng dịch vụ cục bộ{" "}
             <code className="rounded bg-muted px-1 font-mono text-[11px]">/public/ocr/cccd</code>
-            . Set <code className="rounded bg-muted px-1 font-mono text-[11px]">VITE_OCR_CCCD_URL</code> if
-            it runs on another host.
+            . Đặt <code className="rounded bg-muted px-1 font-mono text-[11px]">VITE_OCR_CCCD_URL</code> nếu
+            chạy trên máy chủ khác.
           </p>
           <button
             type="button"
@@ -145,14 +145,14 @@ const OnboardingPersonal = () => {
             className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />
-            {isOcrRunning ? "Reading ID…" : "Run OCR on ID"}
+            {isOcrRunning ? "Đang đọc CCCD…" : "Quét OCR CCCD"}
           </button>
         </div>
       </section>
 
       <section className="mt-5 rounded-2xl border bg-muted/40 p-5 md:p-6">
         <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Auto-filled details from ID
+          Thông tin tự điền từ CCCD
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
@@ -160,7 +160,7 @@ const OnboardingPersonal = () => {
               htmlFor="idNumber"
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
-              ID Number
+              Số CCCD/CMND
             </label>
             <input
               id="idNumber"
@@ -168,7 +168,7 @@ const OnboardingPersonal = () => {
               value={data.identity.idNumber}
               onChange={(event) => updateIdentity({ idNumber: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="G-123-5678-9012"
+              placeholder="001234567890"
             />
           </div>
           <div>
@@ -176,7 +176,7 @@ const OnboardingPersonal = () => {
               htmlFor="expirationDate"
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
-              Expiration Date
+              Ngày hết hạn
             </label>
             <input
               id="expirationDate"
@@ -191,7 +191,7 @@ const OnboardingPersonal = () => {
               htmlFor="residentialAddress"
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
-              Residential Address
+              Địa chỉ thường trú
             </label>
             <input
               id="residentialAddress"
@@ -199,7 +199,7 @@ const OnboardingPersonal = () => {
               value={data.identity.residentialAddress}
               onChange={(event) => updateIdentity({ residentialAddress: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="123 Care Lane, Suite 400"
+              placeholder="123 Đường ABC, Quận 1, TP.HCM"
             />
           </div>
           <div>
@@ -207,7 +207,7 @@ const OnboardingPersonal = () => {
               htmlFor="issuedDate"
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
-              Issued Date
+              Ngày cấp
             </label>
             <input
               id="issuedDate"
@@ -222,7 +222,7 @@ const OnboardingPersonal = () => {
               htmlFor="issuer"
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
-              Issuer
+              Nơi cấp
             </label>
             <input
               id="issuer"
@@ -230,18 +230,18 @@ const OnboardingPersonal = () => {
               value={data.identity.issuer}
               onChange={(event) => updateIdentity({ issuer: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="FL DHSMV"
+              placeholder="Cục Cảnh sát QLHC về TTXH"
             />
           </div>
         </div>
       </section>
 
       <section className="mt-6 rounded-2xl border bg-card p-5 md:p-6">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">Personal Information</h2>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Thông tin cá nhân</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label htmlFor="legalFirstName" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Legal First Name
+              Tên (theo giấy tờ)
             </label>
             <input
               id="legalFirstName"
@@ -250,12 +250,12 @@ const OnboardingPersonal = () => {
               value={data.personal.legalFirstName}
               onChange={(event) => updatePersonal({ legalFirstName: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="Enter as it appears on ID"
+              placeholder="Nhập theo CCCD/CMND"
             />
           </div>
           <div>
             <label htmlFor="legalLastName" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Legal Last Name
+              Họ (theo giấy tờ)
             </label>
             <input
               id="legalLastName"
@@ -264,12 +264,12 @@ const OnboardingPersonal = () => {
               value={data.personal.legalLastName}
               onChange={(event) => updatePersonal({ legalLastName: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="Enter as it appears on ID"
+              placeholder="Nhập theo CCCD/CMND"
             />
           </div>
           <div>
             <label htmlFor="dateOfBirth" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Date of Birth
+              Ngày sinh
             </label>
             <input
               id="dateOfBirth"
@@ -282,7 +282,7 @@ const OnboardingPersonal = () => {
           </div>
           <div>
             <label htmlFor="phoneNumber" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Phone Number
+              Số điện thoại
             </label>
             <input
               id="phoneNumber"
@@ -291,12 +291,12 @@ const OnboardingPersonal = () => {
               value={data.personal.phoneNumber}
               onChange={(event) => updatePersonal({ phoneNumber: event.target.value })}
               className="min-h-11 w-full rounded-xl border bg-background px-4 text-base outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="(555) 000-0000"
+              placeholder="0901234567"
             />
           </div>
           <div className="md:col-span-2">
             <label htmlFor="emailAddress" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Email Address
+              Email
             </label>
             <input
               id="emailAddress"
@@ -312,7 +312,7 @@ const OnboardingPersonal = () => {
 
         <div className="mt-7">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Preferred Pronouns
+            Đại từ xưng hô
           </h2>
           <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-4">
             {pronounOptions.map((option) => {
@@ -339,8 +339,8 @@ const OnboardingPersonal = () => {
       <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
         <p className="flex items-start gap-2">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          Your privacy is our priority. We use bank-level encryption and only share data with your
-          licensed care team.
+          Quyền riêng tư của bạn là ưu tiên hàng đầu. Chúng tôi sử dụng mã hóa cấp ngân hàng và chỉ
+          chia sẻ dữ liệu với đội ngũ chăm sóc được cấp phép của bạn.
         </p>
       </div>
 
@@ -350,7 +350,7 @@ const OnboardingPersonal = () => {
         </p>
       ) : null}
 
-      <OnboardingActions nextLabel="Continue to Insurance" onNext={handleNext} />
+      <OnboardingActions nextLabel="Tiếp tục: Bảo hiểm" onNext={handleNext} />
     </div>
   );
 };

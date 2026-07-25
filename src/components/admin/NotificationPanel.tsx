@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, CalendarPlus, CheckCheck, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { AppointmentNotification } from "@/hooks/useAdminNotifications";
+import { UI_WALK_IN } from "@/config/ui-labels";
 
 type Props = {
   notifications: AppointmentNotification[];
@@ -13,7 +14,7 @@ type Props = {
 };
 
 function formatTime(n: AppointmentNotification): string {
-  if (n.walkIn) return "Walk-in";
+  if (n.walkIn) return UI_WALK_IN;
   if (n.slotDate && n.startTime) {
     const [y, m, d] = n.slotDate.split("-");
     return `${n.startTime.slice(0, 5)} · ${d}/${m}/${y}`;

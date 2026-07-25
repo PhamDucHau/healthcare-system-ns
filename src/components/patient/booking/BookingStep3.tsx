@@ -74,7 +74,7 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
         <div>
           <h2 className="text-xl font-bold text-foreground mb-1">Đặt lịch thành công!</h2>
           <p className="text-sm text-muted-foreground">
-            Email xác nhận và mã QR check-in đã được gửi đến email của bạn.
+            Email xác nhận và mã QR tiếp nhận đã được gửi đến email của bạn.
           </p>
         </div>
 
@@ -155,7 +155,7 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
         <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-blue-700 leading-relaxed">
           Sau khi xác nhận, thông tin lịch hẹn sẽ được gửi đến email của bạn và mã QR sẽ
-          hiển thị trong mục "Lịch hẹn của tôi" để check-in tại phòng khám.
+          hiển thị trong mục "Lịch hẹn của tôi" để tiếp nhận tại phòng khám.
         </p>
       </div>
 

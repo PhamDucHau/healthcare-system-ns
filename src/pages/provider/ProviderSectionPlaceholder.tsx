@@ -10,7 +10,7 @@ const ProviderSectionPlaceholder = ({ title }: Props) => (
       to="/provider-portal/dashboard"
       className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90"
     >
-      Về Dashboard
+      Về bảng tổng quan
     </Link>
   </div>
 );

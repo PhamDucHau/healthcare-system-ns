@@ -31,7 +31,7 @@ export default function CheckinSuccessSheet({
           <div className="flex justify-center mb-2">
             <CheckCircle className="h-12 w-12 text-green-500" />
           </div>
-          <SheetTitle className="text-xl">Check-in thành công!</SheetTitle>
+          <SheetTitle className="text-xl">Tiếp nhận thành công!</SheetTitle>
           <p className="text-sm text-muted-foreground">
             Vui lòng ngồi chờ và theo dõi bảng điện tử
           </p>

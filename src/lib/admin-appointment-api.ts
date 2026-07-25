@@ -281,12 +281,12 @@ export function mapAdminError(message: string): string {
     FORBIDDEN:          "Bạn không có quyền thực hiện thao tác này.",
     PROFILE_NOT_FOUND:  "Không tìm thấy hồ sơ bệnh nhân.",
     NOT_FOUND:          "Không tìm thấy lịch hẹn.",
-    CANNOT_CHECKIN:     "Chỉ có thể check-in lịch ở trạng thái Đã xác nhận.",
+    CANNOT_CHECKIN:     "Chỉ có thể tiếp nhận lịch ở trạng thái Chờ khám.",
     CANNOT_CANCEL:      "Lịch hẹn này không thể hủy.",
     CANNOT_RESCHEDULE:  "Lịch hẹn này không thể đổi giờ.",
     SLOT_UNAVAILABLE:   "Giờ khám này đã được đặt. Vui lòng chọn giờ khám khác.",
     SLOT_IN_PAST:       "Slot đã qua, không thể đặt.",
-    SPECIALTY_MISMATCH: "Bác sĩ chỉ có thể tạo Walk-in thuộc chuyên khoa của mình.",
+    SPECIALTY_MISMATCH: "Bác sĩ chỉ có thể tạo lịch khám không hẹn thuộc chuyên khoa của mình.",
     PATIENT_NO_ACCOUNT: "Hồ sơ bệnh nhân chưa có tài khoản. Vui lòng tạo hồ sơ mới.",
   };
   for (const [code, msg] of Object.entries(map)) {

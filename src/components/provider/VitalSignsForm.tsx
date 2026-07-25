@@ -234,7 +234,7 @@ export default function VitalSignsForm({
     },
     onSuccess: (result) => {
       if (result.is_critical) {
-        toast.error("⚠ Sinh hiệu CRITICAL — Thông báo đến Bác sĩ ngay!", {
+        toast.error("⚠ Sinh hiệu nguy kịch — Thông báo đến Bác sĩ ngay!", {
           duration: 8000,
           description: result.critical_flags.join(" · "),
         });
@@ -428,7 +428,7 @@ export default function VitalSignsForm({
         return (
           <div className="flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
             <Siren className="h-4 w-4 shrink-0" />
-            Sinh hiệu CRITICAL — sẽ gửi thông báo khẩn đến Bác sĩ sau khi lưu
+            Sinh hiệu nguy kịch — sẽ gửi thông báo khẩn đến Bác sĩ sau khi lưu
           </div>
         );
       })()}

@@ -82,7 +82,7 @@ export default function DoctorSchedulesTab() {
         loading={loading}
         title="Lịch làm việc"
         onAdd={openAdd}
-        headers={['Bác sĩ', 'Chuyên khoa', 'Cơ sở / Phòng', 'Ngày làm việc', 'Giờ', 'Slot (phút)', 'Trạng thái', '']}
+        headers={['Bác sĩ', 'Chuyên khoa', 'Cơ sở / Phòng', 'Ngày làm việc', 'Giờ', '(phút)', 'Trạng thái', '']}
         rows={rows}
         renderRow={(r) => (
           <>
@@ -272,7 +272,7 @@ function ScheduleDialog({
             <Field label="Giờ kết thúc">
               <input type="time" value={form.work_end_time} onChange={(e) => setForm((f) => ({ ...f, work_end_time: e.target.value }))} className={inputCls} />
             </Field>
-            <Field label="Slot (phút)">
+            <Field label="(phút)">
               <input type="number" min={5} max={120} step={5} value={form.slot_duration_minutes} onChange={(e) => setForm((f) => ({ ...f, slot_duration_minutes: Number(e.target.value) }))} className={inputCls} />
             </Field>
           </div>

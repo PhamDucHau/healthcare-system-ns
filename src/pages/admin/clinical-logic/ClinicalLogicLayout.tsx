@@ -9,11 +9,11 @@ import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const sidebarItems = [
-  { icon: LayoutGrid, label: "Dashboard",        path: "/admin/clinical-logic/dashboard" },
-  { icon: GitBranch,  label: "Decision Trees",    path: "/admin/clinical-logic/decision-trees" },
-  { icon: FileText,   label: "Question Library",  path: "/admin/clinical-logic/question-library" },
-  { icon: BarChart3,  label: "Analytics",         path: "/admin/clinical-logic/analytics" },
-  { icon: UserCog,    label: "Staff Access",      path: "/admin/clinical-logic/staff-access" },
+  { icon: LayoutGrid, label: "Bảng tổng quan",      path: "/admin/clinical-logic/dashboard" },
+  { icon: GitBranch,  label: "Cây quyết định",      path: "/admin/clinical-logic/decision-trees" },
+  { icon: FileText,   label: "Thư viện câu hỏi",    path: "/admin/clinical-logic/question-library" },
+  { icon: BarChart3,  label: "Phân tích",           path: "/admin/clinical-logic/analytics" },
+  { icon: UserCog,    label: "Phân quyền nhân sự",  path: "/admin/clinical-logic/staff-access" },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -36,14 +36,14 @@ const ClinicalLogicSidebarContent = ({
         <HeartPulse className="h-5 w-5 text-primary-foreground" />
       </div>
       <div>
-        <p className="text-sm font-bold text-primary">Clinical Logic</p>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Empathetic Anchor System</p>
+        <p className="text-sm font-bold text-primary">Logic lâm sàng</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Hệ thống hỗ trợ đồng cảm</p>
       </div>
     </div>
     <nav className="flex flex-col gap-1 p-3 flex-1">
       <NavLink to="/admin/overview" onClick={onNavigate} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors mb-2">
         <ArrowLeft className="h-4 w-4" />
-        Admin Portal
+        Cổng quản trị
       </NavLink>
       {sidebarItems.map(({ icon: Icon, label, path }) => (
         <NavLink key={path} to={path} className={navLinkClass} onClick={onNavigate}>
@@ -64,7 +64,7 @@ const ClinicalLogicSidebarContent = ({
         ) : (
           <LogOut className="h-4 w-4" aria-hidden="true" />
         )}
-        {isLoggingOut ? "Đang đăng xuất…" : "Sign Out"}
+        {isLoggingOut ? "Đang đăng xuất…" : "Đăng xuất"}
       </button>
     </div>
   </>

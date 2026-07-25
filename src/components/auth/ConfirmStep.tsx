@@ -31,7 +31,7 @@ const ConfirmStep = ({
 
     <ol className="mb-6 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
       <li>Mở hộp thư (và thư mục Spam).</li>
-      <li>Nhấn link <strong className="text-foreground">Confirm your mail</strong>.</li>
+      <li>Nhấn link <strong className="text-foreground">Xác nhận email của bạn</strong>.</li>
       <li>Trình duyệt sẽ quay lại app — tiếp tục đặt mật khẩu.</li>
     </ol>
 

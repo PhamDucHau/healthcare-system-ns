@@ -63,7 +63,7 @@ export default function CheckinButton({
         ) : (
           <QrCode className="h-4 w-4" />
         )}
-        {loading ? 'Đang xử lý...' : 'Check-in'}
+        {loading ? 'Đang xử lý...' : 'Tiếp nhận'}
       </Button>
 
       <CheckinSuccessSheet

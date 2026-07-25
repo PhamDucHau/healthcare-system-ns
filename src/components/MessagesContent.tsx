@@ -5,62 +5,62 @@ import { Badge } from "@/components/ui/badge";
 const conversations = [
   {
     id: 1,
-    name: "April Jewell, APRN",
-    role: "My Provider",
-    preview: "I've reviewed your latest lab results. Everything...",
-    time: "Just Now",
+    name: "BS. Nguyễn Thị Lan",
+    role: "Bác sĩ điều trị",
+    preview: "Tôi đã xem kết quả xét nghiệm mới nhất của bạn. Mọi thứ...",
+    time: "Vừa xong",
     online: true,
-    initials: "AJ",
+    initials: "NL",
     initialsColor: "bg-primary/10 text-primary",
   },
   {
     id: 2,
-    name: "Marcus Chen",
-    role: "Medical Assistant",
-    preview: "The prescription has been sent to your local...",
-    time: "2h Ago",
+    name: "Trần Minh Cường",
+    role: "Trợ lý y tế",
+    preview: "Đơn thuốc đã được gửi đến nhà thuốc gần bạn...",
+    time: "2 giờ trước",
     online: false,
-    initials: "MC",
+    initials: "TC",
     initialsColor: "bg-muted text-muted-foreground",
   },
   {
     id: 3,
-    name: "Care Concierge",
-    role: "Customer Support",
-    preview: "Your insurance verification for the upcoming visi...",
-    time: "Yesterday",
+    name: "Bộ phận hỗ trợ",
+    role: "Chăm sóc khách hàng",
+    preview: "Xác minh bảo hiểm cho lần khám sắp tới của bạn...",
+    time: "Hôm qua",
     online: false,
-    initials: "CC",
+    initials: "HT",
     initialsColor: "bg-accent text-primary",
   },
 ];
 
 const filterTabs = [
-  { label: "Support", icon: HelpCircle },
-  { label: "Assistant", icon: Bot },
-  { label: "Provider", icon: User },
+  { label: "Hỗ trợ", icon: HelpCircle },
+  { label: "Trợ lý", icon: Bot },
+  { label: "Bác sĩ", icon: User },
 ];
 
 const messages = [
   {
     id: 1,
     sender: "provider",
-    text: "Hi Taylor, I've had a chance to look over your bloodwork from Monday. Your vitamin D levels are slightly low, but everything else is within the optimal range.",
-    time: "04:32 PM",
-    day: "Yesterday",
+    text: "Chào bạn, tôi đã xem kết quả xét nghiệm máu hôm thứ Hai. Mức vitamin D của bạn hơi thấp, các chỉ số khác đều trong ngưỡng tốt.",
+    time: "16:32",
+    day: "Hôm qua",
   },
   {
     id: 2,
     sender: "user",
-    text: "Thanks for the update, April! Should I start taking a supplement, or try to adjust my diet first?",
-    time: "04:45 PM",
+    text: "Cảm ơn bác sĩ! Tôi nên uống bổ sung hay điều chỉnh chế độ ăn trước?",
+    time: "16:45",
   },
   {
     id: 3,
     sender: "provider",
-    text: 'I would recommend a 2000 IU supplement daily for the next three months. I\'ve sent a recommendation to your patient portal "Files" section for brands I trust. Does that sound manageable?',
-    time: "09:15 AM",
-    day: "Today",
+    text: "Tôi khuyên bạn uống bổ sung 2000 IU mỗi ngày trong 3 tháng tới. Tôi đã gửi gợi ý thương hiệu vào mục \"Tệp tin\" trên cổng bệnh nhân. Bạn thấy ổn không?",
+    time: "09:15",
+    day: "Hôm nay",
   },
 ];
 
@@ -70,15 +70,14 @@ const MessagesContent = () => {
 
   return (
     <main className="flex-1 flex overflow-hidden">
-      {/* Conversation List */}
       <div className="w-full max-w-xs border-r bg-card flex flex-col hidden md:flex">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-bold text-foreground mb-3">Messages</h2>
+          <h2 className="text-lg font-bold text-foreground mb-3">Tin nhắn</h2>
           <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder="Tìm cuộc trò chuyện..."
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
             />
           </div>
@@ -130,9 +129,7 @@ const MessagesContent = () => {
         </div>
       </div>
 
-      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat Header */}
         <div className="flex items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -146,10 +143,10 @@ const MessagesContent = () => {
             <div>
               <p className="text-sm font-bold text-foreground">{activeContact.name}</p>
               <div className="flex items-center gap-2">
-                {activeContact.online && <span className="text-xs font-medium text-success">Online</span>}
+                {activeContact.online && <span className="text-xs font-medium text-success">Đang trực tuyến</span>}
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  M-F 8am - 6pm
+                  T2–T6 8:00–18:00
                 </span>
               </div>
             </div>
@@ -167,7 +164,6 @@ const MessagesContent = () => {
           </div>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.map((msg) => (
             <div key={msg.id}>
@@ -198,7 +194,7 @@ const MessagesContent = () => {
                     <span className="text-[10px] text-muted-foreground">{msg.time}</span>
                     {msg.sender === "user" && (
                       <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-[8px] font-bold text-primary-foreground">
-                        TC
+                        BN
                       </div>
                     )}
                   </div>
@@ -207,16 +203,14 @@ const MessagesContent = () => {
             </div>
           ))}
 
-          {/* HIPAA notice */}
           <div className="flex justify-center pt-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs text-muted-foreground">
               <Lock className="h-3 w-3" />
-              This conversation is encrypted and HIPAA compliant.
+              Cuộc trò chuyện được mã hóa và bảo mật theo quy định y tế.
             </span>
           </div>
         </div>
 
-        {/* Message Input */}
         <div className="border-t px-5 py-3">
           <div className="flex items-center gap-2 rounded-xl border bg-card px-3 py-2">
             <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
@@ -230,7 +224,7 @@ const MessagesContent = () => {
             </button>
             <input
               type="text"
-              placeholder="Type a message..."
+              placeholder="Nhập tin nhắn..."
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
             />
             <button className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center hover:opacity-90 transition-opacity">
@@ -238,7 +232,7 @@ const MessagesContent = () => {
             </button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center mt-2">
-            Use messages for non-emergency medical concerns only. For emergencies, call 911.
+            Chỉ dùng tin nhắn cho vấn đề y tế không khẩn cấp. Trong trường hợp khẩn cấp, gọi 115.
           </p>
         </div>
       </div>

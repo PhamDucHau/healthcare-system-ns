@@ -16,6 +16,21 @@ const TABLE_FILTER_OPTIONS = [
   { value: 'question_categories', label: 'Danh mục' },
 ];
 
+const TABLE_NAME_LABELS: Record<string, string> = {
+  specialties: 'Chuyên khoa',
+  services: 'Dịch vụ',
+  facilities: 'Cơ sở',
+  rooms: 'Phòng khám',
+  doctor_schedules: 'Lịch làm việc',
+  question_categories: 'Danh mục câu hỏi',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  INSERT: 'Thêm mới',
+  UPDATE: 'Cập nhật',
+  DEACTIVATE: 'Vô hiệu hóa',
+};
+
 const ACTION_COLORS: Record<string, string> = {
   INSERT:     'bg-blue-100 text-blue-700',
   UPDATE:     'bg-yellow-100 text-yellow-700',
@@ -57,7 +72,7 @@ export default function AuditLogTab() {
         <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : entries.length === 0 ? (
         <div className="rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">
-          Chưa có log.
+          Chưa có nhật ký thay đổi.
         </div>
       ) : (
         <div className="rounded-xl border overflow-hidden">
@@ -65,7 +80,7 @@ export default function AuditLogTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/30">
-                  {['Thời gian', 'Bảng', 'Hành động', 'Record ID', 'Thay đổi'].map((h) => (
+                  {['Thời gian', 'Bảng', 'Hành động', 'Mã bản ghi', 'Thay đổi'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -76,10 +91,10 @@ export default function AuditLogTab() {
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {format(parseISO(e.changed_at), 'dd/MM/yy HH:mm', { locale: vi })}
                     </td>
-                    <td className="px-4 py-3 text-xs font-mono">{e.table_name}</td>
+                    <td className="px-4 py-3 text-xs">{TABLE_NAME_LABELS[e.table_name] ?? e.table_name}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${ACTION_COLORS[e.action] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {e.action}
+                        {ACTION_LABELS[e.action] ?? e.action}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs font-mono text-muted-foreground max-w-[140px] truncate">

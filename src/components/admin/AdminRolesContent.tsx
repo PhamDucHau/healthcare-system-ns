@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import RolePermissionsSummary from "@/components/admin/RolePermissionsSummary";
-import { getPermissionCategoryLabel, groupPermissionsByCategory } from "@/config/rbac-permissions";
+import { getPermissionCategoryLabel, getPermissionDisplayName, groupPermissionsByCategory } from "@/config/rbac-permissions";
 
 type RoleForm = {
   name: string;
@@ -197,7 +197,7 @@ const AdminRolesContent = () => {
                       {role.is_system ? (
                         <Badge variant="secondary">Hệ thống</Badge>
                       ) : (
-                        <Badge variant="outline">Custom Role</Badge>
+                        <Badge variant="outline">Vai trò tùy chỉnh</Badge>
                       )}
                       <Badge variant="outline">{role.userCount} người dùng</Badge>
                     </div>
@@ -240,8 +240,8 @@ const AdminRolesContent = () => {
             </div>
             {!editing && (
               <div>
-                <Label htmlFor="roleSlug">Slug</Label>
-                <Input id="roleSlug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="receptionist" />
+                <Label htmlFor="roleSlug">Mã định danh</Label>
+                <Input id="roleSlug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="le-tan" />
               </div>
             )}
             <div>
@@ -262,7 +262,7 @@ const AdminRolesContent = () => {
                           checked={form.permissionIds.has(p.id)}
                           onCheckedChange={() => togglePermission(p.id)}
                         />
-                        <span>{p.name}</span>
+                        <span>{getPermissionDisplayName(p)}</span>
                       </label>
                     ))}
                   </div>

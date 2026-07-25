@@ -13,9 +13,9 @@ type OnboardingStepperProps = {
 };
 
 const steps: OnboardingStep[] = [
-  { key: "personal", label: "Personal & Identity", path: "/onboarding/personal" },
-  { key: "insurance", label: "Insurance", path: "/onboarding/insurance" },
-  { key: "review", label: "Review", path: "/onboarding/review" },
+  { key: "personal", label: "Thông tin cá nhân & định danh", path: "/onboarding/personal" },
+  { key: "insurance", label: "Bảo hiểm", path: "/onboarding/insurance" },
+  { key: "review", label: "Xác nhận", path: "/onboarding/review" },
 ];
 
 const getCurrentStepIndex = (currentStep: OnboardingStep["key"]) =>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { format, differenceInYears, parseISO } from "date-fns";
-import { Clock, Stethoscope, Phone, CalendarCheck, X, FileUser, UserRoundPlus, ClipboardList } from "lucide-react";
+import { Clock, Stethoscope, Phone, CalendarCheck, X, FileUser, UserRoundPlus, ClipboardList, Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ import {
 } from "@/lib/appointment-readiness";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { UI_WALK_IN, UI_CHECK_IN } from "@/config/ui-labels";
 
 interface Props {
   appointment: AdminAppointment | null;
@@ -76,11 +76,11 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
     setCheckingIn(true);
     try {
       await adminCheckinAppointment(appointment.id);
-      toast.success("Check-in thành công.");
+      toast.success("Tiếp nhận thành công.");
       onRefresh();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Check-in thất bại.");
+      toast.error(err instanceof Error ? err.message : "Tiếp nhận thất bại.");
     } finally {
       setCheckingIn(false);
     }
@@ -88,7 +88,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onClose}>
+      <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader className="mb-4">
             <SheetTitle>Chi tiết lịch hẹn</SheetTitle>
@@ -148,7 +148,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
                   <p className="text-lg font-bold text-cyan-900">
                     {appointment.slot_date && appointment.start_time
                       ? appointment.start_time.slice(0, 5)
-                      : "Walk-in"}
+                      : UI_WALK_IN}
                   </p>
                   {appointment.slot_date && (
                     <p className="text-xs text-cyan-700 mt-0.5">
@@ -182,7 +182,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
                   <span className={`h-2.5 w-2.5 rounded-full ${ADMIN_STATUS_DOT[appointment.status]}`} />
                   <span className="text-sm font-medium">{ADMIN_STATUS_LABEL[appointment.status]}</span>
                   {appointment.walk_in && (
-                    <Badge variant="secondary" className="text-xs">Walk-in</Badge>
+                    <Badge variant="secondary" className="text-xs">{UI_WALK_IN}</Badge>
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground font-mono">#{shortId}</span>
@@ -224,7 +224,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
                       ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       : <CalendarCheck className="mr-2 h-4 w-4" />
                     }
-                    Check-in ngay
+                    {UI_CHECK_IN} ngay
                     {hasProfile === null && <Loader2 className="ml-2 h-3 w-3 animate-spin opacity-60" />}
                   </Button>
                 )}

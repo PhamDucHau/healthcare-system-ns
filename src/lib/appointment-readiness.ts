@@ -14,12 +14,12 @@ export function getAppointmentReadiness(appt: AdminAppointment): AppointmentRead
 
 export function getAppointmentReadinessMessage(readiness: AppointmentReadiness): string {
   if (!readiness.hasPreConsult && !readiness.hasVitalSigns) {
-    return "Chưa hoàn thành khai báo trước khám và chưa nhập sinh hiệu. Vui lòng hoàn tất cả trước khi check-in hoặc khám.";
+    return "Chưa hoàn thành khai báo trước khám và chưa nhập sinh hiệu. Vui lòng hoàn tất cả trước khi tiếp nhận hoặc khám.";
   }
   if (!readiness.hasPreConsult) {
-    return "Chưa hoàn thành khai báo trước khám. Bệnh nhân cần hoàn thành khai báo y tế trước khi check-in hoặc khám.";
+    return "Chưa hoàn thành khai báo trước khám. Bệnh nhân cần hoàn thành khai báo y tế trước khi tiếp nhận hoặc khám.";
   }
-  return "Chưa nhập sinh hiệu. Vui lòng nhập sinh hiệu trước khi check-in hoặc khám.";
+  return "Chưa nhập sinh hiệu. Vui lòng nhập sinh hiệu trước khi tiếp nhận hoặc khám.";
 }
 
 export function isAppointmentReadyForExam(appt: AdminAppointment): boolean {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { WALK_IN_LABEL } from "@/types/admin-appointment";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -64,7 +65,7 @@ export default function CancelDialog({ appointment, open, onClose, onSuccess }: 
             <p className="text-muted-foreground">
               {appointment.slot_date
                 ? `${appointment.start_time?.slice(0, 5)} · ${appointment.slot_date}`
-                : "Walk-in · " + new Date(appointment.created_at).toLocaleDateString("vi-VN")}
+                : WALK_IN_LABEL + " · " + new Date(appointment.created_at).toLocaleDateString("vi-VN")}
             </p>
           </div>
 

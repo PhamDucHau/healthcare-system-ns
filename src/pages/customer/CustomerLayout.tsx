@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { UI_ACTION } from "@/config/ui-labels";
 import { logoutAndRedirectTo } from "@/lib/auth-session";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -71,7 +72,7 @@ const CustomerSidebarContent = ({
         ) : (
           <LogOut className="h-4 w-4" />
         )}
-        {isLoggingOut ? "Đang đăng xuất…" : "LOGOUT"}
+        {isLoggingOut ? UI_ACTION.loggingOut : UI_ACTION.logout}
       </button>
     </div>
   </>

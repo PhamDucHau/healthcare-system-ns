@@ -46,7 +46,7 @@ const AdminSidebarContent = ({
         </div>
         <div>
           <p className="text-sm font-bold text-primary">Rcare Plus</p>
-          <p className="text-xs text-muted-foreground">IT Operations</p>
+          <p className="text-xs text-muted-foreground">Vận hành hệ thống</p>
         </div>
       </div>
       <nav className="flex flex-col gap-1 p-3 flex-1">

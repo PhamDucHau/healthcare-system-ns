@@ -38,13 +38,14 @@ import {
   formatSurgeryLabel,
   LANGUAGE_LABELS,
 } from "@/types/patient-health-history";
+import { translatePatientStatus, UI_FALLBACK } from "@/config/ui-labels";
 
-const DEMO_DIAGNOSES = ["Type 2 Diabetes", "Mild Hypertension"];
+const DEMO_DIAGNOSES = ["Đái tháo đường type 2", "Tăng huyết áp nhẹ"];
 const DEMO_MEDICATIONS = ["Metformin 500mg", "Lisinopril 10mg"];
-const DEMO_ALLERGIES = ["Penicillin", "Peanuts"];
+const DEMO_ALLERGIES = ["Penicillin", "Đậu phộng"];
 const DEMO_LABS = [
-  { name: "Blood Panel", date: "2024-01-12" },
-  { name: "Chest X-Ray", date: "2023-12-28" },
+  { name: "Xét nghiệm máu tổng quát", date: "2024-01-12" },
+  { name: "X-quang ngực", date: "2023-12-28" },
 ];
 
 const OVERVIEW_TABS = [
@@ -125,12 +126,7 @@ function statusBadgeClass(status: string | null | undefined) {
 }
 
 function translateStatus(status: string | null | undefined): string {
-  if (status === "Active") return "Đang hoạt động";
-  if (status === "Stable") return "Ổn định";
-  if (status === "Review Needed") return "Cần xem xét";
-  if (status === "Draft") return "Nháp";
-  if (status === "Routine") return "Thường quy";
-  return status ?? "—";
+  return translatePatientStatus(status);
 }
 
 function demoToDetail(demo: DemoPatient): PatientPortalDetail {
@@ -293,7 +289,7 @@ const ProviderPatientsPage = () => {
 
   const draftFullName =
     [draftPersonal.legalFirstName, draftPersonal.legalLastName].filter(Boolean).join(" ") ||
-    "Alex Rivera";
+    "Nguyễn Văn An";
   const draftDob = formatDob(draftPersonal.dateOfBirth ?? null, "05/12/1994");
 
   const demoPatients: DemoPatient[] = useMemo(
@@ -309,7 +305,7 @@ const ProviderPatientsPage = () => {
       },
       {
         key: "demo2",
-        name: "Jordan Smith",
+        name: "Trần Thị Bình",
         dob: "11/24/1988",
         last: "1 tuần trước",
         status: "Review Needed",
@@ -317,7 +313,7 @@ const ProviderPatientsPage = () => {
       },
       {
         key: "demo3",
-        name: "Marcus Chen",
+        name: "Lê Minh Cường",
         dob: "02/03/1972",
         last: "3 tuần trước",
         status: "Routine",
@@ -493,7 +489,7 @@ const ProviderPatientsPage = () => {
     (patientDetail?.id && !isDemoPatientId(patientDetail.id)
       ? `QC-${patientDetail.id.slice(0, 8).toUpperCase()}`
       : "QC-DEMO-8842");
-  const pronouns = patientDetail?.preferred_pronouns ?? draftPersonal.pronouns ?? "Not set";
+  const pronouns = patientDetail?.preferred_pronouns ?? draftPersonal.pronouns ?? UI_FALLBACK.notSet;
 
   const diagnosisLabels = useMemo(() => {
     if (isDemoSelection) return DEMO_DIAGNOSES;
@@ -558,7 +554,7 @@ const ProviderPatientsPage = () => {
 
   const emergencyName =
     healthChart?.emergency_contact_name?.trim()
-    || (isDemoSelection ? `${displayName.split(" ")[0] ?? "Patient"} Contact` : "—");
+    || (isDemoSelection ? `Liên hệ ${displayName.split(" ")[0] ?? UI_FALLBACK.patient}` : "—");
   const emergencyPhone =
     healthChart?.emergency_contact_phone?.trim()
     || patientDetail?.phone_number
@@ -571,7 +567,7 @@ const ProviderPatientsPage = () => {
 
   const handleSaveNote = useCallback(() => {
     writeNote(activeNoteKey, noteDraft);
-    toast.success("Đã lưu ghi chú phiên làm việc (session)");
+    toast.success("Đã lưu ghi chú phiên làm việc");
   }, [activeNoteKey, noteDraft]);
 
   const isListBusy = isListLoading;
@@ -619,7 +615,7 @@ const ProviderPatientsPage = () => {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold">{row.full_name ?? "Patient"}</p>
+                        <p className="text-sm font-semibold">{row.full_name ?? UI_FALLBACK.patient}</p>
                         <p className="text-xs text-muted-foreground">
                           Ngày sinh: {formatDob(row.date_of_birth, "—")}
                         </p>

@@ -151,7 +151,7 @@ export default function QuestionLibraryPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm kiếm bộ câu hỏi, mã số, hoặc tag..."
+            placeholder="Tìm kiếm bộ câu hỏi, mã số hoặc thẻ..."
             className="h-10 w-full rounded-lg border-0 bg-muted/60 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>

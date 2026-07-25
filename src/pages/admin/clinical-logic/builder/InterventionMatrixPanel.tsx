@@ -9,8 +9,8 @@ const PATH_STYLES: Record<string, { box: string; label: string }> = {
 
 function pathStyle(label: string) {
   const key = label.toLowerCase();
-  if (key.includes("critical")) return PATH_STYLES.critical;
-  if (key.includes("moderate")) return PATH_STYLES.moderate;
+  if (key.includes("critical") || key.includes("nghiêm")) return PATH_STYLES.critical;
+  if (key.includes("moderate") || key.includes("trung")) return PATH_STYLES.moderate;
   return PATH_STYLES.default;
 }
 
@@ -22,7 +22,7 @@ type Props = {
 
 export default function InterventionMatrixPanel({ rules, onChange, disabled }: Props) {
   function addRule() {
-    onChange([...rules, { condition: "", label: "moderate", action: "" }]);
+    onChange([...rules, { condition: "", label: "trung bình", action: "" }]);
   }
 
   function updateRule(i: number, fields: Partial<InterventionRule>) {
