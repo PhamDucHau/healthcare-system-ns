@@ -9,27 +9,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// Intercept PostgREST 401s: sign out and redirect to login.
-// Auth-endpoint 401s (/auth/v1/) are intentionally excluded to avoid loops.
-let _redirecting = false;
-
+// Intercept 401s on protected endpoints: refresh token → retry once → logout only if refresh fails.
+// Auth-endpoint 401s (/auth/v1/) are excluded to avoid refresh loops.
 const fetchWithAuthGuard: typeof fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const response = await globalThis.fetch(input, init);
 
-  if (
-    response.status === 401 &&
-    !_redirecting &&
-    typeof input === "string" &&
-    input.includes("/rest/v1/")
-  ) {
-    _redirecting = true;
-    // Fire-and-forget — page is about to unload anyway
-    supabase.auth.signOut().finally(() => {
-      window.location.href = "/login";
-    });
+  if (response.status !== 401) {
+    return response;
   }
 
-  return response;
+  const { handleUnauthorizedFetch, shouldHandle401 } = await import("@/lib/auth-refresh");
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+
+  if (!shouldHandle401(url)) {
+    return response;
+  }
+
+  return handleUnauthorizedFetch(input, init, response);
 };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

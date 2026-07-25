@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { isSessionNearExpiry, refreshSessionOnce } from "@/lib/auth-refresh";
 import { getSessionRole } from "@/lib/portal-auth";
 import { supabase } from "@/lib/supabase";
 import type { PortalType } from "@/types/portal";
@@ -22,7 +23,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
-      setSession(data.session);
+
+      let nextSession = data.session;
+      if (isSessionNearExpiry(nextSession)) {
+        nextSession = await refreshSessionOnce();
+      }
+
+      setSession(nextSession);
       setIsLoading(false);
     };
 
@@ -38,14 +45,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    // Pick up role changes after admin reassignment (new JWT from refresh)
-    void supabase.auth.refreshSession().then(({ data }) => {
-      if (data.session) setSession(data.session);
-    });
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void supabase.auth.getSession().then(({ data }) => {
+        if (isSessionNearExpiry(data.session, 120)) {
+          void refreshSessionOnce().then((refreshed) => {
+            if (refreshed) setSession(refreshed);
+          });
+        }
+      });
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

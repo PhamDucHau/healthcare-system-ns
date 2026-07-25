@@ -1,8 +1,8 @@
 import {
-  clearAuthAndRedirectHome,
-  isUnauthorizedError,
-} from "@/lib/auth-session";
-import { supabase } from "@/lib/supabase";
+  forceAuthLogout,
+  fetchWithAuthRetry,
+  getAccessTokenOrRefresh,
+} from "@/lib/auth-refresh";
 
 const functionsBase = () => {
   const override = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL;
@@ -26,14 +26,13 @@ export class AdminApiError extends Error {
 }
 
 async function postAdmin<T>(path: string, payload: unknown): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = await getAccessTokenOrRefresh();
   if (!token) {
-    await clearAuthAndRedirectHome();
+    await forceAuthLogout();
   }
 
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const res = await fetch(`${functionsBase()}/${path}`, {
+  const res = await fetchWithAuthRetry(`${functionsBase()}/${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -50,9 +49,6 @@ async function postAdmin<T>(path: string, payload: unknown): Promise<T> {
   };
 
   if (!res.ok) {
-    if (isUnauthorizedError(res.status, body.error)) {
-      await clearAuthAndRedirectHome();
-    }
     throw new AdminApiError(res.status, body);
   }
 

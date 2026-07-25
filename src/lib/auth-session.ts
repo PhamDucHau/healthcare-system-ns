@@ -3,6 +3,13 @@ import { supabase } from "@/lib/supabase";
 
 let isClearingSession = false;
 
+/** Acquire exclusive lock for session clearing; returns false if already clearing. */
+export function acquireSessionClearLock(): boolean {
+  if (isClearingSession) return false;
+  isClearingSession = true;
+  return true;
+}
+
 /** Xóa token Supabase trong localStorage + signOut local */
 export async function clearAuthStorage(): Promise<void> {
   try {
@@ -34,18 +41,11 @@ export async function clearAuthStorage(): Promise<void> {
 }
 
 /**
- * Token hết hạn / không hợp lệ: xóa session và về /home để đăng nhập lại.
+ * Token hết hạn / không hợp lệ: xóa session và về /login để đăng nhập lại.
  */
 export async function clearAuthAndRedirectHome(): Promise<never> {
-  if (!isClearingSession) {
-    isClearingSession = true;
-    await clearAuthStorage();
-    window.location.replace("/home");
-  }
-
-  return new Promise(() => {
-    /* redirect in progress */
-  }) as never;
+  const { forceAuthLogout } = await import("@/lib/auth-refresh");
+  return forceAuthLogout();
 }
 
 export function isUnauthorizedError(
@@ -57,8 +57,7 @@ export function isUnauthorizedError(
 
 /** Đăng xuất: revoke session + xóa token local → trang chủ */
 export async function logoutAndRedirectTo(landingPath = "/"): Promise<void> {
-  if (isClearingSession) return;
-  isClearingSession = true;
+  if (!acquireSessionClearLock()) return;
   try {
     await portalLogout();
   } catch {

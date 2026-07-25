@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { fetchWithAuthRetry, forceAuthLogout, getAccessTokenOrRefresh } from "@/lib/auth-refresh";
 
 function functionsBaseUrl(): string {
   const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -7,14 +7,16 @@ function functionsBaseUrl(): string {
 }
 
 async function invokeFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("Not authenticated");
+  const token = await getAccessTokenOrRefresh();
+  if (!token) {
+    await forceAuthLogout();
+  }
 
-  const res = await fetch(`${functionsBaseUrl()}/${name}`, {
+  const res = await fetchWithAuthRetry(`${functionsBaseUrl()}/${name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   });

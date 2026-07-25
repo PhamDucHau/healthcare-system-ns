@@ -9,6 +9,10 @@ import {
   verifyAdminMfa,
   PortalAuthError,
 } from "@/lib/portal-auth-api";
+import {
+  AUTH_SESSION_EXPIRED_KEY,
+  DEFAULT_SESSION_EXPIRED_MESSAGE,
+} from "@/lib/auth-refresh";
 import { isValidIsoDate, normalizeDobValue } from "@/lib/patient-dob-validation";
 import type { PortalType } from "@/types/portal";
 import OtpStep from "@/components/auth/OtpStep";
@@ -44,6 +48,18 @@ const UnifiedLoginPage = () => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [dobFieldError, setDobFieldError] = useState("");
   const [dobAttemptsLeft, setDobAttemptsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      const expiredMessage = sessionStorage.getItem(AUTH_SESSION_EXPIRED_KEY);
+      if (expiredMessage) {
+        sessionStorage.removeItem(AUTH_SESSION_EXPIRED_KEY);
+        toast.info(expiredMessage || DEFAULT_SESSION_EXPIRED_MESSAGE);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoading || !session || !role) return;
