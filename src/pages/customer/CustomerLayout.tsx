@@ -19,7 +19,9 @@ const sidebarItems = [
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-    isActive ? "text-primary bg-accent" : "text-muted-foreground hover:bg-muted"
+    isActive
+      ? "border-l-4 border-primary bg-[#FDECEE] pl-2 text-primary"
+      : "border-l-4 border-transparent text-muted-foreground hover:bg-muted"
   }`;
 
 const CustomerSidebarContent = ({

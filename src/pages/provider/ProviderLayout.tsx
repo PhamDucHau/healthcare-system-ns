@@ -34,7 +34,9 @@ const NAV_ITEMS = [
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
-    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+    isActive
+      ? "border-l-4 border-primary bg-[#FDECEE] pl-2 text-primary"
+      : "border-l-4 border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
   }`;
 
 function formatDoctorTitle(specialty: string | null | undefined): string {

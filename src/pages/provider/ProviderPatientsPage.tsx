@@ -600,7 +600,7 @@ const ProviderPatientsPage = () => {
 
       <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
         <section className="rounded-xl border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col items-start gap-2">
             <h2 className="text-xl font-semibold">Danh sách bệnh nhân</h2>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
               {(patientSummaries.length || demoPatients.length)} đang hoạt động
