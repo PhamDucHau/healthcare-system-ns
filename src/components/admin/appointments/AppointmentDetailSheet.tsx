@@ -253,6 +253,7 @@ export default function AppointmentDetailSheet({ appointment, open, onClose, onR
               <PreConsultationDualView
                 appointmentId={appointment.id}
                 appointmentStatus={appointment.status}
+                onSaved={onRefresh}
               />
             </TabsContent>
           </Tabs>

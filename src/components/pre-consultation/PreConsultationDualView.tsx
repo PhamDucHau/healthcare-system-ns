@@ -16,6 +16,7 @@ type Props = {
   appointmentId: string;
   appointmentStatus?: string;
   editable?: boolean;
+  onSaved?: () => void;
 };
 
 const CLOSED_STATUSES = new Set(['CANCELLED', 'COMPLETED', 'NO_SHOW']);
@@ -24,6 +25,7 @@ export default function PreConsultationDualView({
   appointmentId,
   appointmentStatus,
   editable = true,
+  onSaved,
 }: Props) {
   const [bundle, setBundle] = useState<PreConsultationBundle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,10 @@ export default function PreConsultationDualView({
         canEdit={canEdit}
         updaterName={bundle?.doctorUpdaterName}
         updatedAt={bundle?.doctor?.updated_at}
-        onSaved={() => void load()}
+        onSaved={() => {
+          void load();
+          onSaved?.();
+        }}
       />
     </div>
   );

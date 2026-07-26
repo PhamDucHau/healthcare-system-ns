@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mapRpcDoctorAppointmentRow } from "@/lib/doctor-appointment-api";
+import { appointmentHasPreConsult } from "@/lib/appointment-readiness";
 
 describe("mapRpcDoctorAppointmentRow", () => {
   it("maps RPC row with pre-consult and vital signs", () => {
@@ -58,5 +59,30 @@ describe("mapRpcDoctorAppointmentRow", () => {
     expect(row.pre_consult_status).toBe("none");
     expect(row.walk_in).toBe(true);
     expect(row.has_vital_signs).toBe(false);
+  });
+
+  it("maps doctor-only pre-consult with merged flags", () => {
+    const row = mapRpcDoctorAppointmentRow({
+      id: "appt-3",
+      patient_id: "user-3",
+      profile_id: "profile-3",
+      specialty_id: "spec-1",
+      slot_id: "slot-1",
+      status: "CONFIRMED",
+      walk_in: false,
+      created_at: "2026-07-26T08:00:00Z",
+      updated_at: "2026-07-26T08:00:00Z",
+      pre_consult_status_raw: null,
+      pre_consult_flags: { severe_pain: true },
+      pre_consult_doctor_exists: true,
+      pre_consult_doctor_flags: { drug_allergy: true },
+      has_vital_signs: true,
+    });
+
+    expect(row.pre_consult_status).toBe("none");
+    expect(row.pre_consult_doctor_exists).toBe(true);
+    expect(row.pre_consult_drug_allergy).toBe(true);
+    expect(row.pre_consult_severe_pain).toBe(true);
+    expect(appointmentHasPreConsult(row)).toBe(true);
   });
 });

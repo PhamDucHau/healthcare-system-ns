@@ -172,6 +172,13 @@ export default function ProviderAppointmentsPage() {
 
   const filtered = appointmentListData?.rows ?? [];
   const appointmentTotal = appointmentListData?.total ?? 0;
+
+  useEffect(() => {
+    const selectedId = selected?.id;
+    if (!selectedId) return;
+    const updated = filtered.find((r) => r.id === selectedId);
+    if (updated) setSelected(updated);
+  }, [filtered, selected?.id]);
   const appointmentTotalPages = Math.max(
     1,
     Math.ceil(appointmentTotal / APPOINTMENT_LIST_PAGE_SIZE),
