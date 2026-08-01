@@ -142,13 +142,13 @@ const AdminLayout = () => {
                 />
               </SheetContent>
             </Sheet>
-            <div className="relative max-w-md w-full">
+            {/* <div className="relative max-w-md w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 placeholder="Tìm kiếm các chỉ số vận hành..."
                 className="w-full bg-muted border-none rounded-full py-1.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
-            </div>
+            </div> */}
           </div>
           <div className="flex items-center gap-6">
             <NotificationPanel
