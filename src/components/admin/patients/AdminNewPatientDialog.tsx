@@ -8,6 +8,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import UploadCard from "@/components/onboarding/UploadCard";
 import DuplicatePatientAlert from "@/components/common/DuplicatePatientAlert";
 import { supabase } from "@/lib/supabase";
@@ -393,8 +400,19 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
                 required error={errors.legalFirstName} />
               <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")}
                 type="date" required error={errors.dateOfBirth} />
-              <F label="Giới tính" value={form.gender} onChange={set("gender")}
-                placeholder="Nam / Nữ / Khác" />
+              <div>
+                <label className={lc}>Giới tính</label>
+                <Select value={form.gender} onValueChange={set("gender")}>
+                  <SelectTrigger className="min-h-10 w-full rounded-xl">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Anh / Nam</SelectItem>
+                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <F label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")}
                 type="tel" placeholder="0912 345 678" required error={errors.phoneNumber} />
               <F label="Email" value={form.email} onChange={set("email")}
@@ -433,7 +451,19 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               <F label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
               <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
               <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
-              <F label="Giới tính" value={form.bhytGender} onChange={set("bhytGender")} placeholder="Nam / Nữ" />
+              <div>
+                <label className={lc}>Giới tính</label>
+                <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
+                  <SelectTrigger className="min-h-10 w-full rounded-xl">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Anh / Nam</SelectItem>
+                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <F label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
               <F label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
               <F label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />

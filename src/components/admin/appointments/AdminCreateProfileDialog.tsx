@@ -8,6 +8,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import UploadCard from "@/components/onboarding/UploadCard";
 import { supabase } from "@/lib/supabase";
 import {
@@ -260,7 +267,19 @@ export default function AdminCreateProfileDialog({
               <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
               <F label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")} type="tel" placeholder="0912 345 678" />
               <F label="Email" value={form.email} onChange={set("email")} type="email" placeholder="example@email.com" />
-              <F label="Đại từ" value={form.pronouns} onChange={set("pronouns")} placeholder="Anh/Nam, Chị/Nữ…" />
+              <div>
+                <label className={lc}>Giới tính</label>
+                <Select value={form.pronouns} onValueChange={set("pronouns")}>
+                  <SelectTrigger className="min-h-10 w-full rounded-xl">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Anh / Nam</SelectItem>
+                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </section>
 
@@ -275,7 +294,19 @@ export default function AdminCreateProfileDialog({
               <F label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
               <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
               <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
-              <F label="Giới tính" value={form.bhytGender} onChange={set("bhytGender")} placeholder="Nam / Nữ" />
+              <div>
+                <label className={lc}>Giới tính</label>
+                <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
+                  <SelectTrigger className="min-h-10 w-full rounded-xl">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Anh / Nam</SelectItem>
+                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <F label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
               <F label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
               <F label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />
