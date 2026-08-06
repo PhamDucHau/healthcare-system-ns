@@ -43,10 +43,20 @@ $$;
 -- ─── Seed: 3 sample rooms ─────────────────────────────────────────────────────
 -- specialty_id is left NULL here because specialty UUIDs are environment-specific.
 -- Administrators can update specialty_id via the Master Data admin UI after deployment.
+-- Only insert if a default facility exists.
 
-insert into public.rooms (name, specialty_id, is_active)
-values
-  ('Phòng 1 - Nội khoa',  null, true),
-  ('Phòng 2 - Nhi khoa',  null, true),
-  ('Phòng 3 - Tim mạch',  null, true)
-on conflict do nothing;
+do $$
+declare
+  v_facility_id uuid;
+begin
+  select id into v_facility_id from public.facilities limit 1;
+  if v_facility_id is not null then
+    insert into public.rooms (facility_id, name, room_number, specialty_id, is_active)
+    values
+      (v_facility_id, 'Phòng 1 - Nội khoa',  '101', null, true),
+      (v_facility_id, 'Phòng 2 - Nhi khoa',  '102', null, true),
+      (v_facility_id, 'Phòng 3 - Tim mạch',  '103', null, true)
+    on conflict (facility_id, room_number) do nothing;
+  end if;
+end;
+$$;

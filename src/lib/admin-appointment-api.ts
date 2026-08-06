@@ -403,7 +403,6 @@ export function mapAdminError(message: string): string {
     SLOT_UNAVAILABLE:   "Giờ khám này đã được đặt. Vui lòng chọn giờ khám khác.",
     SLOT_IN_PAST:       "Slot đã qua, không thể đặt.",
     SPECIALTY_MISMATCH: "Bác sĩ chỉ có thể tạo lịch khám không hẹn thuộc chuyên khoa của mình.",
-    PATIENT_NO_ACCOUNT: "Hồ sơ bệnh nhân chưa có tài khoản. Vui lòng tạo hồ sơ mới.",
   };
   for (const [code, msg] of Object.entries(map)) {
     if (message.includes(code)) return msg;

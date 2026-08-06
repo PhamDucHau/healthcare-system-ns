@@ -66,10 +66,16 @@ comment on function public.auto_no_show() is
 
 -- ─── pg_cron schedule ────────────────────────────────────────────────────────
 -- Requires pg_cron extension to be enabled in Supabase (Database → Extensions → pg_cron).
--- Schedule: every minute.
+-- Schedule: every minute. Skip if pg_cron is not available.
 
-select cron.schedule(
-  'auto-no-show-every-minute',   -- job name (must be unique)
-  '* * * * *',                   -- cron expression: every minute
-  $$ select public.auto_no_show() $$
-);
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule(
+      'auto-no-show-every-minute',
+      '* * * * *',
+      $cron$ select public.auto_no_show() $cron$
+    );
+  end if;
+end;
+$$;
