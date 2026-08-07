@@ -22,6 +22,8 @@ import {
   applyBhytParsedFillEmpty,
   applyCccdParsedFillEmpty,
 } from "@/lib/cccd-ocr";
+import { AddressSelector, type AddressData } from "@/components/address/AddressSelector";
+import { buildFullAddress } from "@/lib/vietnam-provinces-api";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -31,6 +33,10 @@ function sanitize(name: string) {
 
 type FormData = {
   idNumber: string; expirationDate: string; residentialAddress: string;
+  provinceCode: string; provinceName: string;
+  districtCode: string; districtName: string;
+  wardCode: string; wardName: string;
+  streetAddress: string;
   issuedDate: string; issuer: string;
   legalFirstName: string; legalLastName: string; dateOfBirth: string;
   phoneNumber: string; email: string; pronouns: string;
@@ -42,6 +48,10 @@ type FormData = {
 
 const empty: FormData = {
   idNumber: "", expirationDate: "", residentialAddress: "",
+  provinceCode: "", provinceName: "",
+  districtCode: "", districtName: "",
+  wardCode: "", wardName: "",
+  streetAddress: "",
   issuedDate: "", issuer: "",
   legalFirstName: "", legalLastName: "", dateOfBirth: "",
   phoneNumber: "", email: "", pronouns: "",
@@ -154,13 +164,26 @@ export default function AdminCreateProfileDialog({
       }
 
       const e2n = (v: string) => v.trim() || null;
+      const fullAddress = buildFullAddress(
+        form.streetAddress,
+        form.wardName,
+        form.districtName,
+        form.provinceName,
+      );
 
       const { error } = await supabase.from("patient").upsert({
         id: profileId,
         user_id: patientUserId,
         id_number: e2n(form.idNumber),
         id_expiration_date: e2n(form.expirationDate),
-        residential_address: e2n(form.residentialAddress),
+        residential_address: e2n(fullAddress || form.residentialAddress),
+        province_code: e2n(form.provinceCode),
+        province_name: e2n(form.provinceName),
+        district_code: e2n(form.districtCode),
+        district_name: e2n(form.districtName),
+        ward_code: e2n(form.wardCode),
+        ward_name: e2n(form.wardName),
+        street_address: e2n(form.streetAddress),
         id_issued_date: e2n(form.issuedDate),
         id_issuer: e2n(form.issuer),
         legal_first_name: e2n(form.legalFirstName),
@@ -251,8 +274,32 @@ export default function AdminCreateProfileDialog({
               <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
               <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
               <F label="Nơi cấp" value={form.issuer} onChange={set("issuer")} placeholder="Cục cảnh sát QLHC về TTXH" />
-              <F label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")}
-                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2 />
+              <div className="sm:col-span-2">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Địa chỉ thường trú
+                </p>
+                <AddressSelector
+                  value={{
+                    provinceCode: form.provinceCode,
+                    provinceName: form.provinceName,
+                    districtCode: form.districtCode,
+                    districtName: form.districtName,
+                    wardCode: form.wardCode,
+                    wardName: form.wardName,
+                    streetAddress: form.streetAddress,
+                  }}
+                  onChange={(addr: AddressData) => setForm(p => ({
+                    ...p,
+                    provinceCode: addr.provinceCode,
+                    provinceName: addr.provinceName,
+                    districtCode: addr.districtCode,
+                    districtName: addr.districtName,
+                    wardCode: addr.wardCode,
+                    wardName: addr.wardName,
+                    streetAddress: addr.streetAddress,
+                  }))}
+                />
+              </div>
             </div>
           </section>
 

@@ -12,6 +12,13 @@ export type PatientPortalDetail = {
   phone_number: string | null;
   id_number: string | null;
   residential_address: string | null;
+  province_code: string | null;
+  province_name: string | null;
+  district_code: string | null;
+  district_name: string | null;
+  ward_code: string | null;
+  ward_name: string | null;
+  street_address: string | null;
   id_expiration_date: string | null;
   id_issued_date: string | null;
   id_issuer: string | null;
@@ -120,6 +127,13 @@ export function mapPatientPortalRow(row: Record<string, unknown>): PatientPortal
     phone_number: row.phone_number != null ? String(row.phone_number) : null,
     id_number: row.id_number != null ? String(row.id_number) : null,
     residential_address: row.residential_address != null ? String(row.residential_address) : null,
+    province_code: row.province_code != null ? String(row.province_code) : null,
+    province_name: row.province_name != null ? String(row.province_name) : null,
+    district_code: row.district_code != null ? String(row.district_code) : null,
+    district_name: row.district_name != null ? String(row.district_name) : null,
+    ward_code: row.ward_code != null ? String(row.ward_code) : null,
+    ward_name: row.ward_name != null ? String(row.ward_name) : null,
+    street_address: row.street_address != null ? String(row.street_address) : null,
     id_expiration_date: row.id_expiration_date != null ? String(row.id_expiration_date) : null,
     id_issued_date: row.id_issued_date != null ? String(row.id_issued_date) : null,
     id_issuer: row.id_issuer != null ? String(row.id_issuer) : null,

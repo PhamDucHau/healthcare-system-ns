@@ -20,6 +20,13 @@ type IdentityData = {
   idNumber: string;
   expirationDate: string;
   residentialAddress: string;
+  provinceCode: string;
+  provinceName: string;
+  districtCode: string;
+  districtName: string;
+  wardCode: string;
+  wardName: string;
+  streetAddress: string;
   issuedDate: string;
   issuer: string;
   idFileName: string;
@@ -61,6 +68,13 @@ const defaultData: OnboardingFormData = {
     idNumber: "",
     expirationDate: "",
     residentialAddress: "",
+    provinceCode: "",
+    provinceName: "",
+    districtCode: "",
+    districtName: "",
+    wardCode: "",
+    wardName: "",
+    streetAddress: "",
     issuedDate: "",
     issuer: "",
     idFileName: "",

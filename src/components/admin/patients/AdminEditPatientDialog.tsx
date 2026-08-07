@@ -23,6 +23,8 @@ import {
   applyCccdParsedFillEmpty,
 } from "@/lib/cccd-ocr";
 import type { PatientPortalDetail } from "@/types/patient-portal";
+import { AddressSelector, type AddressData } from "@/components/address/AddressSelector";
+import { buildFullAddress } from "@/lib/vietnam-provinces-api";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -35,6 +37,10 @@ type FormData = {
   gender: string; phoneNumber: string; email: string;
   idNumber: string; expirationDate: string; issuedDate: string;
   issuer: string; residentialAddress: string;
+  provinceCode: string; provinceName: string;
+  districtCode: string; districtName: string;
+  wardCode: string; wardName: string;
+  streetAddress: string;
   provider: string; memberId: string; groupNumber: string;
   bhytName: string; bhytDob: string; bhytGender: string;
   bhytAddress: string; bhytKcb: string; bhytKcbCode: string;
@@ -54,6 +60,13 @@ function toForm(p: PatientPortalDetail): FormData {
     issuedDate: p.id_issued_date ?? "",
     issuer: p.id_issuer ?? "",
     residentialAddress: p.residential_address ?? "",
+    provinceCode: p.province_code ?? "",
+    provinceName: p.province_name ?? "",
+    districtCode: p.district_code ?? "",
+    districtName: p.district_name ?? "",
+    wardCode: p.ward_code ?? "",
+    wardName: p.ward_name ?? "",
+    streetAddress: p.street_address ?? "",
     provider: p.insurance_provider ?? "",
     memberId: p.member_id ?? "",
     groupNumber: p.group_number ?? "",
@@ -257,6 +270,12 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
       if (cardFile) paths.card_front_storage_path = await upload(cardFile, "insurance-cards", "card_front");
 
       const e2n = (v: string) => v.trim() || null;
+      const fullAddress = buildFullAddress(
+        form.streetAddress,
+        form.wardName,
+        form.districtName,
+        form.provinceName,
+      );
       const { error } = await supabase.from("patient").upsert({
         id: profile.id,
         user_id: userId,
@@ -270,7 +289,14 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
         id_expiration_date: e2n(form.expirationDate),
         id_issued_date: e2n(form.issuedDate),
         id_issuer: e2n(form.issuer),
-        residential_address: e2n(form.residentialAddress),
+        residential_address: e2n(fullAddress || form.residentialAddress),
+        province_code: e2n(form.provinceCode),
+        province_name: e2n(form.provinceName),
+        district_code: e2n(form.districtCode),
+        district_name: e2n(form.districtName),
+        ward_code: e2n(form.wardCode),
+        ward_name: e2n(form.wardName),
+        street_address: e2n(form.streetAddress),
         insurance_provider: e2n(form.provider),
         member_id: e2n(form.memberId),
         group_number: e2n(form.groupNumber),
@@ -381,7 +407,32 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                 <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
                 <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
                 <F label="Nơi cấp" value={form.issuer} onChange={set("issuer")} />
-                <F label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")} col2 />
+                <div className="sm:col-span-2">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Địa chỉ thường trú
+                  </p>
+                  <AddressSelector
+                    value={{
+                      provinceCode: form.provinceCode,
+                      provinceName: form.provinceName,
+                      districtCode: form.districtCode,
+                      districtName: form.districtName,
+                      wardCode: form.wardCode,
+                      wardName: form.wardName,
+                      streetAddress: form.streetAddress,
+                    }}
+                    onChange={(addr: AddressData) => setForm(p => p ? {
+                      ...p,
+                      provinceCode: addr.provinceCode,
+                      provinceName: addr.provinceName,
+                      districtCode: addr.districtCode,
+                      districtName: addr.districtName,
+                      wardCode: addr.wardCode,
+                      wardName: addr.wardName,
+                      streetAddress: addr.streetAddress,
+                    } : p)}
+                  />
+                </div>
               </div>
             </section>
 

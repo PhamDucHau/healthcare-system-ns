@@ -4,6 +4,7 @@ import { ShieldCheck } from "lucide-react";
 import OnboardingActions from "@/components/onboarding/OnboardingActions";
 import UploadCard from "@/components/onboarding/UploadCard";
 import { useOnboardingForm } from "@/hooks/useOnboardingForm";
+import { AddressSelector, type AddressData as AddressDataType } from "@/components/address/AddressSelector";
 
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
@@ -34,12 +35,26 @@ const OnboardingIdentity = () => {
     setIdBackFile(file);
   };
 
+  const handleAddressChange = (addressData: AddressDataType) => {
+    updateIdentity({
+      provinceCode: addressData.provinceCode,
+      provinceName: addressData.provinceName,
+      districtCode: addressData.districtCode,
+      districtName: addressData.districtName,
+      wardCode: addressData.wardCode,
+      wardName: addressData.wardName,
+      streetAddress: addressData.streetAddress,
+    });
+  };
+
   const handleNext = () => {
     setErrorMessage("");
     const {
       idNumber,
       expirationDate,
-      residentialAddress,
+      provinceCode,
+      districtCode,
+      wardCode,
       issuedDate,
       issuer,
       idFileName,
@@ -50,7 +65,9 @@ const OnboardingIdentity = () => {
       !idBackFileName ||
       !idNumber ||
       !expirationDate ||
-      !residentialAddress ||
+      !provinceCode ||
+      !districtCode ||
+      !wardCode ||
       !issuedDate ||
       !issuer
     ) {
@@ -117,16 +134,20 @@ const OnboardingIdentity = () => {
             />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="residentialAddress" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Địa chỉ thường trú
-            </label>
-            <input
-              id="residentialAddress"
-              type="text"
-              value={data.identity.residentialAddress}
-              onChange={(event) => updateIdentity({ residentialAddress: event.target.value })}
-              className="min-h-11 w-full rounded-lg border bg-background px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              placeholder="123 Đường ABC, Quận 1, TP.HCM"
+            </p>
+            <AddressSelector
+              value={{
+                provinceCode: data.identity.provinceCode,
+                provinceName: data.identity.provinceName,
+                districtCode: data.identity.districtCode,
+                districtName: data.identity.districtName,
+                wardCode: data.identity.wardCode,
+                wardName: data.identity.wardName,
+                streetAddress: data.identity.streetAddress,
+              }}
+              onChange={handleAddressChange}
             />
           </div>
           <div>

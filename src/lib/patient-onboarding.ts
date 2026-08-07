@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OnboardingFormData, PatientOnboardingUploadFiles } from "@/hooks/useOnboardingForm";
+import { buildFullAddress } from "@/lib/vietnam-provinces-api";
 
 function sanitizeStorageSegment(fileName: string): string {
   const ascii = fileName.trim().replace(/[^\w.\-]+/g, "_");
@@ -52,13 +53,27 @@ export async function submitPatientProfile(
 
   const submittedAt = new Date().toISOString();
 
+  const fullAddress = buildFullAddress(
+    form.identity.streetAddress,
+    form.identity.wardName,
+    form.identity.districtName,
+    form.identity.provinceName,
+  );
+
   const row = {
     user_id: userId,
     id_document_storage_path: idPath,
     id_document_back_storage_path: idBackPath,
     id_number: emptyToNull(form.identity.idNumber),
     id_expiration_date: emptyToNull(form.identity.expirationDate),
-    residential_address: emptyToNull(form.identity.residentialAddress),
+    residential_address: emptyToNull(fullAddress || form.identity.residentialAddress),
+    province_code: emptyToNull(form.identity.provinceCode),
+    province_name: emptyToNull(form.identity.provinceName),
+    district_code: emptyToNull(form.identity.districtCode),
+    district_name: emptyToNull(form.identity.districtName),
+    ward_code: emptyToNull(form.identity.wardCode),
+    ward_name: emptyToNull(form.identity.wardName),
+    street_address: emptyToNull(form.identity.streetAddress),
     id_issued_date: emptyToNull(form.identity.issuedDate),
     id_issuer: emptyToNull(form.identity.issuer),
     legal_first_name: emptyToNull(form.personal.legalFirstName),

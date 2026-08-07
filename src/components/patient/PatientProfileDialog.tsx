@@ -34,6 +34,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { AddressSelector, type AddressData } from "@/components/address/AddressSelector";
+import { buildFullAddress } from "@/lib/vietnam-provinces-api";
 
 type PatientProfileDialogProps = {
   open: boolean;
@@ -52,6 +54,13 @@ type EditData = {
   idIssuedDate: string;
   idExpirationDate: string;
   residentialAddress: string;
+  provinceCode: string;
+  provinceName: string;
+  districtCode: string;
+  districtName: string;
+  wardCode: string;
+  wardName: string;
+  streetAddress: string;
   insuranceProvider: string;
   memberId: string;
   groupNumber: string;
@@ -132,6 +141,13 @@ function profileToEditData(p: PatientPortalDetail): EditData {
     idIssuedDate: p.id_issued_date ?? "",
     idExpirationDate: p.id_expiration_date ?? "",
     residentialAddress: p.residential_address ?? "",
+    provinceCode: p.province_code ?? "",
+    provinceName: p.province_name ?? "",
+    districtCode: p.district_code ?? "",
+    districtName: p.district_name ?? "",
+    wardCode: p.ward_code ?? "",
+    wardName: p.ward_name ?? "",
+    streetAddress: p.street_address ?? "",
     insuranceProvider: p.insurance_provider ?? "",
     memberId: p.member_id ?? "",
     groupNumber: p.group_number ?? "",
@@ -163,6 +179,13 @@ function readOnboardingDraft(): Partial<PatientPortalDetail> | null {
         idNumber?: string;
         expirationDate?: string;
         residentialAddress?: string;
+        provinceCode?: string;
+        provinceName?: string;
+        districtCode?: string;
+        districtName?: string;
+        wardCode?: string;
+        wardName?: string;
+        streetAddress?: string;
         issuedDate?: string;
         issuer?: string;
       };
@@ -189,6 +212,13 @@ function readOnboardingDraft(): Partial<PatientPortalDetail> | null {
       phone_number: p?.phoneNumber ?? null,
       id_number: i?.idNumber ?? null,
       residential_address: i?.residentialAddress ?? null,
+      province_code: i?.provinceCode ?? null,
+      province_name: i?.provinceName ?? null,
+      district_code: i?.districtCode ?? null,
+      district_name: i?.districtName ?? null,
+      ward_code: i?.wardCode ?? null,
+      ward_name: i?.wardName ?? null,
+      street_address: i?.streetAddress ?? null,
       id_expiration_date: i?.expirationDate ?? null,
       id_issued_date: i?.issuedDate ?? null,
       id_issuer: i?.issuer ?? null,
@@ -462,13 +492,33 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
         phone_number: null,
         id_number: null,
         residential_address: null,
+        province_code: null,
+        province_name: null,
+        district_code: null,
+        district_name: null,
+        ward_code: null,
+        ward_name: null,
+        street_address: null,
         id_expiration_date: null,
         id_issued_date: null,
         id_issuer: null,
         insurance_provider: null,
         member_id: null,
         group_number: null,
+        bhyt_name: null,
+        bhyt_dob: null,
+        bhyt_gender: null,
+        bhyt_address: null,
+        bhyt_kcb: null,
+        bhyt_kcb_code: null,
+        bhyt_valid_from: null,
+        bhyt_five_year: null,
+        id_document_storage_path: null,
+        id_document_back_storage_path: null,
+        card_front_storage_path: null,
+        avatar_storage_path: null,
         submitted_at: null,
+        updated_at: null,
         consent_accepted: false,
       };
     }
@@ -671,6 +721,13 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
       });
     }
 
+    const fullAddress = buildFullAddress(
+      editData.streetAddress,
+      editData.wardName,
+      editData.districtName,
+      editData.provinceName,
+    );
+
     const { error } = await supabase.from("patient").upsert(
       {
         user_id: userId,
@@ -684,7 +741,14 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
         id_issuer: editData.idIssuer || null,
         id_issued_date: editData.idIssuedDate || null,
         id_expiration_date: editData.idExpirationDate || null,
-        residential_address: editData.residentialAddress || null,
+        residential_address: fullAddress || editData.residentialAddress || null,
+        province_code: editData.provinceCode || null,
+        province_name: editData.provinceName || null,
+        district_code: editData.districtCode || null,
+        district_name: editData.districtName || null,
+        ward_code: editData.wardCode || null,
+        ward_name: editData.wardName || null,
+        street_address: editData.streetAddress || null,
         insurance_provider: editData.insuranceProvider || null,
         member_id: editData.memberId || null,
         group_number: editData.groupNumber || null,
@@ -852,7 +916,28 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                   <EditField label="Ngày cấp" value={editData.idIssuedDate} onChange={set("idIssuedDate")} type="date" />
                   <EditField label="Ngày hết hạn" value={editData.idExpirationDate} onChange={set("idExpirationDate")} type="date" />
                   <div className="sm:col-span-2">
-                    <EditField label="Địa chỉ" value={editData.residentialAddress} onChange={set("residentialAddress")} />
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Địa chỉ thường trú</p>
+                    <AddressSelector
+                      value={{
+                        provinceCode: editData.provinceCode,
+                        provinceName: editData.provinceName,
+                        districtCode: editData.districtCode,
+                        districtName: editData.districtName,
+                        wardCode: editData.wardCode,
+                        wardName: editData.wardName,
+                        streetAddress: editData.streetAddress,
+                      }}
+                      onChange={(addr: AddressData) => setEditData((prev) => prev ? {
+                        ...prev,
+                        provinceCode: addr.provinceCode,
+                        provinceName: addr.provinceName,
+                        districtCode: addr.districtCode,
+                        districtName: addr.districtName,
+                        wardCode: addr.wardCode,
+                        wardName: addr.wardName,
+                        streetAddress: addr.streetAddress,
+                      } : prev)}
+                    />
                   </div>
                 </div>
               ) : (
@@ -861,7 +946,21 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                   <Field label="Nơi cấp" value={profile.id_issuer ?? ""} />
                   <Field label="Ngày cấp" value={formatDob(profile.id_issued_date)} />
                   <Field label="Ngày hết hạn" value={formatDob(profile.id_expiration_date)} />
-                  <Field label="Địa chỉ" value={profile.residential_address ?? ""} />
+                  <div className="sm:col-span-2">
+                    <Field
+                      label="Địa chỉ thường trú"
+                      value={
+                        profile.province_code
+                          ? buildFullAddress(
+                              profile.street_address,
+                              profile.ward_name,
+                              profile.district_name,
+                              profile.province_name,
+                            )
+                          : profile.residential_address ?? ""
+                      }
+                    />
+                  </div>
                 </div>
               )}
             </section>
