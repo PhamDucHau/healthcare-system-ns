@@ -63,7 +63,7 @@ export function formatSlotTime(time: string): string {
 }
 
 export const STATUS_LABELS: Record<AppointmentStatus, string> = {
-  CONFIRMED:   'Đã xác nhận',
+  CONFIRMED:   'Chờ khám',
   CHECKED_IN:  'Đã tiếp nhận',
   IN_PROGRESS: 'Đang khám',
   COMPLETED:   'Hoàn thành',

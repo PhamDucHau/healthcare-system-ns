@@ -47,6 +47,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { searchPatientRecords } from "@/lib/patient-records";
 import type { PatientRecordListRow } from "@/types/patient-portal";
+import { PatientListFilters, type PatientFilters } from "@/components/provider/PatientListFilters";
+import { searchPatientsWithAppointments } from "@/lib/patient-appointment-filter-api";
+import { fetchDoctors } from "@/lib/master-data-api";
+import { useAuth } from "@/hooks/use-auth";
 
 const DEMO_DIAGNOSES = ["Đái tháo đường type 2", "Tăng huyết áp nhẹ"];
 const DEMO_MEDICATIONS = ["Metformin 500mg", "Lisinopril 10mg"];
@@ -377,7 +381,17 @@ const ProviderPatientsPage = () => {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [listPage, setListPage] = useState(1);
+  const [filters, setFilters] = useState<PatientFilters>({});
   const queryClient = useQueryClient();
+  const { session, role } = useAuth();
+  const isAdmin = role === "admin";
+  const currentUserId = session?.user?.id ?? null;
+
+  const { data: doctors = [] } = useQuery({
+    queryKey: ["doctors"],
+    queryFn: fetchDoctors,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -388,7 +402,11 @@ const ProviderPatientsPage = () => {
 
   useEffect(() => {
     setListPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, filters]);
+
+  const hasAppointmentFilters = Boolean(
+    filters.dateFrom || filters.dateTo || filters.status || filters.doctorId
+  );
 
   const listQueryParams = useMemo(
     () => ({
@@ -397,8 +415,10 @@ const ProviderPatientsPage = () => {
       limit: PATIENT_LIST_PAGE_SIZE,
       sortBy: "updated_at" as const,
       sortDir: "desc" as const,
+      ...filters,
+      includeWalkIns: true,
     }),
-    [debouncedSearch, listPage],
+    [debouncedSearch, listPage, filters],
   );
 
   const {
@@ -410,6 +430,14 @@ const ProviderPatientsPage = () => {
   } = useQuery({
     queryKey: [...PATIENT_LIST_QUERY_KEY, listQueryParams],
     queryFn: async () => {
+      if (hasAppointmentFilters) {
+        const { rows, total, error: listError } = await searchPatientsWithAppointments(supabase, listQueryParams);
+        if (listError) throw listError;
+        return {
+          items: rows.map(mapRecordToListItem),
+          total,
+        };
+      }
       const { rows, total, error: listError } = await searchPatientRecords(supabase, listQueryParams);
       if (listError) throw listError;
       return {
@@ -622,6 +650,18 @@ const ProviderPatientsPage = () => {
     toast.success("Đã lưu ghi chú phiên làm việc");
   }, [activeNoteKey, noteDraft]);
 
+  const handleFilter = useCallback((newFilters: PatientFilters) => {
+    const effectiveFilters = { ...newFilters };
+    if (!isAdmin && currentUserId) {
+      effectiveFilters.doctorId = currentUserId;
+    }
+    setFilters(effectiveFilters);
+  }, [isAdmin, currentUserId]);
+
+  const handleResetFilters = useCallback(() => {
+    setFilters({});
+  }, []);
+
   const isListBusy = isListLoading;
   const isDetailBusy = Boolean(selectedId) && !isDemoPatientId(selectedId) && isDetailLoading;
 
@@ -664,9 +704,20 @@ const ProviderPatientsPage = () => {
               type="search"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Tìm theo tên, SĐT, email…"
+              placeholder="Nhập họ tên, CCCD, số điện thoại hoặc mã bệnh nhân"
               className="pl-9"
               aria-label="Tìm bệnh nhân"
+            />
+          </div>
+
+          <div className="mb-3">
+            <PatientListFilters
+              doctors={doctors}
+              currentDoctorId={currentUserId}
+              isAdmin={isAdmin}
+              isLoading={isListFetching}
+              onFilter={handleFilter}
+              onReset={handleResetFilters}
             />
           </div>
 
@@ -775,7 +826,7 @@ const ProviderPatientsPage = () => {
 
           {patientSummaries.length === 0 && !isListBusy ? (
             <p className="mt-3 text-xs text-muted-foreground">
-              {debouncedSearch ? (
+              {debouncedSearch || hasAppointmentFilters ? (
                 <>Không tìm thấy bệnh nhân phù hợp.</>
               ) : (
                 <>
