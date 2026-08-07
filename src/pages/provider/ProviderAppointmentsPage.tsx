@@ -363,168 +363,325 @@ export default function ProviderAppointmentsPage() {
               : "Không có lịch hẹn nào trong khoảng thời gian này."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Giờ</TableHead>
-                  <TableHead>Bệnh nhân</TableHead>
-                  <TableHead>Bác sĩ</TableHead>
-                  <TableHead>Chuyên khoa</TableHead>
-                  <TableHead>Ngày khám</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((row) => {
-                  const canCancel = !["CANCELLED", "COMPLETED"].includes(row.status);
-                  const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(row.status) && !row.walk_in;
-                  const canVitalSigns = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
-                  const canRemindPreConsult =
-                    !appointmentHasPreConsult(row) &&
-                    ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
-                  return (
-                    <TableRow
-                      key={row.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => { setSelected(row); setSheetOpen(true); }}
-                    >
-                      <TableCell className="font-mono text-sm font-semibold">
-                        {row.start_time
-                          ? row.start_time.slice(0, 5)
-                          : <span className="font-sans text-orange-500 font-bold text-[11px] leading-tight">{WALK_IN_LABEL}</span>}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarColor(row.patient_name)}`}>
-                            {avatarInitial(row.patient_name)}
-                          </span>
-                          <div>
-                            <p className="font-medium text-sm leading-tight flex items-center gap-1.5">
-                              {row.patient_name ?? "—"}
-                              {row.pre_consult_drug_allergy && (
-                                <span title="Dị ứng thuốc (khai báo trước khám)">
-                                  <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
-                                </span>
-                              )}
-                              {row.pre_consult_severe_pain && (
-                                <span title="Đau dữ dội (khai báo trước khám)">
-                                  <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
-                                </span>
-                              )}
-                              {appointmentHasPreConsult(row) && (
-                                <span title="Đã khai báo y tế trước khám">
-                                  <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                                </span>
-                              )}
-                            </p>
-                            {row.patient_phone && (
-                              <p className="text-xs text-muted-foreground">{row.patient_phone}</p>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {row.doctor_name
-                          ? `Bs. ${row.doctor_name}`
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        {row.specialty_name ? (
-                          <Badge variant="outline" className="text-xs">
-                            {row.specialty_icon} {row.specialty_name}
-                          </Badge>
-                        ) : "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {row.slot_date
-                          ? format(new Date(row.slot_date), "dd/MM/yyyy", { locale: vi })
-                          : WALK_IN_LABEL}
-                      </TableCell>
-                      <TableCell>
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {filtered.map((row) => {
+                const canCancel = !["CANCELLED", "COMPLETED"].includes(row.status);
+                const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(row.status) && !row.walk_in;
+                const canVitalSigns = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
+                const canRemindPreConsult =
+                  !appointmentHasPreConsult(row) &&
+                  ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
+                return (
+                  <div
+                    key={row.id}
+                    className="rounded-xl border bg-card p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => { setSelected(row); setSheetOpen(true); }}
+                  >
+                    {/* Header: Time + Status + Actions */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-lg font-bold text-primary">
+                          {row.start_time
+                            ? row.start_time.slice(0, 5)
+                            : <span className="font-sans text-orange-500 text-sm">{WALK_IN_LABEL}</span>}
+                        </span>
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ADMIN_STATUS_COLOR[row.status]}`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${ADMIN_STATUS_DOT[row.status]}`} />
                           {ADMIN_STATUS_LABEL[row.status]}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        {row.status !== "COMPLETED" && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {row.status === "CONFIRMED" && (<>
-                              <DropdownMenuItem
-                                disabled={checkingInId === row.id}
-                                onClick={() => void handleCheckin(row)}
-                              >
-                                {checkingInId === row.id
-                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  : <CalendarCheck className="mr-2 h-4 w-4 text-green-600" />}
-                                {UI_CHECK_IN}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={checkingInId === row.id}
-                                onClick={() => void handleExamination(row)}
-                              >
-                                {checkingInId === row.id
-                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  : <Stethoscope className="mr-2 h-4 w-4 text-primary" />}
-                                Khám
-                              </DropdownMenuItem>
-                            </>)}
-                            {(row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") && (
-                              <DropdownMenuItem onClick={() => void handleExamination(row)}>
-                                <Stethoscope className="mr-2 h-4 w-4 text-primary" />
-                                Khám bệnh (SOAP)
-                              </DropdownMenuItem>
-                            )}
-                            {canVitalSigns && (
-                              <DropdownMenuItem onClick={() => handleVitalSigns(row)}>
-                                <HeartPulse className="mr-2 h-4 w-4 text-teal-600" />
-                                Nhập sinh hiệu
-                              </DropdownMenuItem>
-                            )}
-                            {canRemindPreConsult && (
-                              <DropdownMenuItem
-                                disabled={remindingId === row.id}
-                                onClick={() => void handlePreConsultReminder(row)}
-                              >
-                                {remindingId === row.id
-                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  : <Mail className="mr-2 h-4 w-4 text-pink-600" />}
-                                Nhắc nhở khai báo
-                              </DropdownMenuItem>
-                            )}
-                            {canReschedule && (
-                              <DropdownMenuItem onClick={() => { setSelected(row); setRescheduleOpen(true); }}>
-                                <CalendarClock className="mr-2 h-4 w-4 text-amber-500" />
-                                Đổi lịch
-                              </DropdownMenuItem>
-                            )}
-                            {canCancel && (
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={() => { setSelected(row); setCancelOpen(true); }}
-                              >
-                                <CalendarX className="mr-2 h-4 w-4" />
-                                Hủy lịch
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      </div>
+                      {row.status !== "COMPLETED" && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {row.status === "CONFIRMED" && (<>
+                                <DropdownMenuItem
+                                  disabled={checkingInId === row.id}
+                                  onClick={() => void handleCheckin(row)}
+                                >
+                                  {checkingInId === row.id
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <CalendarCheck className="mr-2 h-4 w-4 text-green-600" />}
+                                  {UI_CHECK_IN}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={checkingInId === row.id}
+                                  onClick={() => void handleExamination(row)}
+                                >
+                                  {checkingInId === row.id
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <Stethoscope className="mr-2 h-4 w-4 text-primary" />}
+                                  Khám
+                                </DropdownMenuItem>
+                              </>)}
+                              {(row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") && (
+                                <DropdownMenuItem onClick={() => void handleExamination(row)}>
+                                  <Stethoscope className="mr-2 h-4 w-4 text-primary" />
+                                  Khám bệnh (SOAP)
+                                </DropdownMenuItem>
+                              )}
+                              {canVitalSigns && (
+                                <DropdownMenuItem onClick={() => handleVitalSigns(row)}>
+                                  <HeartPulse className="mr-2 h-4 w-4 text-teal-600" />
+                                  Nhập sinh hiệu
+                                </DropdownMenuItem>
+                              )}
+                              {canRemindPreConsult && (
+                                <DropdownMenuItem
+                                  disabled={remindingId === row.id}
+                                  onClick={() => void handlePreConsultReminder(row)}
+                                >
+                                  {remindingId === row.id
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <Mail className="mr-2 h-4 w-4 text-pink-600" />}
+                                  Nhắc nhở khai báo
+                                </DropdownMenuItem>
+                              )}
+                              {canReschedule && (
+                                <DropdownMenuItem onClick={() => { setSelected(row); setRescheduleOpen(true); }}>
+                                  <CalendarClock className="mr-2 h-4 w-4 text-amber-500" />
+                                  Đổi lịch
+                                </DropdownMenuItem>
+                              )}
+                              {canCancel && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => { setSelected(row); setCancelOpen(true); }}
+                                >
+                                  <CalendarX className="mr-2 h-4 w-4" />
+                                  Hủy lịch
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Patient Info */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarColor(row.patient_name)}`}>
+                        {avatarInitial(row.patient_name)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm leading-tight flex items-center gap-1.5 truncate">
+                          {row.patient_name ?? "—"}
+                          {row.pre_consult_drug_allergy && (
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                          )}
+                          {row.pre_consult_severe_pain && (
+                            <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+                          )}
+                          {appointmentHasPreConsult(row) && (
+                            <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          )}
+                        </p>
+                        {row.patient_phone && (
+                          <p className="text-xs text-muted-foreground">{row.patient_phone}</p>
                         )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Bác sĩ:</span>{" "}
+                        <span className="font-medium">
+                          {row.doctor_name ? `Bs. ${row.doctor_name}` : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Ngày:</span>{" "}
+                        <span className="font-medium">
+                          {row.slot_date
+                            ? format(new Date(row.slot_date), "dd/MM/yyyy", { locale: vi })
+                            : WALK_IN_LABEL}
+                        </span>
+                      </div>
+                      {row.specialty_name && (
+                        <div className="col-span-2">
+                          <Badge variant="outline" className="text-xs">
+                            {row.specialty_icon} {row.specialty_name}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Giờ</TableHead>
+                    <TableHead>Bệnh nhân</TableHead>
+                    <TableHead>Bác sĩ</TableHead>
+                    <TableHead>Chuyên khoa</TableHead>
+                    <TableHead>Ngày khám</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead className="text-right">Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((row) => {
+                    const canCancel = !["CANCELLED", "COMPLETED"].includes(row.status);
+                    const canReschedule = ["CONFIRMED", "CHECKED_IN"].includes(row.status) && !row.walk_in;
+                    const canVitalSigns = ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
+                    const canRemindPreConsult =
+                      !appointmentHasPreConsult(row) &&
+                      ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(row.status);
+                    return (
+                      <TableRow
+                        key={row.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => { setSelected(row); setSheetOpen(true); }}
+                      >
+                        <TableCell className="font-mono text-sm font-semibold">
+                          {row.start_time
+                            ? row.start_time.slice(0, 5)
+                            : <span className="font-sans text-orange-500 font-bold text-[11px] leading-tight">{WALK_IN_LABEL}</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarColor(row.patient_name)}`}>
+                              {avatarInitial(row.patient_name)}
+                            </span>
+                            <div>
+                              <p className="font-medium text-sm leading-tight flex items-center gap-1.5">
+                                {row.patient_name ?? "—"}
+                                {row.pre_consult_drug_allergy && (
+                                  <span title="Dị ứng thuốc (khai báo trước khám)">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                                  </span>
+                                )}
+                                {row.pre_consult_severe_pain && (
+                                  <span title="Đau dữ dội (khai báo trước khám)">
+                                    <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+                                  </span>
+                                )}
+                                {appointmentHasPreConsult(row) && (
+                                  <span title="Đã khai báo y tế trước khám">
+                                    <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                  </span>
+                                )}
+                              </p>
+                              {row.patient_phone && (
+                                <p className="text-xs text-muted-foreground">{row.patient_phone}</p>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.doctor_name
+                            ? `Bs. ${row.doctor_name}`
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          {row.specialty_name ? (
+                            <Badge variant="outline" className="text-xs">
+                              {row.specialty_icon} {row.specialty_name}
+                            </Badge>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.slot_date
+                            ? format(new Date(row.slot_date), "dd/MM/yyyy", { locale: vi })
+                            : WALK_IN_LABEL}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ADMIN_STATUS_COLOR[row.status]}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${ADMIN_STATUS_DOT[row.status]}`} />
+                            {ADMIN_STATUS_LABEL[row.status]}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          {row.status !== "COMPLETED" && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {row.status === "CONFIRMED" && (<>
+                                <DropdownMenuItem
+                                  disabled={checkingInId === row.id}
+                                  onClick={() => void handleCheckin(row)}
+                                >
+                                  {checkingInId === row.id
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <CalendarCheck className="mr-2 h-4 w-4 text-green-600" />}
+                                  {UI_CHECK_IN}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={checkingInId === row.id}
+                                  onClick={() => void handleExamination(row)}
+                                >
+                                  {checkingInId === row.id
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <Stethoscope className="mr-2 h-4 w-4 text-primary" />}
+                                  Khám
+                                </DropdownMenuItem>
+                              </>)}
+                              {(row.status === "CHECKED_IN" || row.status === "IN_PROGRESS") && (
+                                <DropdownMenuItem onClick={() => void handleExamination(row)}>
+                                  <Stethoscope className="mr-2 h-4 w-4 text-primary" />
+                                  Khám bệnh (SOAP)
+                                </DropdownMenuItem>
+                              )}
+                              {canVitalSigns && (
+                                <DropdownMenuItem onClick={() => handleVitalSigns(row)}>
+                                  <HeartPulse className="mr-2 h-4 w-4 text-teal-600" />
+                                  Nhập sinh hiệu
+                                </DropdownMenuItem>
+                              )}
+                              {canRemindPreConsult && (
+                                <DropdownMenuItem
+                                  disabled={remindingId === row.id}
+                                  onClick={() => void handlePreConsultReminder(row)}
+                                >
+                                  {remindingId === row.id
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <Mail className="mr-2 h-4 w-4 text-pink-600" />}
+                                  Nhắc nhở khai báo
+                                </DropdownMenuItem>
+                              )}
+                              {canReschedule && (
+                                <DropdownMenuItem onClick={() => { setSelected(row); setRescheduleOpen(true); }}>
+                                  <CalendarClock className="mr-2 h-4 w-4 text-amber-500" />
+                                  Đổi lịch
+                                </DropdownMenuItem>
+                              )}
+                              {canCancel && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => { setSelected(row); setCancelOpen(true); }}
+                                >
+                                  <CalendarX className="mr-2 h-4 w-4" />
+                                  Hủy lịch
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
 
@@ -595,6 +752,24 @@ export default function ProviderAppointmentsPage() {
       <VitalSignsSheet
         appointment={vitalSignsAppt}
         onClose={() => setVitalSignsAppt(null)}
+        onCheckIn={async (appt) => {
+          await handleCheckin(appt);
+          setVitalSignsAppt(null);
+        }}
+        onReschedule={(appt) => {
+          setSelected(appt);
+          setRescheduleOpen(true);
+          setVitalSignsAppt(null);
+        }}
+        onCancelAppointment={(appt) => {
+          setSelected(appt);
+          setCancelOpen(true);
+          setVitalSignsAppt(null);
+        }}
+        onViewPatientRecords={(appt) => {
+          navigate(`/provider-portal/patients?patient=${appt.profile_id}`);
+          setVitalSignsAppt(null);
+        }}
       />
 
       <WalkInDialog

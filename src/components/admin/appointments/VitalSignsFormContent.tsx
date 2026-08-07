@@ -1,18 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
 import {
   Activity, Heart, Thermometer, Wind, Scale,
-  AlertTriangle, CheckCircle2, Siren, X, Save,
+  AlertTriangle, CheckCircle2, Siren, X,
   Accessibility, FileEdit,
 } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
-import { recordVitalSigns } from "@/lib/vital-signs-api";
 import {
   VITAL_RANGES, computeBmi, bmiCategory, isOutOfRange,
   type VitalFieldKey,
-  type RecordVitalSignsInput,
 } from "@/types/vital-signs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -34,20 +28,10 @@ type FieldError = {
   message: string;
 };
 
-type PatientInfo = {
-  name: string;
-  patientCode: string;
-  avatarUrl?: string;
-};
-
-type VitalSignsFormProps = {
+type VitalSignsFormContentProps = {
   appointmentId: string;
-  patient: PatientInfo;
   initialValues?: Partial<FormState>;
-  onSuccess?: (isCritical: boolean) => void;
-  onCancel?: () => void;
-  hideFooter?: boolean;
-  formRef?: React.MutableRefObject<{ submit: () => void; isPending: boolean; hasBlockingError: boolean } | null>;
+  onChange?: (data: Record<string, string>, hasBlockingError: boolean) => void;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -126,17 +110,17 @@ function MetricCard({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function VitalSignsForm({
-  appointmentId, patient, initialValues, onSuccess, onCancel, hideFooter = false, formRef,
-}: VitalSignsFormProps) {
+export default function VitalSignsFormContent({
+  appointmentId, initialValues, onChange,
+}: VitalSignsFormContentProps) {
   const [form, setForm] = useState<FormState>(() => ({ ...EMPTY, ...initialValues }));
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<VitalFieldKey, FieldError>>>({});
 
-  // Re-sync when initialValues change (e.g. sheet opened for different appointment)
+  // Re-sync when initialValues change
   useEffect(() => {
     setForm({ ...EMPTY, ...(initialValues ?? {}) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId]);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<VitalFieldKey, FieldError>>>({});
 
   const set = useCallback((key: keyof FormState) => (v: string) => {
     setForm((prev) => ({ ...prev, [key]: v }));
@@ -163,7 +147,7 @@ export default function VitalSignsForm({
   // HA warning banner
   const bpWarnMsg = bpWarning(form.bp_systolic, form.bp_diastolic);
 
-  // Weight/height hard errors (RULE-014a) — also enforce realistic human ranges
+  // Weight/height hard errors
   const weightVal = parseNum(form.weight_kg);
   const heightVal = parseNum(form.height_cm);
   const weightErr = form.weight_kg !== ""
@@ -181,56 +165,19 @@ export default function VitalSignsForm({
       : null
     : null;
 
-  // BMI overflow guard: NUMERIC(5,2) max is 999.99
+  // BMI overflow guard
   const bmiOverflow = bmi !== null && bmi > 999.99;
   const bmiErr = bmiOverflow ? "BMI không hợp lệ — kiểm tra lại cân nặng và chiều cao" : null;
 
   const hasBlockingError = Boolean(weightErr || heightErr || bmiErr);
 
-  const { mutate: submit, isPending } = useMutation({
-    mutationFn: async () => {
-      const input: RecordVitalSignsInput = {
-        appointment_id:   appointmentId,
-        bp_systolic:      parseNum(form.bp_systolic),
-        bp_diastolic:     parseNum(form.bp_diastolic),
-        heart_rate:       parseNum(form.heart_rate),
-        temperature_c:    parseNum(form.temperature_c),
-        respiratory_rate: parseNum(form.respiratory_rate),
-        spo2:             parseNum(form.spo2),
-        weight_kg:        parseNum(form.weight_kg),
-        height_cm:        parseNum(form.height_cm),
-        clinical_note:    form.clinical_note.trim() || null,
-      };
-      const { result, error } = await recordVitalSigns(supabase, input);
-      if (error) throw error;
-      return result!;
-    },
-    onSuccess: (result) => {
-      if (result.is_critical) {
-        toast.error("⚠ Sinh hiệu nguy kịch — Thông báo đến Bác sĩ ngay!", {
-          duration: 8000,
-          description: result.critical_flags.join(" · "),
-        });
-      } else {
-        toast.success("Đã lưu sinh hiệu thành công");
-      }
-      onSuccess?.(result.is_critical);
-    },
-    onError: (err: Error) => {
-      if (err.message.includes("INVALID_WEIGHT")) {
-        toast.error("Cân nặng phải > 0");
-      } else if (err.message.includes("INVALID_HEIGHT")) {
-        toast.error("Chiều cao phải > 0");
-      } else if (err.message.includes("numeric field overflow") || err.message.includes("22003")) {
-        toast.error("Giá trị vượt quá giới hạn cho phép — kiểm tra lại cân nặng và chiều cao");
-      } else {
-        toast.error(`Lưu thất bại: ${err.message}`);
-      }
-    },
-  });
+  // Notify parent of form changes
+  useEffect(() => {
+    onChange?.(form as unknown as Record<string, string>, hasBlockingError);
+  }, [form, hasBlockingError, onChange]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* ── Main grid layout: 2 columns on desktop ─────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
 
@@ -429,28 +376,6 @@ export default function VitalSignsForm({
           </div>
         );
       })()}
-
-      {/* ── Actions — footer ───────────────────────────────────────────────── */}
-      {!hideFooter && (
-        <div className="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-border">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isPending}
-            className="h-12 px-8 text-sm font-semibold text-foreground border border-border rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            Hủy bỏ
-          </button>
-          <Button
-            className="h-12 px-8 text-sm font-semibold rounded-lg gap-2 min-w-[120px]"
-            onClick={() => submit()}
-            disabled={isPending || hasBlockingError}
-          >
-            <Save className="h-4 w-4" />
-            {isPending ? "Đang lưu…" : "Lưu"}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -28,9 +28,10 @@ import {
 import { getLatestVitalSignsForPatient, listAllVitalSignsForPatient, updateVitalSigns } from "@/lib/vital-signs-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { VitalSignsRow } from "@/types/vital-signs";
-import { computeBmi } from "@/types/vital-signs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import VitalSignsForm from "@/components/provider/VitalSignsForm";
+import { computeBmi, type RecordVitalSignsInput } from "@/types/vital-signs";
+import VitalSignsFormContent from "@/components/admin/appointments/VitalSignsFormContent";
+import { recordVitalSigns } from "@/lib/vital-signs-api";
+import { Save } from "lucide-react";
 import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
 import PatientHealthRecordsPanel from "@/components/provider/PatientHealthRecordsPanel";
 import { fetchPatientHealthChartByUserId } from "@/lib/patient-health-history-api";
@@ -321,6 +322,124 @@ function VitalEditDialog({
   );
 }
 
+// ── VitalSignsDialog ────────────────────────────────────────────────────────────
+function VitalSignsDialog({
+  open, onOpenChange, appointmentId, patientName, patientCode, onSuccess, onCancel,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  appointmentId: string | null;
+  patientName: string;
+  patientCode: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [hasBlockingError, setHasBlockingError] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  const handleFormChange = useCallback((data: Record<string, string>, hasError: boolean) => {
+    setFormData(data);
+    setHasBlockingError(hasError);
+  }, []);
+
+  const parseNum = (v: string): number | null => {
+    const n = parseFloat(v.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleSubmit = async () => {
+    if (!appointmentId) return;
+    setIsPending(true);
+    const input: RecordVitalSignsInput = {
+      appointment_id:   appointmentId,
+      bp_systolic:      parseNum(formData.bp_systolic || ""),
+      bp_diastolic:     parseNum(formData.bp_diastolic || ""),
+      heart_rate:       parseNum(formData.heart_rate || ""),
+      temperature_c:    parseNum(formData.temperature_c || ""),
+      respiratory_rate: parseNum(formData.respiratory_rate || ""),
+      spo2:             parseNum(formData.spo2 || ""),
+      weight_kg:        parseNum(formData.weight_kg || ""),
+      height_cm:        parseNum(formData.height_cm || ""),
+      clinical_note:    (formData.clinical_note || "").trim() || null,
+    };
+    const { result, error } = await recordVitalSigns(supabase, input);
+    setIsPending(false);
+    if (error) {
+      if (error.message.includes("INVALID_WEIGHT")) {
+        toast.error("Cân nặng phải > 0");
+      } else if (error.message.includes("INVALID_HEIGHT")) {
+        toast.error("Chiều cao phải > 0");
+      } else {
+        toast.error(`Lưu thất bại: ${error.message}`);
+      }
+      return;
+    }
+    if (result?.is_critical) {
+      toast.error("⚠ Sinh hiệu nguy kịch — Thông báo đến Bác sĩ ngay!", {
+        duration: 8000,
+        description: result.critical_flags.join(" · "),
+      });
+    } else {
+      toast.success("Đã lưu sinh hiệu thành công");
+    }
+    onSuccess();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-5xl h-[90vh] max-h-[900px] flex flex-col gap-0 p-0 overflow-hidden rounded-xl">
+        <DialogHeader className="flex flex-row items-center gap-4 border-b px-6 py-4 shrink-0 bg-muted/30">
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Activity className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <DialogTitle className="text-lg font-bold text-primary">
+              Sinh hiệu – {patientName}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Mã bệnh nhân: #{patientCode}
+            </p>
+          </div>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto px-6 py-5 bg-muted/20">
+          {appointmentId ? (
+            <VitalSignsFormContent
+              appointmentId={appointmentId}
+              onChange={handleFormChange}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
+              <p className="text-sm text-muted-foreground">
+                Bệnh nhân chưa có lịch ở trạng thái Đã tiếp nhận hoặc Đang khám để nhập sinh hiệu.
+              </p>
+            </div>
+          )}
+        </div>
+        {/* Footer — fixed at bottom */}
+        <div className="shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t bg-background">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="h-12 px-8 text-sm font-semibold text-foreground border border-border rounded-lg hover:bg-muted/50 transition-colors"
+          >
+            Hủy bỏ
+          </button>
+          <Button
+            className="h-12 px-8 text-sm font-semibold rounded-lg gap-2 min-w-[120px]"
+            onClick={() => void handleSubmit()}
+            disabled={isPending || hasBlockingError || !appointmentId}
+          >
+            <Save className="h-4 w-4" />
+            {isPending ? "Đang lưu…" : "Lưu"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const ProviderPatientsPage = () => {
   const draftPersonal = useMemo(() => readOnboardingPersonalDraft(), []);
 
@@ -363,12 +482,12 @@ const ProviderPatientsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<OverviewTabId>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => searchParams.get("select"),
+    () => searchParams.get("select") || searchParams.get("patient"),
   );
 
-  // Clear ?select= from URL after initial auto-select
+  // Clear ?select= or ?patient= from URL after initial auto-select
   useEffect(() => {
-    if (searchParams.get("select")) {
+    if (searchParams.get("select") || searchParams.get("patient")) {
       setSearchParams({}, { replace: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1114,36 +1233,19 @@ const ProviderPatientsPage = () => {
         </Link>
       </div> */}
 
-      {/* ── Vital signs sheet (doctor enters vitals directly) ─────────────────── */}
-      <Sheet open={vitalSheetOpen} onOpenChange={(o) => { if (!o) setVitalSheetOpen(false); }}>
-        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
-          <SheetHeader className="flex flex-row items-center gap-2 border-b px-5 py-4 shrink-0">
-            <Activity className="h-5 w-5 text-primary" />
-            <SheetTitle className="text-base font-bold text-primary">
-              SINH HIỆU — {displayName}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            {activeAppointmentId ? (
-              <VitalSignsForm
-                appointmentId={activeAppointmentId}
-                patient={{ name: displayName, patientCode: displayId.replace(/^QC-/, "") }}
-                onSuccess={() => {
-                  setVitalSheetOpen(false);
-                  void queryClient.invalidateQueries({ queryKey: ["vital_signs", "patient", realPatientUserId] });
-                }}
-                onCancel={() => setVitalSheetOpen(false)}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
-                <p className="text-sm text-muted-foreground">
-                Bệnh nhân chưa có lịch ở trạng thái Đã tiếp nhận hoặc Đang khám để nhập sinh hiệu.
-                </p>
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* ── Vital signs dialog (doctor enters vitals directly) ─────────────────── */}
+      <VitalSignsDialog
+        open={vitalSheetOpen}
+        onOpenChange={(o) => { if (!o) setVitalSheetOpen(false); }}
+        appointmentId={activeAppointmentId}
+        patientName={displayName}
+        patientCode={displayId.replace(/^QC-/, "")}
+        onSuccess={() => {
+          setVitalSheetOpen(false);
+          void queryClient.invalidateQueries({ queryKey: ["vital_signs", "patient", realPatientUserId] });
+        }}
+        onCancel={() => setVitalSheetOpen(false)}
+      />
 
       {/* ── Vital signs history dialog ─────────────────────────────────────── */}
       <Dialog open={vitalHistoryOpen} onOpenChange={(o) => { setVitalHistoryOpen(o); if (!o) setEditingVital(null); }}>
