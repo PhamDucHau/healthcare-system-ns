@@ -21,6 +21,9 @@ import {
   fetchOcrSingle,
   applyBhytParsedFillEmpty,
   applyCccdParsedFillEmpty,
+  checkCccdOcrQuality,
+  checkBhytOcrQuality,
+  type OcrQualityResult,
 } from "@/lib/cccd-ocr";
 import type { PatientPortalDetail } from "@/types/patient-portal";
 
@@ -210,21 +213,36 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
 
   const runOcr = async (type: "front" | "back" | "bhyt") => {
     const file = type === "front" ? idFile : type === "back" ? idBackFile : cardFile;
-    // For existing images fall back to the stored URL (can't re-OCR from URL; require new file)
     if (!file) { toast.info("Tải ảnh mới lên để chạy OCR"); return; }
     const setter = type === "front" ? setOcrFront : type === "back" ? setOcrBack : setOcrBhyt;
     setter(true);
     try {
       if (type === "bhyt") {
         const json = await fetchOcrSingle(file, "bhyt", "front");
-        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        setForm(p => p ? applyBhytParsedFillEmpty(p, json.parsed) : p);
-        toast.success("OCR BHYT hoàn tất");
+        const quality = checkBhytOcrQuality(json);
+
+        if (json.parsed && typeof json.parsed === "object") {
+          setForm(p => p ? applyBhytParsedFillEmpty(p, json.parsed) : p);
+        }
+
+        if (quality.isLowQuality) {
+          toast.warning("Ảnh BHYT không đủ rõ", { description: quality.message });
+        } else {
+          toast.success("OCR BHYT hoàn tất");
+        }
       } else {
         const json = await fetchOcrSingle(file, "cccd", "front");
-        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        setForm(p => p ? applyCccdParsedFillEmpty(p, json.parsed) : p);
-        toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+        const quality = checkCccdOcrQuality(json);
+
+        if (json.parsed && typeof json.parsed === "object") {
+          setForm(p => p ? applyCccdParsedFillEmpty(p, json.parsed) : p);
+        }
+
+        if (quality.isLowQuality) {
+          toast.warning("Ảnh không đủ rõ", { description: quality.message });
+        } else {
+          toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+        }
       }
     } catch (e) {
       toast.error("OCR thất bại", { description: e instanceof Error ? e.message : undefined });

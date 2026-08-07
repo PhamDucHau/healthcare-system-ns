@@ -5,6 +5,8 @@ import {
   coalesceOcrField,
   isOcrTargetFieldEmpty,
   mergeOcrFillEmpty,
+  checkCccdOcrQuality,
+  checkBhytOcrQuality,
 } from "@/lib/cccd-ocr";
 
 describe("isOcrTargetFieldEmpty", () => {
@@ -133,5 +135,85 @@ describe("applyBhytParsedFillEmpty", () => {
     expect(result.memberId).toBe("DN1234567890");
     expect(result.bhytName).toBe("LÊ THỊ THU VÂN");
     expect(result.bhytDob).toBe("1989-03-21");
+  });
+});
+
+describe("checkCccdOcrQuality", () => {
+  it("returns low quality when parsed is empty or undefined", () => {
+    const result = checkCccdOcrQuality({ parsed: {} });
+    expect(result.isLowQuality).toBe(true);
+    expect(result.confidence).toBe(0);
+    expect(result.filledFieldCount).toBe(0);
+    expect(result.message).toContain("không đủ rõ");
+  });
+
+  it("returns low quality when fewer than 2 fields are filled", () => {
+    const result = checkCccdOcrQuality({
+      parsed: { id: "001234567890" },
+    });
+    expect(result.isLowQuality).toBe(true);
+    expect(result.filledFieldCount).toBe(1);
+  });
+
+  it("returns good quality when all expected fields are filled", () => {
+    const result = checkCccdOcrQuality({
+      parsed: {
+        id: "001234567890",
+        name: "NGUYỄN VĂN A",
+        dob: "01/01/1990",
+        gender: "Nam",
+        address: "123 Đường ABC, Quận 1",
+      },
+    });
+    expect(result.isLowQuality).toBe(false);
+    expect(result.filledFieldCount).toBe(5);
+    expect(result.confidence).toBe(100);
+    expect(result.message).toBeUndefined();
+  });
+
+  it("returns low quality when confidence from server is below threshold", () => {
+    const result = checkCccdOcrQuality({
+      parsed: {
+        id: "001234567890",
+        name: "NGUYỄN VĂN A",
+        dob: "01/01/1990",
+        gender: "Nam",
+        address: "123 Đường ABC",
+      },
+      confidence: 50,
+    });
+    expect(result.isLowQuality).toBe(true);
+    expect(result.confidence).toBe(50);
+  });
+
+  it("uses server confidence when provided", () => {
+    const result = checkCccdOcrQuality({
+      parsed: { id: "001234567890", name: "A" },
+      confidence: 85,
+    });
+    expect(result.confidence).toBe(85);
+    expect(result.isLowQuality).toBe(false);
+  });
+});
+
+describe("checkBhytOcrQuality", () => {
+  it("returns low quality when parsed is empty", () => {
+    const result = checkBhytOcrQuality({ parsed: {} });
+    expect(result.isLowQuality).toBe(true);
+    expect(result.message).toContain("BHYT không đủ rõ");
+  });
+
+  it("returns good quality when expected fields are filled", () => {
+    const result = checkBhytOcrQuality({
+      parsed: {
+        id: "DN1234567890",
+        name: "NGUYỄN VĂN A",
+        dob: "01/01/1990",
+        kcb: "BV Quận 1",
+      },
+    });
+    expect(result.isLowQuality).toBe(false);
+    expect(result.filledFieldCount).toBe(4);
+    expect(result.confidence).toBe(100);
   });
 });

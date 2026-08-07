@@ -21,6 +21,9 @@ import {
   fetchOcrSingle,
   applyBhytParsedFillEmpty,
   applyCccdParsedFillEmpty,
+  checkCccdOcrQuality,
+  checkBhytOcrQuality,
+  type OcrQualityResult,
 } from "@/lib/cccd-ocr";
 
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -65,14 +68,14 @@ interface Props {
 const lc = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
 
-function F({ label, value, onChange, type = "text", placeholder, col2 }: {
-  label: string; value: string; onChange: (v: string) => void;
+function F({ id, label, value, onChange, type = "text", placeholder, col2 }: {
+  id?: string; label: string; value: string; onChange: (v: string) => void;
   type?: string; placeholder?: string; col2?: boolean;
 }) {
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
-      <label className={lc}>{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)}
+      <label htmlFor={id} className={lc}>{label}</label>
+      <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder} className={fc} />
     </div>
   );
@@ -88,7 +91,40 @@ export default function AdminCreateProfileDialog({
   const [ocrFront, setOcrFront] = useState(false);
   const [ocrBack, setOcrBack] = useState(false);
   const [ocrBhyt, setOcrBhyt] = useState(false);
+  const [ocrFrontQuality, setOcrFrontQuality] = useState<OcrQualityResult | null>(null);
+  const [ocrBackQuality, setOcrBackQuality] = useState<OcrQualityResult | null>(null);
+  const [ocrBhytQuality, setOcrBhytQuality] = useState<OcrQualityResult | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const focusFirstEmptyCccdField = () => {
+    const fields = ["idNumber", "expirationDate", "residentialAddress", "issuedDate", "issuer"];
+    for (const fid of fields) {
+      const el = document.getElementById(fid) as HTMLInputElement | null;
+      if (el && !el.value?.trim()) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => el.focus(), 100);
+        return;
+      }
+    }
+    const first = document.getElementById("idNumber");
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => first?.focus(), 100);
+  };
+
+  const focusFirstEmptyBhytField = () => {
+    const fields = ["provider", "memberId", "groupNumber", "bhytName"];
+    for (const fid of fields) {
+      const el = document.getElementById(fid) as HTMLInputElement | null;
+      if (el && !el.value?.trim()) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => el.focus(), 100);
+        return;
+      }
+    }
+    const first = document.getElementById("provider");
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => first?.focus(), 100);
+  };
 
   const set = (k: keyof FormData) => (v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -108,21 +144,48 @@ export default function AdminCreateProfileDialog({
     const file = type === "front" ? idFile : type === "back" ? idBackFile : cardFile;
     if (!file) return;
     const setter = type === "front" ? setOcrFront : type === "back" ? setOcrBack : setOcrBhyt;
+    const qualitySetter = type === "front" ? setOcrFrontQuality : type === "back" ? setOcrBackQuality : setOcrBhytQuality;
     setter(true);
+    qualitySetter(null);
     try {
       if (type === "bhyt") {
         const json = await fetchOcrSingle(file, "bhyt", "front");
-        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        setForm(p => applyBhytParsedFillEmpty(p, json.parsed));
-        toast.success("OCR BHYT hoàn tất");
+        const quality = checkBhytOcrQuality(json);
+        qualitySetter(quality);
+
+        if (json.parsed && typeof json.parsed === "object") {
+          setForm(p => applyBhytParsedFillEmpty(p, json.parsed));
+        }
+
+        if (quality.isLowQuality) {
+          toast.warning("Ảnh BHYT không đủ rõ", { description: quality.message });
+        } else {
+          toast.success("OCR BHYT hoàn tất");
+        }
       } else {
         const json = await fetchOcrSingle(file, "cccd", "front");
-        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        setForm(p => applyCccdParsedFillEmpty(p, json.parsed, "pronouns"));
-        toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+        const quality = checkCccdOcrQuality(json);
+        qualitySetter(quality);
+
+        if (json.parsed && typeof json.parsed === "object") {
+          setForm(p => applyCccdParsedFillEmpty(p, json.parsed, "pronouns"));
+        }
+
+        if (quality.isLowQuality) {
+          toast.warning("Ảnh không đủ rõ", { description: quality.message });
+        } else {
+          toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+        }
       }
     } catch (e) {
       toast.error("OCR thất bại", { description: e instanceof Error ? e.message : undefined });
+      qualitySetter({
+        isLowQuality: true,
+        confidence: 0,
+        filledFieldCount: 0,
+        totalExpectedFields: type === "bhyt" ? 4 : 5,
+        message: "OCR thất bại. Vui lòng chụp lại hoặc nhập thủ công.",
+      });
     } finally {
       setter(false);
     }
@@ -217,14 +280,17 @@ export default function AdminCreateProfileDialog({
             <p className="mb-4 text-xs text-muted-foreground">CCCD mặt trước, mặt sau và thẻ BHYT.</p>
             <div className="grid gap-3 sm:grid-cols-3">
               <UploadCard id="adm-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước"
-                file={idFile} onFileSelect={f => pickFile(f, setIdFile)}
-                onOcr={() => runOcr("front")} isOcrRunning={ocrFront} />
+                file={idFile} onFileSelect={f => { setOcrFrontQuality(null); pickFile(f, setIdFile); }}
+                onOcr={() => runOcr("front")} isOcrRunning={ocrFront} ocrQuality={ocrFrontQuality}
+                onManualInput={focusFirstEmptyCccdField} />
               <UploadCard id="adm-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau"
-                file={idBackFile} onFileSelect={f => pickFile(f, setIdBackFile)}
-                onOcr={() => runOcr("back")} isOcrRunning={ocrBack} />
+                file={idBackFile} onFileSelect={f => { setOcrBackQuality(null); pickFile(f, setIdBackFile); }}
+                onOcr={() => runOcr("back")} isOcrRunning={ocrBack} ocrQuality={ocrBackQuality}
+                onManualInput={focusFirstEmptyCccdField} />
               <UploadCard id="adm-card" title="Nhấn để tải lên" hint="Bảo hiểm y tế (BHYT)"
-                file={cardFile} onFileSelect={f => pickFile(f, setCardFile)}
-                onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} />
+                file={cardFile} onFileSelect={f => { setOcrBhytQuality(null); pickFile(f, setCardFile); }}
+                onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} ocrQuality={ocrBhytQuality}
+                onManualInput={focusFirstEmptyBhytField} />
             </div>
             <div className="mt-3 flex justify-end">
               <Button type="button" size="sm"
@@ -247,11 +313,11 @@ export default function AdminCreateProfileDialog({
               Thông tin từ CCCD
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Số CCCD" value={form.idNumber} onChange={set("idNumber")} placeholder="G-123-5678-9012" />
-              <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
-              <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
-              <F label="Nơi cấp" value={form.issuer} onChange={set("issuer")} placeholder="Cục cảnh sát QLHC về TTXH" />
-              <F label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")}
+              <F id="idNumber" label="Số CCCD" value={form.idNumber} onChange={set("idNumber")} placeholder="G-123-5678-9012" />
+              <F id="expirationDate" label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
+              <F id="issuedDate" label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
+              <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")} placeholder="Cục cảnh sát QLHC về TTXH" />
+              <F id="residentialAddress" label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")}
                 placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2 />
             </div>
           </section>
@@ -262,11 +328,11 @@ export default function AdminCreateProfileDialog({
               Thông tin cá nhân
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Họ" value={form.legalLastName} onChange={set("legalLastName")} />
-              <F label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")} />
-              <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
-              <F label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")} type="tel" placeholder="0912 345 678" />
-              <F label="Email" value={form.email} onChange={set("email")} type="email" placeholder="example@email.com" />
+              <F id="legalLastName" label="Họ" value={form.legalLastName} onChange={set("legalLastName")} />
+              <F id="legalFirstName" label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")} />
+              <F id="dateOfBirth" label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
+              <F id="phoneNumber" label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")} type="tel" placeholder="0912 345 678" />
+              <F id="email" label="Email" value={form.email} onChange={set("email")} type="email" placeholder="example@email.com" />
               <div>
                 <label className={lc}>Giới tính</label>
                 <Select value={form.pronouns} onValueChange={set("pronouns")}>
@@ -289,11 +355,11 @@ export default function AdminCreateProfileDialog({
               Bảo hiểm (BHYT)
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
-              <F label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")} placeholder="DN 4 79 791 101 31" />
-              <F label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
-              <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
-              <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
+              <F id="provider" label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
+              <F id="memberId" label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")} placeholder="DN 4 79 791 101 31" />
+              <F id="groupNumber" label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
+              <F id="bhytName" label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
+              <F id="bhytDob" label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
               <div>
                 <label className={lc}>Giới tính</label>
                 <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
@@ -307,11 +373,11 @@ export default function AdminCreateProfileDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <F label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
-              <F label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
-              <F label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />
-              <F label="Hiệu lực từ" value={form.bhytValidFrom} onChange={set("bhytValidFrom")} type="date" />
-              <F label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
+              <F id="bhytKcbCode" label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
+              <F id="bhytKcb" label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
+              <F id="bhytAddress" label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />
+              <F id="bhytValidFrom" label="Hiệu lực từ" value={form.bhytValidFrom} onChange={set("bhytValidFrom")} type="date" />
+              <F id="bhytFiveYear" label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
             </div>
           </section>
         </div>

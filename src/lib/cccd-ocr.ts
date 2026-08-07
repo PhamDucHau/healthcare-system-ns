@@ -20,6 +20,15 @@ export type CccdOcrResponse = {
   type?: string;
   parsed?: CccdParsed;
   raw?: string;
+  confidence?: number;
+};
+
+export type OcrQualityResult = {
+  isLowQuality: boolean;
+  confidence: number;
+  filledFieldCount: number;
+  totalExpectedFields: number;
+  message?: string;
 };
 
 export type BhytParsed = {
@@ -38,7 +47,68 @@ export type BhytOcrResponse = {
   type?: string;
   parsed?: BhytParsed;
   raw?: string;
+  confidence?: number;
 };
+
+const LOW_QUALITY_THRESHOLD = 70;
+const CCCD_EXPECTED_FIELDS = ["id", "name", "dob", "gender", "address"] as const;
+const BHYT_EXPECTED_FIELDS = ["id", "name", "dob", "kcb"] as const;
+
+/** Check OCR quality based on confidence and filled fields. */
+export function checkCccdOcrQuality(response: CccdOcrResponse): OcrQualityResult {
+  const parsed = response.parsed ?? {};
+  const confidence = response.confidence ?? 0;
+
+  const filledFields = CCCD_EXPECTED_FIELDS.filter(
+    (field) => parsed[field]?.trim()
+  );
+  const filledFieldCount = filledFields.length;
+  const totalExpectedFields = CCCD_EXPECTED_FIELDS.length;
+
+  const inferredConfidence = confidence > 0
+    ? confidence
+    : Math.round((filledFieldCount / totalExpectedFields) * 100);
+
+  const isLowQuality = inferredConfidence < LOW_QUALITY_THRESHOLD || filledFieldCount < 2;
+
+  return {
+    isLowQuality,
+    confidence: inferredConfidence,
+    filledFieldCount,
+    totalExpectedFields,
+    message: isLowQuality
+      ? "Ảnh không đủ rõ. Vui lòng chụp lại hoặc nhập thủ công."
+      : undefined,
+  };
+}
+
+/** Check BHYT OCR quality based on confidence and filled fields. */
+export function checkBhytOcrQuality(response: BhytOcrResponse): OcrQualityResult {
+  const parsed = response.parsed ?? {};
+  const confidence = response.confidence ?? 0;
+
+  const filledFields = BHYT_EXPECTED_FIELDS.filter(
+    (field) => parsed[field]?.trim()
+  );
+  const filledFieldCount = filledFields.length;
+  const totalExpectedFields = BHYT_EXPECTED_FIELDS.length;
+
+  const inferredConfidence = confidence > 0
+    ? confidence
+    : Math.round((filledFieldCount / totalExpectedFields) * 100);
+
+  const isLowQuality = inferredConfidence < LOW_QUALITY_THRESHOLD || filledFieldCount < 2;
+
+  return {
+    isLowQuality,
+    confidence: inferredConfidence,
+    filledFieldCount,
+    totalExpectedFields,
+    message: isLowQuality
+      ? "Ảnh BHYT không đủ rõ. Vui lòng chụp lại hoặc nhập thủ công."
+      : undefined,
+  };
+}
 
 function getOcrBaseUrl(): string {
   const raw = import.meta.env.VITE_OCR_CCCD_URL;

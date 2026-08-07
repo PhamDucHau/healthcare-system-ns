@@ -25,6 +25,9 @@ import {
   fetchOcrSingle,
   applyBhytParsedFillEmpty,
   applyCccdParsedFillEmpty,
+  checkCccdOcrQuality,
+  checkBhytOcrQuality,
+  type OcrQualityResult,
 } from "@/lib/cccd-ocr";
 import type { PatientSearchResult } from "@/types/admin-appointment";
 
@@ -69,14 +72,14 @@ const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
 const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ label, value, onChange, type = "text", placeholder, col2, required, error }: {
-  label: string; value: string; onChange: (v: string) => void;
+function F({ id, label, value, onChange, type = "text", placeholder, col2, required, error }: {
+  id?: string; label: string; value: string; onChange: (v: string) => void;
   type?: string; placeholder?: string; col2?: boolean; required?: boolean; error?: string;
 }) {
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
-      <label className={lc}>{label}{required && <span className="text-destructive ml-0.5">*</span>}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)}
+      <label htmlFor={id} className={lc}>{label}{required && <span className="text-destructive ml-0.5">*</span>}</label>
+      <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder} className={`${fc} ${error ? fc_err : ""}`} />
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
@@ -91,6 +94,39 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   const [ocrFront, setOcrFront] = useState(false);
   const [ocrBack, setOcrBack] = useState(false);
   const [ocrBhyt, setOcrBhyt] = useState(false);
+  const [ocrFrontQuality, setOcrFrontQuality] = useState<OcrQualityResult | null>(null);
+  const [ocrBackQuality, setOcrBackQuality] = useState<OcrQualityResult | null>(null);
+  const [ocrBhytQuality, setOcrBhytQuality] = useState<OcrQualityResult | null>(null);
+
+  const focusFirstEmptyCccdField = () => {
+    const fields = ["legalLastName", "legalFirstName", "dateOfBirth", "idNumber", "expirationDate", "issuedDate", "issuer", "residentialAddress", "phoneNumber"];
+    for (const id of fields) {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el && !el.value?.trim()) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => el.focus(), 100);
+        return;
+      }
+    }
+    const first = document.getElementById("legalLastName");
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => first?.focus(), 100);
+  };
+
+  const focusFirstEmptyBhytField = () => {
+    const fields = ["provider", "memberId", "groupNumber", "bhytName", "bhytDob", "bhytKcbCode", "bhytKcb"];
+    for (const id of fields) {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el && !el.value?.trim()) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => el.focus(), 100);
+        return;
+      }
+    }
+    const first = document.getElementById("provider");
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => first?.focus(), 100);
+  };
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [dupResult, setDupResult] = useState<DupCheckResult | null>(null);
@@ -118,21 +154,48 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
     const file = type === "front" ? idFile : type === "back" ? idBackFile : cardFile;
     if (!file) return;
     const setter = type === "front" ? setOcrFront : type === "back" ? setOcrBack : setOcrBhyt;
+    const qualitySetter = type === "front" ? setOcrFrontQuality : type === "back" ? setOcrBackQuality : setOcrBhytQuality;
     setter(true);
+    qualitySetter(null);
     try {
       if (type === "bhyt") {
         const json = await fetchOcrSingle(file, "bhyt", "front");
-        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        setForm(p => applyBhytParsedFillEmpty(p, json.parsed));
-        toast.success("OCR BHYT hoàn tất");
+        const quality = checkBhytOcrQuality(json);
+        qualitySetter(quality);
+
+        if (json.parsed && typeof json.parsed === "object") {
+          setForm(p => applyBhytParsedFillEmpty(p, json.parsed));
+        }
+
+        if (quality.isLowQuality) {
+          toast.warning("Ảnh BHYT không đủ rõ", { description: quality.message });
+        } else {
+          toast.success("OCR BHYT hoàn tất");
+        }
       } else {
         const json = await fetchOcrSingle(file, "cccd", "front");
-        if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-        setForm(p => applyCccdParsedFillEmpty(p, json.parsed));
-        toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+        const quality = checkCccdOcrQuality(json);
+        qualitySetter(quality);
+
+        if (json.parsed && typeof json.parsed === "object") {
+          setForm(p => applyCccdParsedFillEmpty(p, json.parsed));
+        }
+
+        if (quality.isLowQuality) {
+          toast.warning("Ảnh không đủ rõ", { description: quality.message });
+        } else {
+          toast.success(`OCR CCCD ${type === "front" ? "mặt trước" : "mặt sau"} hoàn tất`);
+        }
       }
     } catch (e) {
       toast.error("OCR thất bại", { description: e instanceof Error ? e.message : undefined });
+      qualitySetter({
+        isLowQuality: true,
+        confidence: 0,
+        filledFieldCount: 0,
+        totalExpectedFields: type === "bhyt" ? 4 : 5,
+        message: "OCR thất bại. Vui lòng chụp lại hoặc nhập thủ công.",
+      });
     } finally {
       setter(false);
     }
@@ -366,14 +429,17 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               <UploadCard id="new-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước"
-                file={idFile} onFileSelect={f => pickFile(f, setIdFile)}
-                onOcr={() => runOcr("front")} isOcrRunning={ocrFront} />
+                file={idFile} onFileSelect={f => { setOcrFrontQuality(null); pickFile(f, setIdFile); }}
+                onOcr={() => runOcr("front")} isOcrRunning={ocrFront} ocrQuality={ocrFrontQuality}
+                onManualInput={focusFirstEmptyCccdField} />
               <UploadCard id="new-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau"
-                file={idBackFile} onFileSelect={f => pickFile(f, setIdBackFile)}
-                onOcr={() => runOcr("back")} isOcrRunning={ocrBack} />
+                file={idBackFile} onFileSelect={f => { setOcrBackQuality(null); pickFile(f, setIdBackFile); }}
+                onOcr={() => runOcr("back")} isOcrRunning={ocrBack} ocrQuality={ocrBackQuality}
+                onManualInput={focusFirstEmptyCccdField} />
               <UploadCard id="new-card" title="Nhấn để tải lên" hint="Thẻ BHYT (tùy chọn)"
-                file={cardFile} onFileSelect={f => pickFile(f, setCardFile)}
-                onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} />
+                file={cardFile} onFileSelect={f => { setOcrBhytQuality(null); pickFile(f, setCardFile); }}
+                onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} ocrQuality={ocrBhytQuality}
+                onManualInput={focusFirstEmptyBhytField} />
             </div>
             <div className="mt-3 flex justify-end">
               <Button type="button" size="sm" disabled={ocrRunning || !hasAnyFile}
@@ -394,11 +460,11 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               Thông tin cá nhân
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Họ" value={form.legalLastName} onChange={set("legalLastName")}
+              <F id="legalLastName" label="Họ" value={form.legalLastName} onChange={set("legalLastName")}
                 required error={errors.legalLastName} />
-              <F label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")}
+              <F id="legalFirstName" label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")}
                 required error={errors.legalFirstName} />
-              <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")}
+              <F id="dateOfBirth" label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")}
                 type="date" required error={errors.dateOfBirth} />
               <div>
                 <label className={lc}>Giới tính</label>
@@ -413,9 +479,9 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
                   </SelectContent>
                 </Select>
               </div>
-              <F label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")}
+              <F id="phoneNumber" label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")}
                 type="tel" placeholder="0912 345 678" required error={errors.phoneNumber} />
-              <F label="Email" value={form.email} onChange={set("email")}
+              <F id="email" label="Email" value={form.email} onChange={set("email")}
                 type="email" placeholder="example@email.com" />
             </div>
           </section>
@@ -426,14 +492,14 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               Giấy tờ tùy thân (CCCD)
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Số CCCD" value={form.idNumber} onChange={set("idNumber")}
+              <F id="idNumber" label="Số CCCD" value={form.idNumber} onChange={set("idNumber")}
                 placeholder="G-123-5678-9012" />
-              <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")}
+              <F id="expirationDate" label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")}
                 type="date" />
-              <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
-              <F label="Nơi cấp" value={form.issuer} onChange={set("issuer")}
+              <F id="issuedDate" label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
+              <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")}
                 placeholder="Cục cảnh sát QLHC về TTXH" />
-              <F label="Địa chỉ thường trú" value={form.residentialAddress}
+              <F id="residentialAddress" label="Địa chỉ thường trú" value={form.residentialAddress}
                 onChange={set("residentialAddress")}
                 placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2 />
             </div>
@@ -445,12 +511,12 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               Bảo hiểm y tế (BHYT)
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
-              <F label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")}
+              <F id="provider" label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
+              <F id="memberId" label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")}
                 placeholder="DN 4 79 791 101 31" />
-              <F label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
-              <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
-              <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
+              <F id="groupNumber" label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
+              <F id="bhytName" label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
+              <F id="bhytDob" label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
               <div>
                 <label className={lc}>Giới tính</label>
                 <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
@@ -464,11 +530,11 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
                   </SelectContent>
                 </Select>
               </div>
-              <F label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
-              <F label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
-              <F label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />
-              <F label="Hiệu lực từ" value={form.bhytValidFrom} onChange={set("bhytValidFrom")} type="date" />
-              <F label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
+              <F id="bhytKcbCode" label="Mã KCB" value={form.bhytKcbCode} onChange={set("bhytKcbCode")} />
+              <F id="bhytKcb" label="Nơi đăng ký KCB" value={form.bhytKcb} onChange={set("bhytKcb")} />
+              <F id="bhytAddress" label="Địa chỉ / đơn vị" value={form.bhytAddress} onChange={set("bhytAddress")} col2 />
+              <F id="bhytValidFrom" label="Hiệu lực từ" value={form.bhytValidFrom} onChange={set("bhytValidFrom")} type="date" />
+              <F id="bhytFiveYear" label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
             </div>
           </section>
 

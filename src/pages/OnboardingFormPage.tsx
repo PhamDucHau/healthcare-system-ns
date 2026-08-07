@@ -12,6 +12,9 @@ import {
   fetchOcrSingle,
   mapBhytParsedToInsuranceUpdates,
   mapCccdParsedToFormUpdates,
+  checkCccdOcrQuality,
+  checkBhytOcrQuality,
+  type OcrQualityResult,
 } from "@/lib/cccd-ocr";
 import { submitPatientProfile } from "@/lib/patient-onboarding";
 import { supabase } from "@/lib/supabase";
@@ -65,6 +68,56 @@ const OnboardingFormPage = () => {
   const [isOcrBackRunning, setIsOcrBackRunning] = useState(false);
   const [isOcrBhytRunning, setIsOcrBhytRunning] = useState(false);
 
+  const [ocrFrontQuality, setOcrFrontQuality] = useState<OcrQualityResult | null>(null);
+  const [ocrBackQuality, setOcrBackQuality] = useState<OcrQualityResult | null>(null);
+  const [ocrBhytQuality, setOcrBhytQuality] = useState<OcrQualityResult | null>(null);
+
+  const focusFirstEmptyCccdField = () => {
+    const cccdFields = [
+      { id: "idNumber", value: data.identity.idNumber },
+      { id: "expirationDate", value: data.identity.expirationDate },
+      { id: "residentialAddress", value: data.identity.residentialAddress },
+      { id: "issuedDate", value: data.identity.issuedDate },
+      { id: "issuer", value: data.identity.issuer },
+      { id: "legalFirstName", value: data.personal.legalFirstName },
+      { id: "legalLastName", value: data.personal.legalLastName },
+      { id: "dateOfBirth", value: data.personal.dateOfBirth },
+    ];
+    for (const field of cccdFields) {
+      if (!field.value?.trim()) {
+        const el = document.getElementById(field.id);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => el?.focus(), 100);
+        return;
+      }
+    }
+    const first = document.getElementById("idNumber");
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => first?.focus(), 100);
+  };
+
+  const focusFirstEmptyBhytField = () => {
+    const bhytFields = [
+      { id: "insuranceProvider", value: data.insurance.provider },
+      { id: "memberId", value: data.insurance.memberId },
+      { id: "groupNumber", value: data.insurance.groupNumber },
+      { id: "bhytName", value: data.insurance.bhytName },
+      { id: "bhytDob", value: data.insurance.bhytDob },
+      { id: "bhytKcb", value: data.insurance.bhytKcb },
+    ];
+    for (const field of bhytFields) {
+      if (!field.value?.trim()) {
+        const el = document.getElementById(field.id);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => el?.focus(), 100);
+        return;
+      }
+    }
+    const first = document.getElementById("insuranceProvider");
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => first?.focus(), 100);
+  };
+
   const pickFile = (
     file: File | null,
     onMeta: (name: string) => void,
@@ -84,17 +137,38 @@ const OnboardingFormPage = () => {
     if (!uploadFiles.idFile) return;
     setIsOcrFrontRunning(true);
     setErrorMessage("");
+    setOcrFrontQuality(null);
     try {
       const json = await fetchOcrSingle(uploadFiles.idFile, "cccd", "front");
-      if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-      const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
-      updateIdentityFromOcr(identity);
-      updatePersonalFromOcr(personal);
-      toast.success("OCR CCCD mặt trước hoàn tất");
+      const quality = checkCccdOcrQuality(json);
+      setOcrFrontQuality(quality);
+
+      if (quality.isLowQuality) {
+        toast.warning("Ảnh không đủ rõ", {
+          description: quality.message,
+        });
+      }
+
+      if (json.parsed && typeof json.parsed === "object") {
+        const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
+        updateIdentityFromOcr(identity);
+        updatePersonalFromOcr(personal);
+      }
+
+      if (!quality.isLowQuality) {
+        toast.success("OCR CCCD mặt trước hoàn tất");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR thất bại.";
       setErrorMessage(msg);
       toast.error("OCR thất bại", { description: msg });
+      setOcrFrontQuality({
+        isLowQuality: true,
+        confidence: 0,
+        filledFieldCount: 0,
+        totalExpectedFields: 5,
+        message: "OCR thất bại. Vui lòng chụp lại hoặc nhập thủ công.",
+      });
     } finally {
       setIsOcrFrontRunning(false);
     }
@@ -104,17 +178,38 @@ const OnboardingFormPage = () => {
     if (!uploadFiles.idBackFile) return;
     setIsOcrBackRunning(true);
     setErrorMessage("");
+    setOcrBackQuality(null);
     try {
       const json = await fetchOcrSingle(uploadFiles.idBackFile, "cccd", "front");
-      if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-      const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
-      updateIdentityFromOcr(identity);
-      updatePersonalFromOcr(personal);
-      toast.success("OCR CCCD mặt sau hoàn tất");
+      const quality = checkCccdOcrQuality(json);
+      setOcrBackQuality(quality);
+
+      if (quality.isLowQuality) {
+        toast.warning("Ảnh không đủ rõ", {
+          description: quality.message,
+        });
+      }
+
+      if (json.parsed && typeof json.parsed === "object") {
+        const { identity, personal } = mapCccdParsedToFormUpdates(json.parsed);
+        updateIdentityFromOcr(identity);
+        updatePersonalFromOcr(personal);
+      }
+
+      if (!quality.isLowQuality) {
+        toast.success("OCR CCCD mặt sau hoàn tất");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR thất bại.";
       setErrorMessage(msg);
       toast.error("OCR thất bại", { description: msg });
+      setOcrBackQuality({
+        isLowQuality: true,
+        confidence: 0,
+        filledFieldCount: 0,
+        totalExpectedFields: 5,
+        message: "OCR thất bại. Vui lòng chụp lại hoặc nhập thủ công.",
+      });
     } finally {
       setIsOcrBackRunning(false);
     }
@@ -124,15 +219,36 @@ const OnboardingFormPage = () => {
     if (!uploadFiles.cardFrontFile) return;
     setIsOcrBhytRunning(true);
     setErrorMessage("");
+    setOcrBhytQuality(null);
     try {
       const json = await fetchOcrSingle(uploadFiles.cardFrontFile, "bhyt", "front");
-      if (!json.parsed || typeof json.parsed !== "object") throw new Error("OCR không trả về dữ liệu.");
-      updateInsuranceFromOcr(mapBhytParsedToInsuranceUpdates(json.parsed));
-      toast.success("OCR BHYT hoàn tất");
+      const quality = checkBhytOcrQuality(json);
+      setOcrBhytQuality(quality);
+
+      if (quality.isLowQuality) {
+        toast.warning("Ảnh BHYT không đủ rõ", {
+          description: quality.message,
+        });
+      }
+
+      if (json.parsed && typeof json.parsed === "object") {
+        updateInsuranceFromOcr(mapBhytParsedToInsuranceUpdates(json.parsed));
+      }
+
+      if (!quality.isLowQuality) {
+        toast.success("OCR BHYT hoàn tất");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "OCR BHYT thất bại.";
       setErrorMessage(msg);
       toast.error("OCR BHYT thất bại", { description: msg });
+      setOcrBhytQuality({
+        isLowQuality: true,
+        confidence: 0,
+        filledFieldCount: 0,
+        totalExpectedFields: 4,
+        message: "OCR BHYT thất bại. Vui lòng chụp lại hoặc nhập thủ công.",
+      });
     } finally {
       setIsOcrBhytRunning(false);
     }
@@ -237,9 +353,11 @@ const OnboardingFormPage = () => {
             hint="CCCD — mặt trước"
             fileName={data.identity.idFileName}
             file={uploadFiles.idFile}
-            onFileSelect={(f) => { clearFieldError("idFile"); pickFile(f, (n) => updateIdentity({ idFileName: n }), setIdFile); }}
+            onFileSelect={(f) => { clearFieldError("idFile"); setOcrFrontQuality(null); pickFile(f, (n) => updateIdentity({ idFileName: n }), setIdFile); }}
             onOcr={handleOcrFront}
             isOcrRunning={isOcrFrontRunning}
+            ocrQuality={ocrFrontQuality}
+            onManualInput={focusFirstEmptyCccdField}
             error={fieldErrors.idFile}
           />
           <UploadCard
@@ -248,9 +366,11 @@ const OnboardingFormPage = () => {
             hint="CCCD — mặt sau"
             fileName={data.identity.idBackFileName}
             file={uploadFiles.idBackFile}
-            onFileSelect={(f) => { clearFieldError("idBackFile"); pickFile(f, (n) => updateIdentity({ idBackFileName: n }), setIdBackFile); }}
+            onFileSelect={(f) => { clearFieldError("idBackFile"); setOcrBackQuality(null); pickFile(f, (n) => updateIdentity({ idBackFileName: n }), setIdBackFile); }}
             onOcr={handleOcrBack}
             isOcrRunning={isOcrBackRunning}
+            ocrQuality={ocrBackQuality}
+            onManualInput={focusFirstEmptyCccdField}
             error={fieldErrors.idBackFile}
           />
           <UploadCard
@@ -259,9 +379,11 @@ const OnboardingFormPage = () => {
             hint="Bảo hiểm y tế (BHYT)"
             fileName={data.insurance.cardFrontFileName}
             file={uploadFiles.cardFrontFile}
-            onFileSelect={(f) => { clearFieldError("cardFrontFile"); pickFile(f, (n) => updateInsurance({ cardFrontFileName: n }), setCardFrontFile); }}
+            onFileSelect={(f) => { clearFieldError("cardFrontFile"); setOcrBhytQuality(null); pickFile(f, (n) => updateInsurance({ cardFrontFileName: n }), setCardFrontFile); }}
             onOcr={handleOcrBhyt}
             isOcrRunning={isOcrBhytRunning}
+            ocrQuality={ocrBhytQuality}
+            onManualInput={focusFirstEmptyBhytField}
             error={fieldErrors.cardFrontFile}
           />
         </div>

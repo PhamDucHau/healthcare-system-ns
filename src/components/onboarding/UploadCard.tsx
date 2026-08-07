@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { ScanLine, UploadCloud } from "lucide-react";
+import { AlertTriangle, Camera, Edit3, ScanLine, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { OcrQualityResult } from "@/lib/cccd-ocr";
 
 type UploadCardProps = {
   id: string;
@@ -11,6 +12,8 @@ type UploadCardProps = {
   onFileSelect: (file: File | null) => void;
   onOcr?: () => void | Promise<void>;
   isOcrRunning?: boolean;
+  ocrQuality?: OcrQualityResult | null;
+  onManualInput?: () => void;
   error?: string;
   className?: string;
 };
@@ -24,6 +27,8 @@ const UploadCard = ({
   onFileSelect,
   onOcr,
   isOcrRunning = false,
+  ocrQuality,
+  onManualInput,
   error,
   className,
 }: UploadCardProps) => {
@@ -53,6 +58,18 @@ const UploadCard = ({
     if (!isOcrRunning && onOcr) void onOcr();
   };
 
+  const handleRetakeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const input = document.getElementById(id) as HTMLInputElement | null;
+    if (input) {
+      input.value = "";
+      input.click();
+    }
+  };
+
+  const isLowQuality = ocrQuality?.isLowQuality ?? false;
+
   return (
     <div
       className="relative"
@@ -63,7 +80,7 @@ const UploadCard = ({
         htmlFor={id}
         className={cn(
           "flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-6 py-8 text-center transition-colors hover:border-primary/40 hover:bg-accent/20 focus-within:ring-2 focus-within:ring-primary/30",
-          error ? "border-destructive ring-1 ring-destructive/30" : "border-border",
+          error ? "border-destructive ring-1 ring-destructive/30" : isLowQuality ? "border-warning ring-1 ring-warning/30" : "border-border",
           className,
         )}
       >
@@ -90,18 +107,49 @@ const UploadCard = ({
         <p className="text-base font-semibold text-foreground">{title}</p>
         <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
         <p className="mt-3 text-xs text-muted-foreground">PNG, JPG, JPEG, PDF (tối đa 10MB)</p>
-        {/* {fileName ? (
-          <p className="mt-3 rounded-md bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            Đã chọn: {fileName}
-          </p>
-        ) : null} */}
       </label>
 
       {error ? (
         <p className="mt-1.5 text-xs text-destructive">{error}</p>
       ) : null}
 
-      {onOcr && file && (hovered || isOcrRunning) ? (
+      {isLowQuality && ocrQuality?.message ? (
+        <div className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
+          <div className="flex items-start gap-2 text-xs text-warning">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">{ocrQuality.message}</p>
+              <p className="mt-1 text-warning/80">
+                Độ tin cậy: {ocrQuality.confidence}% — Đã đọc {ocrQuality.filledFieldCount}/{ocrQuality.totalExpectedFields} trường
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRetakeClick}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-warning/30 bg-background px-2.5 py-1.5 text-xs font-semibold text-warning transition-colors hover:bg-warning/10"
+            >
+              <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+              Chụp lại
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onManualInput?.();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-warning/30 bg-background px-2.5 py-1.5 text-xs font-semibold text-warning transition-colors hover:bg-warning/10"
+            >
+              <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+              Nhập thủ công
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {onOcr && file && (hovered || isOcrRunning) && !isLowQuality ? (
         <button
           type="button"
           onClick={handleOcrClick}
