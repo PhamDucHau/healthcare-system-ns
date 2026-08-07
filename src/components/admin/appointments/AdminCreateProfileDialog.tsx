@@ -137,6 +137,7 @@ export default function AdminCreateProfileDialog({
   const handleClose = () => {
     setForm(empty);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
+    setOcrFrontQuality(null); setOcrBackQuality(null); setOcrBhytQuality(null);
     onClose();
   };
 

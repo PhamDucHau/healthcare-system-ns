@@ -147,6 +147,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
     setForm(empty); setErrors({});
     setDupResult(null); setDupBypassed(false);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
+    setOcrFrontQuality(null); setOcrBackQuality(null); setOcrBhytQuality(null);
     onClose();
   };
 
