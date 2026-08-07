@@ -9,6 +9,7 @@ export type DoctorProfile = {
   specialty: string | null;
   facility_id: string | null;
   status: string;
+  avatar_storage_path: string | null;
   sign_pin_plain: string | null;
   pin_set_at: string | null;
   pin_locked_until: string | null;

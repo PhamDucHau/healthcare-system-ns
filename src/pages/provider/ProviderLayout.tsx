@@ -18,12 +18,14 @@ import {
   getMyDoctorProfile,
   type DoctorProfile,
 } from "@/lib/doctor-profile-api";
+import { createAvatarSignedUrl } from "@/lib/doctor-avatar-api";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const NAV_ITEMS = [
   { path: "/provider-portal/dashboard", icon: LayoutDashboard, label: "Bảng tổng quan" },
@@ -47,17 +49,30 @@ function formatDoctorTitle(specialty: string | null | undefined): string {
   return `Bác sĩ chuyên khoa ${trimmed}`;
 }
 
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "BS";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const ProviderLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const isExamination = Boolean(useMatch("/provider-portal/examination/:appointmentId"));
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useDoctorNotifications();
 
   useEffect(() => {
     let cancelled = false;
     void getMyDoctorProfile()
-      .then((data) => {
-        if (!cancelled) setProfile(data);
+      .then(async (data) => {
+        if (cancelled) return;
+        setProfile(data);
+        if (data.avatar_storage_path) {
+          const url = await createAvatarSignedUrl(data.avatar_storage_path);
+          if (!cancelled) setAvatarUrl(url);
+        }
       })
       .catch(() => {
         if (!cancelled) setProfile(null);
@@ -163,11 +178,12 @@ const ProviderLayout = () => {
                       className="relative shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                       aria-label="Mở menu hồ sơ"
                     >
-                      <img
-                        src="/bac-si-nam-chibi.png"
-                        alt=""
-                        className="h-16 w-16 rounded-full object-cover bg-muted ring-1 ring-border transition-opacity hover:opacity-90"
-                      />
+                      <Avatar className="h-16 w-16 ring-1 ring-border transition-opacity hover:opacity-90">
+                        <AvatarImage src={avatarUrl ?? undefined} alt={profile?.full_name ?? "Avatar"} />
+                        <AvatarFallback className="text-lg bg-primary/10 text-primary">
+                          {getInitials(profile?.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-56">
