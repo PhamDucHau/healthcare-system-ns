@@ -37,7 +37,6 @@ import { toast } from "sonner";
 import type { AdminAppointment, AdminAppointmentStatus } from "@/types/admin-appointment";
 import { UI_CHECKED_IN, UI_CHECK_IN } from "@/config/ui-labels";
 import { ADMIN_STATUS_LABEL, ADMIN_STATUS_DOT, ADMIN_STATUS_COLOR, WALK_IN_LABEL } from "@/types/admin-appointment";
-import AppointmentDetailSheet from "@/components/admin/appointments/AppointmentDetailSheet";
 import CancelDialog from "@/components/admin/appointments/CancelDialog";
 import RescheduleDialog from "@/components/admin/appointments/RescheduleDialog";
 import VitalSignsSheet from "@/components/admin/appointments/VitalSignsSheet";
@@ -113,7 +112,6 @@ export default function ProviderAppointmentsPage() {
   const [listPage, setListPage] = useState(1);
   const [status, setStatus] = useState<string>("__all__");
   const [selected, setSelected] = useState<AdminAppointment | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [vitalSignsAppt, setVitalSignsAppt] = useState<AdminAppointment | null>(null);
@@ -201,6 +199,11 @@ export default function ProviderAppointmentsPage() {
 
   const handleCheckin = async (row: AdminAppointment): Promise<boolean> => {
     if (!warnIfNotReady(row)) return false;
+    return doCheckin(row);
+  };
+
+  // Direct check-in without readiness check (used from popup where user just saved data)
+  const doCheckin = async (row: AdminAppointment): Promise<boolean> => {
     setCheckingInId(row.id);
     try {
       const { error } = await supabase.rpc("admin_checkin_appointment", { p_appointment_id: row.id });
@@ -377,7 +380,7 @@ export default function ProviderAppointmentsPage() {
                   <div
                     key={row.id}
                     className="rounded-xl border bg-card p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => { setSelected(row); setSheetOpen(true); }}
+                    onClick={() => setVitalSignsAppt(row)}
                   >
                     {/* Header: Time + Status + Actions */}
                     <div className="flex items-center justify-between mb-3">
@@ -544,7 +547,7 @@ export default function ProviderAppointmentsPage() {
                       <TableRow
                         key={row.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => { setSelected(row); setSheetOpen(true); }}
+                        onClick={() => setVitalSignsAppt(row)}
                       >
                         <TableCell className="font-mono text-sm font-semibold">
                           {row.start_time
@@ -724,13 +727,6 @@ export default function ProviderAppointmentsPage() {
         </div>
       ) : null}
 
-      <AppointmentDetailSheet
-        appointment={selected}
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        onRefresh={() => void refetch()}
-      />
-
       {selected && (
         <CancelDialog
           appointment={selected}
@@ -753,8 +749,15 @@ export default function ProviderAppointmentsPage() {
         appointment={vitalSignsAppt}
         onClose={() => setVitalSignsAppt(null)}
         onCheckIn={async (appt) => {
-          await handleCheckin(appt);
-          setVitalSignsAppt(null);
+          // Refetch to get latest data before checking readiness
+          const { data } = await refetch();
+          const freshAppt = data?.rows.find(r => r.id === appt.id);
+          if (!freshAppt) {
+            toast.error("Không tìm thấy lịch hẹn");
+            return;
+          }
+          const ok = await handleCheckin(freshAppt);
+          if (ok) setVitalSignsAppt(null);
         }}
         onReschedule={(appt) => {
           setSelected(appt);
@@ -769,6 +772,14 @@ export default function ProviderAppointmentsPage() {
         onViewPatientRecords={(appt) => {
           navigate(`/provider-portal/patients?patient=${appt.profile_id}`);
           setVitalSignsAppt(null);
+        }}
+        onRefresh={() => {
+          void refetch().then(() => {
+            if (vitalSignsAppt) {
+              const updated = appointmentListData?.rows.find(r => r.id === vitalSignsAppt.id);
+              if (updated) setVitalSignsAppt(updated);
+            }
+          });
         }}
       />
 

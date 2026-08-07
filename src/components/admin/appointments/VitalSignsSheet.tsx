@@ -30,6 +30,7 @@ type VitalSignsSheetProps = {
   onReschedule?: (appointment: AdminAppointment) => void;
   onCancelAppointment?: (appointment: AdminAppointment) => void;
   onViewPatientRecords?: (appointment: AdminAppointment) => void;
+  onRefresh?: () => void;
 };
 
 function fmt(v: number | null, unit: string) {
@@ -480,9 +481,10 @@ export default function VitalSignsSheet({
   onReschedule,
   onCancelAppointment,
   onViewPatientRecords,
+  onRefresh,
 }: VitalSignsSheetProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("vital-signs");
+  const [activeTab, setActiveTab] = useState("info");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [hasBlockingError, setHasBlockingError] = useState(false);
 
@@ -550,6 +552,8 @@ export default function VitalSignsSheet({
       toast.success("Đã lưu bản khai khám");
       void queryClient.invalidateQueries({ queryKey: ["pre_consultation_bundle", appointment?.id] });
       void queryClient.invalidateQueries({ queryKey: ["admin-appointments"] });
+      void queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] });
+      onRefresh?.();
     },
     onError: (err: Error) => {
       toast.error(`Lưu thất bại: ${err.message}`);
@@ -587,6 +591,7 @@ export default function VitalSignsSheet({
       void queryClient.invalidateQueries({ queryKey: ["admin-appointments"] });
       void queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] });
       void queryClient.invalidateQueries({ queryKey: ["vital_signs", appointment?.id] });
+      onRefresh?.();
     },
     onError: (err: Error) => {
       if (err.message.includes("INVALID_WEIGHT")) {
