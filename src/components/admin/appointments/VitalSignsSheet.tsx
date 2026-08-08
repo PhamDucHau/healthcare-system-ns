@@ -5,6 +5,7 @@ import {
   User, FileText, CalendarDays, ClipboardList, Heart, AlertCircle,
   Pill, History, Cigarette, Wine, Dumbbell,
 } from "lucide-react";
+import SymptomOnsetPicker from "@/components/pre-consultation/SymptomOnsetPicker";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -22,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 import type { AdminAppointment } from "@/types/admin-appointment";
 import type { VitalSignsRow, RecordVitalSignsInput } from "@/types/vital-signs";
 import VitalSignsFormContent from "./VitalSignsFormContent";
+import PatientRecordDialog from "./PatientRecordDialog";
 
 type VitalSignsSheetProps = {
   appointment: AdminAppointment | null;
@@ -376,12 +378,10 @@ function PreVisitTab({
 
           <div className="space-y-2">
             <label className="text-xs font-semibold text-muted-foreground">Thời gian</label>
-            <input
-              type="text"
+            <SymptomOnsetPicker
               value={formData.symptom_duration}
-              onChange={(e) => onFormChange({ ...formData, symptom_duration: e.target.value })}
-              placeholder="Không rõ"
-              className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              onChange={(val) => onFormChange({ ...formData, symptom_duration: val })}
+              placeholder="Chọn ngày giờ"
             />
           </div>
 
@@ -497,6 +497,7 @@ export default function VitalSignsSheet({
     lifestyle: "",
   });
   const [doctorPreConsultationId, setDoctorPreConsultationId] = useState<string | null>(null);
+  const [patientRecordDialogOpen, setPatientRecordDialogOpen] = useState(false);
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ["vital_signs", appointment?.id],
@@ -514,11 +515,45 @@ export default function VitalSignsSheet({
       const bundle = await getPreConsultationBundle(appointment.id);
       if (bundle.doctor) {
         setDoctorPreConsultationId(bundle.doctor.id);
+
+        // Use symptom_onset_at if available, otherwise calculate from duration
+        let durationText = "";
+        if (bundle.doctor.symptom_onset_at) {
+          const onsetDate = new Date(bundle.doctor.symptom_onset_at);
+          if (!isNaN(onsetDate.getTime())) {
+            const day = String(onsetDate.getDate()).padStart(2, '0');
+            const month = String(onsetDate.getMonth() + 1).padStart(2, '0');
+            const year = onsetDate.getFullYear();
+            const hour = String(onsetDate.getHours()).padStart(2, '0');
+            const minute = String(onsetDate.getMinutes()).padStart(2, '0');
+            durationText = `${day}/${month}/${year} ${hour}:${minute}`;
+          }
+        } else if (bundle.doctor.symptom_duration != null && bundle.doctor.symptom_duration > 0) {
+          // Fallback: calculate from duration
+          const now = new Date();
+          let onsetDate: Date;
+          const unit = bundle.doctor.symptom_duration_unit || 'days';
+          const duration = bundle.doctor.symptom_duration;
+
+          if (unit === 'months') {
+            onsetDate = new Date(now.getFullYear(), now.getMonth() - duration, now.getDate());
+          } else if (unit === 'weeks') {
+            onsetDate = new Date(now.getTime() - duration * 7 * 24 * 60 * 60 * 1000);
+          } else {
+            onsetDate = new Date(now.getTime() - duration * 24 * 60 * 60 * 1000);
+          }
+
+          const day = String(onsetDate.getDate()).padStart(2, '0');
+          const month = String(onsetDate.getMonth() + 1).padStart(2, '0');
+          const year = onsetDate.getFullYear();
+          durationText = `${day}/${month}/${year}`;
+        }
+
         setPreVisitFormData({
           chief_complaint: bundle.doctor.chief_complaint || "",
-          symptom_duration: bundle.doctor.symptom_duration?.toString() || "",
+          symptom_duration: durationText,
           medical_history: bundle.doctor.surgical_history || "",
-          drug_allergies: bundle.doctor.drug_allergies.map(a => a.drug_name).join(", ") || "",
+          drug_allergies: bundle.doctor.drug_allergies.map(a => a.drug).join(", ") || "",
           lifestyle: bundle.doctor.smoking_frequency || "",
         });
       }
@@ -540,10 +575,54 @@ export default function VitalSignsSheet({
         setDoctorPreConsultationId(docId);
       }
 
+      // Parse date/time to ISO string for symptom_onset_at
+      let symptom_onset_at: string | undefined;
+      let symptom_duration: number | undefined;
+      let symptom_duration_unit: 'days' | 'weeks' | 'months' | undefined;
+
+      const dateTimeMatch = preVisitFormData.symptom_duration.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+      if (dateTimeMatch) {
+        const [, day, month, year, hour, minute] = dateTimeMatch;
+        const onsetDate = new Date(
+          Number(year),
+          Number(month) - 1,
+          Number(day),
+          hour ? Number(hour) : 0,
+          minute ? Number(minute) : 0
+        );
+        if (!isNaN(onsetDate.getTime())) {
+          symptom_onset_at = onsetDate.toISOString();
+
+          // Also calculate duration for backwards compatibility
+          const now = new Date();
+          const diffMs = now.getTime() - onsetDate.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+          if (diffDays >= 0) {
+            const diffWeeks = Math.floor(diffDays / 7);
+            const diffMonths = Math.floor(diffDays / 30);
+
+            if (diffMonths >= 1) {
+              symptom_duration = diffMonths;
+              symptom_duration_unit = 'months';
+            } else if (diffWeeks >= 1) {
+              symptom_duration = diffWeeks;
+              symptom_duration_unit = 'weeks';
+            } else {
+              symptom_duration = Math.max(diffDays, 1);
+              symptom_duration_unit = 'days';
+            }
+          }
+        }
+      }
+
       // Update with form data
       await updateDoctorPreConsultation(docId, {
         chief_complaint: preVisitFormData.chief_complaint || undefined,
         surgical_history: preVisitFormData.medical_history || undefined,
+        symptom_onset_at,
+        symptom_duration,
+        symptom_duration_unit,
       });
 
       return docId;
@@ -735,7 +814,7 @@ export default function VitalSignsSheet({
             {/* View Patient Records */}
             <button
               type="button"
-              onClick={onViewPatientRecords ? () => onViewPatientRecords(appointment) : undefined}
+              onClick={() => setPatientRecordDialogOpen(true)}
               className="flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-muted/50 transition-colors"
             >
               <ClipboardList className="h-4 w-4" />
@@ -820,6 +899,16 @@ export default function VitalSignsSheet({
           </div>
         )}
       </DialogContent>
+
+      {/* Patient Record Dialog */}
+      {appointment?.profile_id && (
+        <PatientRecordDialog
+          open={patientRecordDialogOpen}
+          onClose={() => setPatientRecordDialogOpen(false)}
+          profileId={appointment.profile_id}
+          nested
+        />
+      )}
     </Dialog>
   );
 }

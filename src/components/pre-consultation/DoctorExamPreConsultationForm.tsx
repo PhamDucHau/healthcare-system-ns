@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import SymptomOnsetPicker from './SymptomOnsetPicker';
 import {
   createOrGetDoctorPreConsultation,
   getPreConsultationBundle,
@@ -175,11 +176,11 @@ export default function DoctorExamPreConsultationForm({
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground font-normal">Thời gian</Label>
-          <Input
+          <SymptomOnsetPicker
             value={fields.durationText}
-            onChange={(e) => updateField('durationText', e.target.value)}
+            onChange={(val) => updateField('durationText', val)}
             disabled={!canEdit}
-            placeholder="VD: 3 ngày"
+            placeholder="Chọn ngày giờ"
           />
         </div>
         <div className="space-y-1">

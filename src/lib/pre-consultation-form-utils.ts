@@ -26,6 +26,7 @@ export function clinicalRecordToFormData(record: ClinicalRecord): PreConsultatio
     chief_complaint: record.chief_complaint ?? '',
     symptom_duration: record.symptom_duration,
     symptom_duration_unit: record.symptom_duration_unit ?? 'days',
+    symptom_onset_at: record.symptom_onset_at ?? null,
     pain_scale: record.pain_scale ?? 0,
     symptom_tags: record.symptom_tags,
     medical_history: record.medical_history,
@@ -49,6 +50,7 @@ export function formDataToUpdateInput(data: PreConsultationFormData): UpdatePreC
     chief_complaint: data.chief_complaint || undefined,
     symptom_duration: data.symptom_duration ?? undefined,
     symptom_duration_unit: data.symptom_duration_unit,
+    symptom_onset_at: data.symptom_onset_at || undefined,
     pain_scale: data.pain_scale,
     symptom_tags: data.symptom_tags,
     medical_history: data.medical_history,
@@ -177,6 +179,49 @@ export function parseLifestyleText(text: string): Pick<
   };
 }
 
+function parseDateToDuration(dateStr: string): { duration: number; unit: SymptomDurationUnit } | null {
+  const dateTimeMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+\d{1,2}:\d{2})?$/);
+  if (!dateTimeMatch) return null;
+
+  const [, day, month, year] = dateTimeMatch;
+  const onsetDate = new Date(Number(year), Number(month) - 1, Number(day));
+  if (isNaN(onsetDate.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = now.getTime() - onsetDate.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return null;
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffMonths >= 1) {
+    return { duration: diffMonths, unit: 'months' };
+  }
+  if (diffWeeks >= 1) {
+    return { duration: diffWeeks, unit: 'weeks' };
+  }
+  return { duration: Math.max(diffDays, 1), unit: 'days' };
+}
+
+function parseDateTimeToISO(dateStr: string): string | null {
+  const dateTimeMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (!dateTimeMatch) return null;
+
+  const [, day, month, year, hour, minute] = dateTimeMatch;
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    hour ? Number(hour) : 0,
+    minute ? Number(minute) : 0
+  );
+
+  if (isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 export function compactFormToFullData(compact: {
   chief_complaint: string;
   durationText: string;
@@ -184,15 +229,31 @@ export function compactFormToFullData(compact: {
   allergiesText: string;
   lifestyleText: string;
 }, base: PreConsultationFormData): PreConsultationFormData {
-  const durationMatch = compact.durationText.trim().match(/^(\d+)\s*(ngày|tuần|tháng|days|weeks|months)?/i);
   let symptom_duration: number | null = base.symptom_duration;
   let symptom_duration_unit: SymptomDurationUnit = base.symptom_duration_unit;
-  if (durationMatch) {
-    symptom_duration = Number(durationMatch[1]);
-    const unitRaw = (durationMatch[2] ?? 'ngày').toLowerCase();
-    if (unitRaw.startsWith('tuần') || unitRaw === 'weeks') symptom_duration_unit = 'weeks';
-    else if (unitRaw.startsWith('tháng') || unitRaw === 'months') symptom_duration_unit = 'months';
-    else symptom_duration_unit = 'days';
+  let symptom_onset_at: string | null = base.symptom_onset_at;
+
+  const trimmed = compact.durationText.trim();
+
+  // Try to parse as date/time first
+  const isoDate = parseDateTimeToISO(trimmed);
+  if (isoDate) {
+    symptom_onset_at = isoDate;
+    // Also calculate duration for backwards compatibility
+    const dateResult = parseDateToDuration(trimmed);
+    if (dateResult) {
+      symptom_duration = dateResult.duration;
+      symptom_duration_unit = dateResult.unit;
+    }
+  } else {
+    const durationMatch = trimmed.match(/^(\d+)\s*(ngày|tuần|tháng|days|weeks|months)?/i);
+    if (durationMatch) {
+      symptom_duration = Number(durationMatch[1]);
+      const unitRaw = (durationMatch[2] ?? 'ngày').toLowerCase();
+      if (unitRaw.startsWith('tuần') || unitRaw === 'weeks') symptom_duration_unit = 'weeks';
+      else if (unitRaw.startsWith('tháng') || unitRaw === 'months') symptom_duration_unit = 'months';
+      else symptom_duration_unit = 'days';
+    }
   }
 
   return {
@@ -200,12 +261,53 @@ export function compactFormToFullData(compact: {
     chief_complaint: compact.chief_complaint,
     symptom_duration,
     symptom_duration_unit,
+    symptom_onset_at,
     medical_history: parseMedicalHistoryText(compact.medicalHistoryText),
     surgical_history: '',
     drug_allergies: parseAllergiesText(compact.allergiesText),
     food_allergies: [],
     ...parseLifestyleText(compact.lifestyleText),
   };
+}
+
+function formatOnsetDateTime(data: PreConsultationFormData): string {
+  // Prefer symptom_onset_at if available
+  if (data.symptom_onset_at) {
+    const onsetDate = new Date(data.symptom_onset_at);
+    if (!isNaN(onsetDate.getTime())) {
+      const day = String(onsetDate.getDate()).padStart(2, '0');
+      const month = String(onsetDate.getMonth() + 1).padStart(2, '0');
+      const year = onsetDate.getFullYear();
+      const hour = String(onsetDate.getHours()).padStart(2, '0');
+      const minute = String(onsetDate.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hour}:${minute}`;
+    }
+  }
+
+  // Fallback: calculate from duration
+  if (data.symptom_duration == null || data.symptom_duration <= 0) return 'Không rõ';
+
+  const now = new Date();
+  let onsetDate: Date;
+
+  switch (data.symptom_duration_unit) {
+    case 'months':
+      onsetDate = new Date(now.getFullYear(), now.getMonth() - data.symptom_duration, now.getDate());
+      break;
+    case 'weeks':
+      onsetDate = new Date(now.getTime() - data.symptom_duration * 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'days':
+    default:
+      onsetDate = new Date(now.getTime() - data.symptom_duration * 24 * 60 * 60 * 1000);
+      break;
+  }
+
+  const day = String(onsetDate.getDate()).padStart(2, '0');
+  const month = String(onsetDate.getMonth() + 1).padStart(2, '0');
+  const year = onsetDate.getFullYear();
+
+  return `${day}/${month}/${year}`;
 }
 
 export function fullDataToCompactForm(data: PreConsultationFormData): {
@@ -217,7 +319,7 @@ export function fullDataToCompactForm(data: PreConsultationFormData): {
 } {
   return {
     chief_complaint: data.chief_complaint,
-    durationText: formatDurationText(data.symptom_duration, data.symptom_duration_unit),
+    durationText: formatOnsetDateTime(data),
     medicalHistoryText: formatMedicalHistoryText(data as ClinicalRecord),
     allergiesText: formatAllergiesText(data as ClinicalRecord),
     lifestyleText: formatLifestyleText(data as ClinicalRecord),

@@ -390,10 +390,10 @@ export default function AdminAppointmentsContent() {
                     appt={appt}
                     selected={selectedIds.has(appt.id)}
                     onToggle={() => toggleSelect(appt.id)}
-                    onClick={() => setDetailAppt(appt)}
+                    onClick={() => setVitalSignsAppt(appt)}
                     onCheckin={() => {
-                      /* inline quick-checkin done via detail sheet */
-                      setDetailAppt(appt);
+                      /* inline quick-checkin done via vital signs sheet */
+                      setVitalSignsAppt(appt);
                     }}
                     onCancel={() => setCancelAppt(appt)}
                     onReschedule={() => setRescheduleAppt(appt)}

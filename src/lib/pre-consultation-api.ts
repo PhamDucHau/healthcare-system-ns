@@ -68,6 +68,7 @@ function mapPreConsultationRow(row: Record<string, unknown>): PreConsultation {
     chief_complaint: row.chief_complaint != null ? String(row.chief_complaint) : null,
     symptom_duration: row.symptom_duration != null ? Number(row.symptom_duration) : null,
     symptom_duration_unit: row.symptom_duration_unit as SymptomDurationUnit | null,
+    symptom_onset_at: row.symptom_onset_at != null ? String(row.symptom_onset_at) : null,
     pain_scale: row.pain_scale != null ? Number(row.pain_scale) : null,
     symptom_tags: parseStringArray(row.symptom_tags),
 
@@ -106,6 +107,7 @@ function mapClinicalFields(row: Record<string, unknown>) {
     chief_complaint: row.chief_complaint != null ? String(row.chief_complaint) : null,
     symptom_duration: row.symptom_duration != null ? Number(row.symptom_duration) : null,
     symptom_duration_unit: row.symptom_duration_unit as SymptomDurationUnit | null,
+    symptom_onset_at: row.symptom_onset_at != null ? String(row.symptom_onset_at) : null,
     pain_scale: row.pain_scale != null ? Number(row.pain_scale) : null,
     symptom_tags: parseStringArray(row.symptom_tags),
     medical_history: parseJsonArray<MedicalHistoryItem>(row.medical_history),
@@ -156,6 +158,7 @@ function buildUpdateRpcParams(input: UpdatePreConsultationInput) {
     p_chief_complaint: input.chief_complaint ?? null,
     p_symptom_duration: input.symptom_duration ?? null,
     p_symptom_duration_unit: input.symptom_duration_unit ?? null,
+    p_symptom_onset_at: input.symptom_onset_at ?? null,
     p_pain_scale: input.pain_scale ?? null,
     p_symptom_tags: input.symptom_tags ?? null,
     p_medical_history: input.medical_history ?? null,

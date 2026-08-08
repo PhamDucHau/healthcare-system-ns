@@ -66,6 +66,7 @@ export type PreConsultation = {
   chief_complaint: string | null;
   symptom_duration: number | null;
   symptom_duration_unit: SymptomDurationUnit | null;
+  symptom_onset_at: string | null;
   pain_scale: number | null;
   symptom_tags: string[];
 
@@ -122,6 +123,7 @@ export type PreConsultationFormData = {
   chief_complaint: string;
   symptom_duration: number | null;
   symptom_duration_unit: SymptomDurationUnit;
+  symptom_onset_at: string | null;
   pain_scale: number;
   symptom_tags: string[];
 
@@ -157,6 +159,7 @@ export type UpdatePreConsultationInput = Partial<{
   chief_complaint: string;
   symptom_duration: number;
   symptom_duration_unit: SymptomDurationUnit;
+  symptom_onset_at: string;
   pain_scale: number;
   symptom_tags: string[];
   medical_history: MedicalHistoryItem[];
@@ -275,6 +278,7 @@ export const DEFAULT_FORM_DATA: PreConsultationFormData = {
   chief_complaint: '',
   symptom_duration: null,
   symptom_duration_unit: 'days',
+  symptom_onset_at: null,
   pain_scale: 0,
   symptom_tags: [],
   medical_history: [],
