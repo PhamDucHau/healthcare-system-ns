@@ -41,7 +41,7 @@ test.describe("Unified login", () => {
     await expect(page).toHaveURL(/\/provider-portal\/dashboard/);
   });
 
-  test("admin redirects to admin overview", async ({ page }) => {
+  test("admin redirects to patient records", async ({ page }) => {
     await mockUnifiedLoginApis(page);
     await page.goto("/login");
 
@@ -49,7 +49,7 @@ test.describe("Unified login", () => {
     await page.locator("#password").fill(portalLoginTestData.admin.password);
     await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-    await expect(page).toHaveURL(/\/admin\/overview/);
+    await expect(page).toHaveURL(/\/admin\/patient-records/);
   });
 
   test("invalid credentials shows error", async ({ page }) => {

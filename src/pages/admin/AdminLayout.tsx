@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  LayoutGrid, Users, Search,
+  Users, Search,
   LogOut, Menu, Loader2, FileUser, FolderOpen, CalendarDays, ClipboardList, Brain, KeyRound, UserRound, Stethoscope, Shield,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
@@ -13,7 +13,6 @@ import NotificationPanel from "@/components/admin/NotificationPanel";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
 const sidebarItems = [
-  { icon: LayoutGrid,    label: "Bảng tổng quan",      path: "/admin/overview" },
   { icon: FileUser,      label: "Hồ sơ bệnh nhân",     path: "/admin/patient-records" },
   { icon: UserRound,     label: "Bệnh nhân",           path: "/admin/patients" },
   { icon: CalendarDays,  label: "Lịch hẹn",            path: "/admin/appointments" },
@@ -58,7 +57,6 @@ const AdminSidebarContent = ({
             to={path}
             className={navLinkClass}
             onClick={onNavigate}
-            end={path === "/admin/overview"}
           >
             <Icon className="h-4 w-4 shrink-0" />
             {label}

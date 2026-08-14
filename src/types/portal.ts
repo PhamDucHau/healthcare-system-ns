@@ -39,7 +39,7 @@ export const PORTAL_CONFIG: Record<
   },
   admin: {
     loginPath: "/login",
-    homePath: "/admin/overview",
+    homePath: "/admin/patient-records",
     title: "Portal Quản trị",
     subtitle: "Quản lý người dùng, báo cáo và cấu hình hệ thống.",
     forgotPasswordPath: "/forgot-password",

@@ -28,7 +28,6 @@ import AuthHashRedirect from "./components/auth/AuthHashRedirect.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import About from "./pages/About.tsx";
 import Admin from "./pages/Admin.tsx";
-import AdminOverview from "./pages/admin/AdminOverview.tsx";
 import AdminSectionPlaceholder from "./pages/admin/AdminSectionPlaceholder.tsx";
 import AdminUsersContent from "./components/admin/AdminUsersContent.tsx";
 import AdminRolesContent from "./components/admin/AdminRolesContent.tsx";
@@ -243,8 +242,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="overview" replace />} />
-              <Route path="overview" element={<AdminOverview />} />
+              <Route index element={<Navigate to="/admin/patient-records" replace />} />
+              <Route path="overview" element={<Navigate to="/admin/patient-records" replace />} />
               <Route
                 path="patient-records"
                 element={<PatientRecordsManagement portal="admin" />}
