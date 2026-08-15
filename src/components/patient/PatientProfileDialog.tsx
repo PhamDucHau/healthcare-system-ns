@@ -470,6 +470,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
         group_number: null,
         submitted_at: null,
         consent_accepted: false,
+        status: "DRAFT",
       };
     }
     return null;

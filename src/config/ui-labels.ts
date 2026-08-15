@@ -36,11 +36,34 @@ export const PATIENT_STATUS_LABELS: Record<string, string> = {
   Routine: "Thường quy",
   Active: "Đang hoạt động",
   Draft: "Nháp",
+  ACTIVE: "Đang hoạt động",
+  UNVERIFIED: "Đã nộp",
+  DRAFT: "Bản nháp",
+  INACTIVE: "Ngừng hoạt động",
+  REJECTED: "Đã từ chối",
 };
 
 export function translatePatientStatus(status: string | null | undefined): string {
   if (!status) return "—";
-  return PATIENT_STATUS_LABELS[status] ?? status;
+  return PATIENT_STATUS_LABELS[status] ?? PATIENT_STATUS_LABELS[status.toUpperCase()] ?? status;
+}
+
+/** Nhãn cột Trạng thái trên danh sách hồ sơ (`patient.status`). */
+export function formatPatientProfileStatus(status: string | null | undefined): string {
+  const key = status?.trim().toUpperCase();
+  switch (key) {
+    case "ACTIVE":
+      return PATIENT_STATUS_LABELS.ACTIVE;
+    case "UNVERIFIED":
+      return PATIENT_STATUS_LABELS.UNVERIFIED;
+    case "INACTIVE":
+      return PATIENT_STATUS_LABELS.INACTIVE;
+    case "REJECTED":
+      return PATIENT_STATUS_LABELS.REJECTED;
+    case "DRAFT":
+    default:
+      return PATIENT_STATUS_LABELS.DRAFT;
+  }
 }
 
 /** Loại cuộc hẹn demo. */

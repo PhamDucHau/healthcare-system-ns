@@ -55,8 +55,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  mapPatientRecordDeleteError,
   searchPatientRecords,
   type PatientRecordSortField,
+  type PatientRecordStatusFilter,
   type PatientRecordsListParams,
 } from "@/lib/patient-records";
 import { supabase } from "@/lib/supabase";
@@ -70,7 +72,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 type PatientRecordsFilters = {
-  status: "all" | "submitted" | "draft";
+  status: PatientRecordStatusFilter;
   createdByRole: PatientCreatedByRole | "all";
   dateFrom: string;
   dateTo: string;
@@ -114,9 +116,18 @@ function formatDateTime(iso: string | null): string {
 }
 
 function statusClass(status: PatientRecordListRow["status"]) {
-  return status === "Đã nộp"
-    ? "bg-emerald-100 text-emerald-800"
-    : "bg-amber-100 text-amber-800";
+  switch (status) {
+    case "Đang hoạt động":
+      return "bg-emerald-100 text-emerald-800";
+    case "Đã nộp":
+      return "bg-green-100 text-green-800";
+    case "Đã từ chối":
+      return "bg-rose-100 text-rose-800";
+    case "Ngừng hoạt động":
+      return "bg-slate-100 text-slate-700";
+    default:
+      return "bg-amber-100 text-amber-800";
+  }
 }
 
 function createdByRoleClass(role: PatientCreatedByRole | null) {
@@ -254,7 +265,9 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
     const { error: deleteError } = await supabase.from("patient").delete().eq("id", deleteTarget.id);
     setDeleting(false);
     if (deleteError) {
-      toast.error("Xóa thất bại", { description: deleteError.message });
+      toast.error("Xóa thất bại", {
+        description: mapPatientRecordDeleteError(deleteError.message),
+      });
     } else {
       toast.success(`Đã xóa hồ sơ ${deleteTarget.full_name}`);
       setDeleteTarget(null);
@@ -354,13 +367,16 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                   setFilters((prev) => ({ ...prev, status: value }))
                 }
               >
-                <SelectTrigger className="h-10 w-[140px] bg-white">
+                <SelectTrigger className="h-10 w-[180px] bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="submitted">Đã nộp</SelectItem>
+                  <SelectItem value="active">Đang hoạt động</SelectItem>
+                  <SelectItem value="unverified">Đã nộp</SelectItem>
                   <SelectItem value="draft">Bản nháp</SelectItem>
+                  <SelectItem value="inactive">Ngừng hoạt động</SelectItem>
+                  <SelectItem value="rejected">Đã từ chối</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -691,6 +707,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
           open={editOpen}
           onClose={() => setEditOpen(false)}
           onSuccess={() => void refetch()}
+          canReview={portal === "admin"}
         />
 
         <AdminNewPatientDialog

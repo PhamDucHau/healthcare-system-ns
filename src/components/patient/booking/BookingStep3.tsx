@@ -20,6 +20,7 @@ type Profile = {
   legal_first_name: string | null;
   legal_last_name: string | null;
   submitted_at: string | null;
+  status: string | null;
 };
 
 export default function BookingStep3({ specialty, date, slot }: Props) {
@@ -43,8 +44,8 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
   async function handleConfirm() {
     if (!profile) return;
 
-    if (!profile.submitted_at) {
-      toast.error('Hồ sơ chưa được xác minh. Vui lòng hoàn tất onboarding trước.');
+    if (profile.status !== 'ACTIVE') {
+      toast.error('Hồ sơ chưa được phê duyệt.');
       return;
     }
 
@@ -130,9 +131,9 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
         </label>
         <div className="rounded-xl border bg-card px-4 py-3 text-sm font-medium text-foreground flex items-center justify-between">
           <span>{profileName} (cá nhân)</span>
-          {!profile?.submitted_at && (
-            <span className="text-[10px] font-bold text-destructive uppercase">Chưa xác minh</span>
-          )}
+          {!profile || profile.status !== 'ACTIVE' ? (
+            <span className="text-[10px] font-bold text-destructive uppercase">Chưa phê duyệt</span>
+          ) : null}
         </div>
       </div>
 
@@ -163,7 +164,7 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
       <div className="flex flex-col gap-2 pt-1">
         <button
           onClick={handleConfirm}
-          disabled={submitting || !profile?.submitted_at}
+          disabled={submitting || profile?.status !== 'ACTIVE'}
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? (

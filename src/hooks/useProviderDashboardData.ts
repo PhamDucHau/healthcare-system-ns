@@ -59,26 +59,45 @@ export function useProviderDashboardRecentPatients() {
         newThisWeek: 0,
       };
 
-      const [submittedResult, weekNewResult] = await Promise.all([
-        searchPatientRecords(supabase, {
-          page: 1,
-          limit: 1,
-          status: "submitted",
-        }),
-        searchPatientRecords(supabase, {
-          page: 1,
-          limit: 1,
-          status: "submitted",
-          dateFrom,
-          dateTo,
-        }),
-      ]);
+      const [activeResult, unverifiedResult, weekActiveResult, weekUnverifiedResult] =
+        await Promise.all([
+          searchPatientRecords(supabase, {
+            page: 1,
+            limit: 1,
+            status: "active",
+          }),
+          searchPatientRecords(supabase, {
+            page: 1,
+            limit: 1,
+            status: "unverified",
+          }),
+          searchPatientRecords(supabase, {
+            page: 1,
+            limit: 1,
+            status: "active",
+            dateFrom,
+            dateTo,
+          }),
+          searchPatientRecords(supabase, {
+            page: 1,
+            limit: 1,
+            status: "unverified",
+            dateFrom,
+            dateTo,
+          }),
+        ]);
 
-      if (!submittedResult.error) {
-        monitoringStats = { ...monitoringStats, total: submittedResult.total };
+      if (!activeResult.error && !unverifiedResult.error) {
+        monitoringStats = {
+          ...monitoringStats,
+          total: activeResult.total + unverifiedResult.total,
+        };
       }
-      if (!weekNewResult.error) {
-        monitoringStats = { ...monitoringStats, newThisWeek: weekNewResult.total };
+      if (!weekActiveResult.error && !weekUnverifiedResult.error) {
+        monitoringStats = {
+          ...monitoringStats,
+          newThisWeek: weekActiveResult.total + weekUnverifiedResult.total,
+        };
       }
 
       return {

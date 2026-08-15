@@ -1,5 +1,7 @@
 import { FileText, Loader2, UserRound } from "lucide-react";
+import { formatPatientProfileStatus } from "@/config/ui-labels";
 import type { PatientPortalDetail } from "@/types/patient-portal";
+import PatientRecordReviewActions from "@/components/patient-records/PatientRecordReviewActions";
 
 function formatDob(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -47,6 +49,8 @@ type PatientRecordDetailPanelProps = {
   isLoading?: boolean;
   isError?: boolean;
   imageUrls?: PatientDocImageUrls;
+  canReview?: boolean;
+  onReviewed?: () => void;
 };
 
 const PatientRecordDetailPanel = ({
@@ -54,6 +58,8 @@ const PatientRecordDetailPanel = ({
   isLoading = false,
   isError = false,
   imageUrls,
+  canReview = false,
+  onReviewed,
 }: PatientRecordDetailPanelProps) => {
   if (isLoading) {
     return (
@@ -106,8 +112,11 @@ const PatientRecordDetailPanel = ({
           <Field label="Đại từ" value={profile.preferred_pronouns ?? ""} />
           <Field
             label="Trạng thái"
-            value={profile.submitted_at ? "Đã nộp" : "Bản nháp"}
+            value={formatPatientProfileStatus(profile.status)}
           />
+          {profile.status === "REJECTED" && profile.rejection_reason ? (
+            <Field label="Lý do từ chối" value={profile.rejection_reason} />
+          ) : null}
           <Field
             label="Đồng ý xử lý dữ liệu"
             value={profile.consent_accepted ? "Có" : "Chưa"}
@@ -159,6 +168,15 @@ const PatientRecordDetailPanel = ({
           </div>
         </section>
       )}
+
+      {canReview ? (
+        <PatientRecordReviewActions
+          patientId={profile.id}
+          status={profile.status}
+          canReview={canReview}
+          onSuccess={() => onReviewed?.()}
+        />
+      ) : null}
     </div>
   );
 };

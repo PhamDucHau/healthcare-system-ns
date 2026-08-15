@@ -26,6 +26,7 @@ import {
   type OcrQualityResult,
 } from "@/lib/cccd-ocr";
 import type { PatientPortalDetail } from "@/types/patient-portal";
+import PatientRecordReviewActions from "@/components/patient-records/PatientRecordReviewActions";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -76,6 +77,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  canReview?: boolean;
 }
 
 const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
@@ -163,7 +165,7 @@ function ImageSlot({
   );
 }
 
-export default function AdminEditPatientDialog({ profileId, open, onClose, onSuccess }: Props) {
+export default function AdminEditPatientDialog({ profileId, open, onClose, onSuccess, canReview = false }: Props) {
   const [profile, setProfile] = useState<PatientPortalDetail | null>(null);
   const [idUrl, setIdUrl] = useState<string | null>(null);
   const [idBackUrl, setIdBackUrl] = useState<string | null>(null);
@@ -435,14 +437,31 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
           <Button variant="outline" onClick={onClose} disabled={saving}>Đóng</Button>
-          {form && (
-            <Button onClick={() => void handleSave()} disabled={saving || loading}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Lưu thay đổi
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {profile ? (
+              <PatientRecordReviewActions
+                patientId={profile.id}
+                status={profile.status}
+                canReview={canReview}
+                disabled={saving}
+                onSuccess={() => {
+                  onSuccess();
+                  if (!profileId) return;
+                  getPatientRecordById(supabase, profileId).then(({ record }) => {
+                    if (record) setProfile(record);
+                  });
+                }}
+              />
+            ) : null}
+            {form && (
+              <Button onClick={() => void handleSave()} disabled={saving || loading}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lưu thay đổi
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

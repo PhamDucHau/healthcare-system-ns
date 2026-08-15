@@ -1,5 +1,6 @@
 import { clientIp, writeAuditLog } from "../_shared/audit.ts";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
+import { setOtpEmailContext } from "../_shared/otp-email-context.ts";
 import {
   getRedis,
   OTP_TTL_SECONDS,
@@ -50,6 +51,11 @@ Deno.serve(async (req) => {
     const exists = await emailExists(email);
     if (exists) {
       const admin = getAdminClient();
+      await setOtpEmailContext(email, {
+        variant: "reset",
+        requestedAt: new Date().toISOString(),
+        ttlSeconds: OTP_TTL_SECONDS,
+      });
       const { error } = await admin.auth.signInWithOtp({
         email,
         options: { shouldCreateUser: false },

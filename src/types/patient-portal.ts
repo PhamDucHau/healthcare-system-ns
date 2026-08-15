@@ -1,3 +1,5 @@
+import { formatPatientProfileStatus } from "@/config/ui-labels";
+
 /** Maps `public.patient` rows for Provider Portal (onboarding profile data). */
 
 export type PatientPortalDetail = {
@@ -33,10 +35,15 @@ export type PatientPortalDetail = {
   submitted_at: string | null;
   updated_at: string | null;
   consent_accepted: boolean;
+  /** DB `patient.status`: DRAFT | UNVERIFIED | ACTIVE | INACTIVE | REJECTED */
+  status: PatientProfileStatus;
+  rejection_reason?: string | null;
 };
 
 /** Who created the patient profile (DB `patient.created_by_role`). */
 export type PatientCreatedByRole = "patient" | "doctor" | "nurse" | "admin";
+
+export type PatientProfileStatus = "DRAFT" | "UNVERIFIED" | "ACTIVE" | "INACTIVE" | "REJECTED";
 
 /** Row for staff patient-records table */
 export type PatientRecordListRow = {
@@ -51,7 +58,7 @@ export type PatientRecordListRow = {
   insurance_provider: string | null;
   submitted_at: string | null;
   updated_at: string | null;
-  status: "Đã nộp" | "Bản nháp";
+  status: string;
   created_by_role: PatientCreatedByRole | null;
 };
 
@@ -77,6 +84,20 @@ function parseCreatedByRole(value: unknown): PatientCreatedByRole | null {
   return null;
 }
 
+export function parsePatientProfileStatus(value: unknown): PatientProfileStatus {
+  const raw = value != null ? String(value).trim().toUpperCase() : "";
+  if (
+    raw === "ACTIVE" ||
+    raw === "UNVERIFIED" ||
+    raw === "DRAFT" ||
+    raw === "INACTIVE" ||
+    raw === "REJECTED"
+  ) {
+    return raw;
+  }
+  return "DRAFT";
+}
+
 export type PatientListItem = {
   id: string;
   full_name: string;
@@ -92,7 +113,7 @@ function buildFullName(
   idNumber?: string | null,
   email?: string | null,
 ): string {
-  const n = [first, last].filter((s) => s && String(s).trim()).join(" ");
+  const n = [last, first].filter((s) => s && String(s).trim()).join(" ");
   if (n.trim()) return n.trim();
   if (idNumber?.trim()) return `BN ${idNumber.trim()}`;
   if (email?.trim()) return email.trim();
@@ -141,6 +162,8 @@ export function mapPatientPortalRow(row: Record<string, unknown>): PatientPortal
     submitted_at: row.submitted_at != null ? String(row.submitted_at) : null,
     updated_at: row.updated_at != null ? String(row.updated_at) : null,
     consent_accepted: Boolean(row.consent_accepted),
+    status: parsePatientProfileStatus(row.status),
+    rejection_reason: row.rejection_reason != null ? String(row.rejection_reason) : null,
   };
 }
 
@@ -166,7 +189,7 @@ export function mapPatientRecordListRow(row: Record<string, unknown>): PatientRe
     insurance_provider: row.insurance_provider != null ? String(row.insurance_provider) : null,
     submitted_at,
     updated_at: row.updated_at != null ? String(row.updated_at) : null,
-    status: submitted_at ? "Đã nộp" : "Bản nháp",
+    status: formatPatientProfileStatus(parsePatientProfileStatus(row.status)),
     created_by_role: parseCreatedByRole(row.created_by_role),
   };
 }

@@ -1,4 +1,5 @@
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
+import { setOtpEmailContext } from "../_shared/otp-email-context.ts";
 import { trackPendingRegistration } from "../_shared/pending-registration.ts";
 import {
   getRedis,
@@ -60,6 +61,12 @@ Deno.serve(async (req) => {
     }
 
     await trackPendingRegistration(email);
+
+    await setOtpEmailContext(email, {
+      variant: "signup",
+      requestedAt: new Date().toISOString(),
+      ttlSeconds: OTP_TTL_SECONDS,
+    });
 
     return jsonResponse({
       message: "OK — client gọi signInWithOtp để gửi email OTP",

@@ -116,7 +116,7 @@ export async function fetchMyAppointments(): Promise<Appointment[]> {
 export async function fetchPatientProfile(userId: string) {
   const { data, error } = await supabase
     .from('patient')
-    .select('id, legal_first_name, legal_last_name, submitted_at')
+    .select('id, legal_first_name, legal_last_name, submitted_at, status')
     .eq('user_id', userId)
     .single();
 
@@ -126,6 +126,7 @@ export async function fetchPatientProfile(userId: string) {
     legal_first_name: string | null;
     legal_last_name: string | null;
     submitted_at: string | null;
+    status: string | null;
   };
 }
 
@@ -136,7 +137,7 @@ export function mapBookingError(message: string): string {
   if (message.includes('DUPLICATE_SESSION'))
     return 'Bạn đã có lịch trong buổi này (sáng/chiều). Vui lòng chọn buổi khác.';
   if (message.includes('PROFILE_UNVERIFIED'))
-    return 'Hồ sơ chưa được xác minh. Vui lòng hoàn tất onboarding trước.';
+    return 'Hồ sơ chưa được phê duyệt.';
   if (message.includes('PROFILE_NOT_FOUND'))
     return 'Không tìm thấy hồ sơ bệnh nhân.';
   if (message.includes('SLOT_IN_PAST'))

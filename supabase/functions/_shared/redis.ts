@@ -196,6 +196,13 @@ export function adminMfaCooldownKey(email: string) {
   return `admin:mfa:cooldown:${email.toLowerCase()}`;
 }
 
+/** Context for branded OTP emails (read by auth-send-email hook). */
+export const OTP_EMAIL_CTX_TTL_SECONDS = 60;
+
+export function otpEmailContextKey(email: string) {
+  return `otp:email:ctx:${email.toLowerCase()}`;
+}
+
 /** Patient DOB step-up verification */
 export const MAX_DOB_ATTEMPTS = 5;
 export const DOB_LOCK_TTL_SECONDS = 900;

@@ -3,6 +3,7 @@ import { FileUser, UserRoundPlus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import PatientRecordDetailPanel, { type PatientDocImageUrls } from "@/components/patient-records/PatientRecordDetailPanel";
+import { useAuth } from "@/hooks/use-auth";
 import { getPatientRecordById } from "@/lib/patient-records";
 import { supabase } from "@/lib/supabase";
 import type { PatientPortalDetail } from "@/types/patient-portal";
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export default function PatientRecordDialog({ profileId, open, onClose, onProfileResolved, onCreateProfile, nested = false }: Props) {
+  const { role } = useAuth();
+  const canReview = role === "admin";
   const [record, setRecord] = useState<PatientPortalDetail | null>(null);
   const [imageUrls, setImageUrls] = useState<PatientDocImageUrls>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -90,6 +93,16 @@ export default function PatientRecordDialog({ profileId, open, onClose, onProfil
             isLoading={isLoading}
             isError={isError}
             imageUrls={imageUrls}
+            canReview={canReview}
+            onReviewed={() => {
+              if (!profileId) return;
+              setIsLoading(true);
+              getPatientRecordById(supabase, profileId).then(({ record: r, error }) => {
+                setIsLoading(false);
+                if (error) { setIsError(true); return; }
+                setRecord(r);
+              });
+            }}
           />
         )}
 

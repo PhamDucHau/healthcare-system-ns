@@ -204,6 +204,7 @@ function demoToDetail(demo: DemoPatient): PatientPortalDetail {
     submitted_at: null,
     updated_at: null,
     consent_accepted: true,
+    status: "ACTIVE",
   };
 }
 
@@ -1329,6 +1330,7 @@ const ProviderPatientsPage = () => {
         onSuccess={() => {
           void queryClient.invalidateQueries({ queryKey: PATIENT_LIST_QUERY_KEY });
         }}
+        canReview={isAdmin}
       />
     </>
   );

@@ -1,6 +1,7 @@
 import { clientIp, clientUserAgent, writeAuditLog } from "../_shared/audit.ts";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
 import { sendAccountLockWarningEmail } from "../_shared/login-lock-email.ts";
+import { setOtpEmailContext } from "../_shared/otp-email-context.ts";
 import {
   ACCESS_TTL_BY_ROLE,
   isPortalType,
@@ -285,6 +286,24 @@ Deno.serve(async (req) => {
           retryAfter: retryAfter > 0 ? retryAfter : ADMIN_MFA_COOLDOWN_SECONDS,
         }, 429);
       }
+
+      const { data: nameRow } = await admin
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const fullName =
+        typeof nameRow?.full_name === "string" && nameRow.full_name.trim()
+          ? nameRow.full_name.trim()
+          : (email.split("@")[0] || "Admin");
+
+      await setOtpEmailContext(email, {
+        variant: "admin_mfa",
+        fullName,
+        ip,
+        requestedAt: new Date().toISOString(),
+        ttlSeconds: ADMIN_MFA_TTL_SECONDS,
+      });
 
       // Gửi OTP qua anon client — giống luồng signup
       const anonClient = getAnonClient();

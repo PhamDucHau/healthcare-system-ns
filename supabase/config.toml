@@ -22,6 +22,7 @@ port = 54323
 [inbucket]
 enabled = true
 port = 54324
+smtp_port = 54325
 
 [storage]
 enabled = true
@@ -55,6 +56,14 @@ enable_refresh_token_rotation = true
 enabled = true
 uri = "pg-functions://postgres/public/custom_access_token_hook"
 
+# Local only — GoTrue in Docker calls the edge function on the host.
+# On hosted, enable Send Email hook in Auth settings with the deployed function URL.
+# Dummy HMAC is for local docker; hosted must use the dashboard-generated secret.
+[auth.hook.send_email]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/auth-send-email"
+secrets = "v1,whsec_bG9jYWwtZGV2LXNlbmQtZW1haWwtaG9vay1zZWNyZXQtMzJieXRlcw=="
+
 [auth.email]
 enable_signup = true
 # OTP 6 số qua signInWithOtp (client), không dùng link Confirm signup
@@ -74,6 +83,9 @@ content_path = "./supabase/templates/invite.html"
 [auth.email.template.confirmation]
 subject = "Xác nhận email — Rcare Plus"
 content_path = "./supabase/templates/confirmation.html"
+
+[functions.auth-send-email]
+verify_jwt = false
 
 [functions.signup-send-otp]
 verify_jwt = false

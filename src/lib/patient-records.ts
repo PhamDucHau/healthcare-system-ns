@@ -7,10 +7,75 @@ import {
   type PatientRecordListRow,
 } from "@/types/patient-portal";
 
-const PATIENT_LIST_SELECT =
-  "id, user_id, legal_first_name, legal_last_name, date_of_birth, phone_number, email_address, id_number, member_id, insurance_provider, submitted_at, updated_at, created_by_role, created_at";
+/** Maps PostgREST/Postgres delete errors to user-facing Vietnamese copy. */
+export function mapPatientRecordDeleteError(message: string): string {
+  if (
+    message.includes("appointments_profile_id_fkey") ||
+    message.includes('on table "appointments"')
+  ) {
+    return "Không thể xóa hồ sơ vì bệnh nhân còn lịch hẹn. Vui lòng hủy hoặc xóa các lịch hẹn trước.";
+  }
+  if (message.includes("violates foreign key") || message.includes("23503")) {
+    return "Không thể xóa hồ sơ vì dữ liệu này đang được sử dụng ở nơi khác.";
+  }
+  return message;
+}
 
-export type PatientRecordStatusFilter = "all" | "submitted" | "draft";
+const PATIENT_LIST_SELECT =
+  "id, user_id, legal_first_name, legal_last_name, date_of_birth, phone_number, email_address, id_number, member_id, insurance_provider, submitted_at, updated_at, created_by_role, created_at, status";
+
+export type PatientRecordStatusFilter =
+  | "all"
+  | "active"
+  | "unverified"
+  | "draft"
+  | "inactive"
+  | "rejected";
+
+const STATUS_FILTER_TO_DB: Record<Exclude<PatientRecordStatusFilter, "all">, string> = {
+  active: "ACTIVE",
+  unverified: "UNVERIFIED",
+  draft: "DRAFT",
+  inactive: "INACTIVE",
+  rejected: "REJECTED",
+};
+
+export type PatientReviewAction = "approve" | "reject";
+
+/** Maps review RPC errors to user-facing Vietnamese copy. */
+export function mapPatientRecordReviewError(message: string): string {
+  if (message.includes("FORBIDDEN") || message.includes("UNAUTHORIZED")) {
+    return "Bạn không có quyền phê duyệt hồ sơ.";
+  }
+  if (message.includes("INVALID_STATUS")) {
+    return "Chỉ có thể duyệt hồ sơ đang ở trạng thái Đã nộp.";
+  }
+  if (message.includes("REASON_REQUIRED")) {
+    return "Vui lòng nhập lý do từ chối.";
+  }
+  if (message.includes("NOT_FOUND")) {
+    return "Không tìm thấy hồ sơ.";
+  }
+  return message;
+}
+
+export async function reviewPatientProfile(
+  supabase: SupabaseClient,
+  patientId: string,
+  action: PatientReviewAction,
+  reason?: string | null,
+): Promise<{ error: Error | null }> {
+  const { error } = await supabase.rpc("admin_review_patient_profile", {
+    p_patient_id: patientId,
+    p_action: action,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) {
+    return { error: new Error(mapPatientRecordReviewError(error.message)) };
+  }
+  return { error: null };
+}
+
 export type PatientRecordSortField = "full_name" | "date_of_birth" | "updated_at";
 export type PatientRecordSortDir = "asc" | "desc";
 
@@ -57,8 +122,6 @@ function buildPatientSearchOrFilter(search: string): string {
 function applyPatientListFilters<
   T extends {
     or: (filters: string) => T;
-    not: (column: string, operator: string, value: null) => T;
-    is: (column: string, value: null) => T;
     eq: (column: string, value: string) => T;
     gte: (column: string, value: string) => T;
     lte: (column: string, value: string) => T;
@@ -69,10 +132,8 @@ function applyPatientListFilters<
   if (search) {
     next = next.or(buildPatientSearchOrFilter(search));
   }
-  if (params.status === "submitted") {
-    next = next.not("submitted_at", "is", null);
-  } else if (params.status === "draft") {
-    next = next.is("submitted_at", null);
+  if (params.status && params.status !== "all") {
+    next = next.eq("status", STATUS_FILTER_TO_DB[params.status]);
   }
   if (params.createdByRole && params.createdByRole !== "all") {
     next = next.eq("created_by_role", params.createdByRole);
@@ -137,7 +198,8 @@ export async function searchPatientRecords(
   const page = Math.max(1, params.page ?? 1);
   const limit = Math.min(100, Math.max(1, params.limit ?? 10));
   const search = params.search?.trim() || null;
-  const status = params.status && params.status !== "all" ? params.status : null;
+  const status =
+    params.status && params.status !== "all" ? STATUS_FILTER_TO_DB[params.status] : null;
   const createdByRole =
     params.createdByRole && params.createdByRole !== "all" ? params.createdByRole : null;
 

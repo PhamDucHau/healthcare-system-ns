@@ -385,6 +385,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
         bhyt_five_year: e2n(form.bhytFiveYear),
         submitted_at: new Date().toISOString(),
         consent_accepted: true,
+        status: "ACTIVE",
         ...paths,
       }, { onConflict: "id" });
 

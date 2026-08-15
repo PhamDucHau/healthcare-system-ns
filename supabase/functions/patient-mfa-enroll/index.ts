@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
+import { setOtpEmailContext } from "../_shared/otp-email-context.ts";
 import {
   getRedis,
   otpLockKey,
@@ -57,6 +58,12 @@ Deno.serve(async (req) => {
       const retryAfter = await redis.ttl(otpLockKey(`mfa:${email}`));
       return jsonResponse({ error: "OTP_LOCKED", retryAfter: retryAfter > 0 ? retryAfter : OTP_TTL_SECONDS }, 429);
     }
+
+    await setOtpEmailContext(email, {
+      variant: "patient_mfa",
+      requestedAt: new Date().toISOString(),
+      ttlSeconds: OTP_TTL_SECONDS,
+    });
 
     return jsonResponse({
       message: "OK — client gọi signInWithOtp để gửi OTP bật 2FA",

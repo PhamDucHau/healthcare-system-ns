@@ -4,6 +4,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { analyzeTranscript, suggestIcd10 } from '@/lib/stt-nlp-api';
+import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
 import type {
   MedicalExamination,
   SoapIcdCode,
@@ -530,12 +531,34 @@ export type AiAccuracyStats = {
   doctor_edited_count: number;
   avg_ai_retention_pct: number;
   edit_rate_pct: number;
+  by_soap: AiAccuracySoapRow[];
+  by_doctor: AiAccuracyDoctorRow[];
 };
 
-export async function getAiAccuracyStats(): Promise<AiAccuracyStats> {
-  const { data, error } = await supabase.rpc('get_ai_accuracy_stats');
+export type AiAccuracyStatsFilters = {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  specialtyId?: string | null;
+};
+
+export async function getAiAccuracyStats(
+  filters: AiAccuracyStatsFilters = {},
+): Promise<AiAccuracyStats> {
+  const { data, error } = await supabase.rpc("get_ai_accuracy_stats", {
+    p_date_from: filters.dateFrom || null,
+    p_date_to: filters.dateTo || null,
+    p_specialty_id: filters.specialtyId || null,
+  });
   if (error) throw new Error(error.message);
-  return data as AiAccuracyStats;
+  const payload = (data ?? {}) as Partial<AiAccuracyStats>;
+  return {
+    total_signed_with_ai: Number(payload.total_signed_with_ai ?? 0),
+    doctor_edited_count: Number(payload.doctor_edited_count ?? 0),
+    avg_ai_retention_pct: Number(payload.avg_ai_retention_pct ?? 0),
+    edit_rate_pct: Number(payload.edit_rate_pct ?? 0),
+    by_soap: payload.by_soap ?? [],
+    by_doctor: payload.by_doctor ?? [],
+  };
 }
 
 function hashIcdCacheKey(sText: string, oText: string): string {
