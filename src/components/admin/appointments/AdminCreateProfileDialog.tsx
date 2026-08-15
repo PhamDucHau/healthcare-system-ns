@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import UploadCard from "@/components/onboarding/UploadCard";
+import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 import { supabase } from "@/lib/supabase";
 import {
   fetchOcrSingle,
@@ -95,6 +96,7 @@ export default function AdminCreateProfileDialog({
   const [ocrBackQuality, setOcrBackQuality] = useState<OcrQualityResult | null>(null);
   const [ocrBhytQuality, setOcrBhytQuality] = useState<OcrQualityResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
 
   const focusFirstEmptyCccdField = () => {
     const fields = ["idNumber", "expirationDate", "residentialAddress", "issuedDate", "issuer"];
@@ -138,6 +140,7 @@ export default function AdminCreateProfileDialog({
     setForm(empty);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
     setOcrFrontQuality(null); setOcrBackQuality(null); setOcrBhytQuality(null);
+    setLightbox(null);
     onClose();
   };
 
@@ -266,8 +269,29 @@ export default function AdminCreateProfileDialog({
   const hasAnyFile = Boolean(idFile || idBackFile || cardFile);
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v && !saving) handleClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto" hideOverlay={nested}>
+    <>
+    <Dialog open={open} onOpenChange={v => {
+      if (!v) {
+        if (lightbox) {
+          setLightbox(null);
+          return;
+        }
+        if (!saving) handleClose();
+      }
+    }}>
+      <DialogContent
+        className="max-h-[92vh] max-w-2xl overflow-y-auto"
+        hideOverlay={nested}
+        onPointerDownOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onFocusOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onInteractOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => {
+          if (lightbox) {
+            e.preventDefault();
+            setLightbox(null);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserRoundPlus className="h-5 w-5 text-primary" />
@@ -284,15 +308,18 @@ export default function AdminCreateProfileDialog({
               <UploadCard id="adm-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước"
                 file={idFile} onFileSelect={f => { setOcrFrontQuality(null); pickFile(f, setIdFile); }}
                 onOcr={() => runOcr("front")} isOcrRunning={ocrFront} ocrQuality={ocrFrontQuality}
-                onManualInput={focusFirstEmptyCccdField} />
+                onManualInput={focusFirstEmptyCccdField}
+                onPreview={(url, label) => setLightbox({ url, label })} />
               <UploadCard id="adm-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau"
                 file={idBackFile} onFileSelect={f => { setOcrBackQuality(null); pickFile(f, setIdBackFile); }}
                 onOcr={() => runOcr("back")} isOcrRunning={ocrBack} ocrQuality={ocrBackQuality}
-                onManualInput={focusFirstEmptyCccdField} />
+                onManualInput={focusFirstEmptyCccdField}
+                onPreview={(url, label) => setLightbox({ url, label })} />
               <UploadCard id="adm-card" title="Nhấn để tải lên" hint="Bảo hiểm y tế (BHYT)"
                 file={cardFile} onFileSelect={f => { setOcrBhytQuality(null); pickFile(f, setCardFile); }}
                 onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} ocrQuality={ocrBhytQuality}
-                onManualInput={focusFirstEmptyBhytField} />
+                onManualInput={focusFirstEmptyBhytField}
+                onPreview={(url, label) => setLightbox({ url, label })} />
             </div>
             <div className="mt-3 flex justify-end">
               <Button type="button" size="sm"
@@ -392,5 +419,13 @@ export default function AdminCreateProfileDialog({
         </div>
       </DialogContent>
     </Dialog>
+    {lightbox ? (
+      <DocImageLightbox
+        url={lightbox.url}
+        label={lightbox.label}
+        onClose={() => setLightbox(null)}
+      />
+    ) : null}
+    </>
   );
 }

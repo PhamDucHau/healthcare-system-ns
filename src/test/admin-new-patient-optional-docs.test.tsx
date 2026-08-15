@@ -72,6 +72,17 @@ describe("AdminNewPatientDialog optional document uploads", () => {
     expect(screen.getByText(/Thẻ BHYT \(tùy chọn\)/)).toBeInTheDocument();
   });
 
+  it("should show Vui lòng nhập under empty required fields and leave CCCD optional", () => {
+    render(<AdminNewPatientDialog open onClose={() => undefined} onSuccess={() => undefined} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
+
+    expect(screen.getAllByText("Vui lòng nhập").length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText("Bắt buộc")).not.toBeInTheDocument();
+    expect(document.querySelector('label[for="idNumber"]')?.textContent).toBe("Số CCCD");
+    expect(document.querySelector('label[for="legalLastName"]')?.textContent).toMatch(/Họ\s*\*/);
+  });
+
   it("should create a patient record when no CCCD or BHYT images are uploaded", async () => {
     const onSuccess = vi.fn();
     render(<AdminNewPatientDialog open onClose={() => undefined} onSuccess={onSuccess} />);
@@ -113,5 +124,25 @@ describe("AdminNewPatientDialog optional document uploads", () => {
     expect(labels).toEqual(["Nam", "Nữ"]);
     expect(labels).not.toContain("Khác");
     expect(labels.some((label) => label?.includes("Anh") || label?.includes("Chị"))).toBe(false);
+  });
+
+  it("should preview an uploaded document without closing the create dialog", () => {
+    const onClose = vi.fn();
+    render(<AdminNewPatientDialog open onClose={onClose} onSuccess={() => undefined} />);
+
+    const input = document.getElementById("new-id-front") as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { files: [new File(["img"], "front.jpg", { type: "image/jpeg" })] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" }));
+    expect(screen.getByRole("dialog", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" })).toHaveClass("pointer-events-auto");
+
+    fireEvent.click(screen.getByRole("button", { name: "Đóng xem ảnh" }));
+
+    expect(screen.queryByRole("dialog", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Tạo hồ sơ bệnh nhân mới/ })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

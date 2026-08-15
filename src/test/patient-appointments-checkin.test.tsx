@@ -6,10 +6,21 @@ import type { Appointment } from "@/types/appointment";
 
 const fetchMyAppointments = vi.fn();
 
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    session: { user: { id: "user-1" } },
+    role: "patient",
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/lib/appointment-api", () => ({
   fetchMyAppointments: (...args: unknown[]) => fetchMyAppointments(...args),
   cancelAppointment: vi.fn(),
   mapBookingError: (message: string) => message,
+  fetchPatientProfile: vi.fn(),
+  canPatientSelfBook: () => true,
+  bookingBlockedMessage: () => "",
 }));
 
 vi.mock("@/components/common/QrCodeDisplay", () => ({

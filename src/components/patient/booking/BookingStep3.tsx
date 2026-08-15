@@ -4,7 +4,13 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Calendar, Building2, Stethoscope, CheckCircle2, QrCode, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { bookAppointment, fetchPatientProfile, mapBookingError } from '@/lib/appointment-api';
+import {
+  bookAppointment,
+  bookingBlockedMessage,
+  canPatientSelfBook,
+  fetchPatientProfile,
+  mapBookingError,
+} from '@/lib/appointment-api';
 import { formatSlotTime } from '@/types/appointment';
 import type { Specialty, AppointmentSlot } from '@/types/appointment';
 import { useAuth } from '@/hooks/use-auth';
@@ -44,8 +50,8 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
   async function handleConfirm() {
     if (!profile) return;
 
-    if (profile.status !== 'ACTIVE') {
-      toast.error('Hồ sơ chưa được phê duyệt.');
+    if (!canPatientSelfBook(profile.status)) {
+      toast.error(bookingBlockedMessage());
       return;
     }
 
@@ -131,7 +137,7 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
         </label>
         <div className="rounded-xl border bg-card px-4 py-3 text-sm font-medium text-foreground flex items-center justify-between">
           <span>{profileName} (cá nhân)</span>
-          {!profile || profile.status !== 'ACTIVE' ? (
+          {!profile || !canPatientSelfBook(profile.status) ? (
             <span className="text-[10px] font-bold text-destructive uppercase">Chưa phê duyệt</span>
           ) : null}
         </div>
@@ -164,7 +170,7 @@ export default function BookingStep3({ specialty, date, slot }: Props) {
       <div className="flex flex-col gap-2 pt-1">
         <button
           onClick={handleConfirm}
-          disabled={submitting || profile?.status !== 'ACTIVE'}
+          disabled={submitting || !canPatientSelfBook(profile?.status)}
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? (

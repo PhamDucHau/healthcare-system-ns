@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, Loader2, Pencil, ScanLine, UploadCloud, UserRound } from "lucide-react";
+import { Eye, FileText, Loader2, Pencil, ScanLine, UploadCloud, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/cccd-ocr";
 import type { PatientPortalDetail } from "@/types/patient-portal";
 import PatientRecordReviewActions from "@/components/patient-records/PatientRecordReviewActions";
+import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -97,12 +98,13 @@ function F({ label, value, onChange, type = "text", placeholder, col2 }: {
 }
 
 function ImageSlot({
-  inputId, label, existingUrl, storagePath, newFile, onFileSelect, onOcr, ocrRunning,
+  inputId, label, existingUrl, storagePath, newFile, onFileSelect, onOcr, ocrRunning, onPreview,
 }: {
   inputId: string; label: string;
   existingUrl: string | null; storagePath: string | null;
   newFile: File | null; onFileSelect: (f: File | null) => void;
   onOcr?: () => void; ocrRunning?: boolean;
+  onPreview?: (url: string, label: string) => void;
 }) {
   const isPdf = (storagePath ?? "").toLowerCase().endsWith(".pdf");
   const [preview, setPreview] = useState("");
@@ -115,6 +117,7 @@ function ImageSlot({
   }, [newFile]);
 
   const displayUrl = preview || (!newFile ? existingUrl : null);
+  const canPreviewImage = Boolean(displayUrl) && !(isPdf && !newFile);
 
   return (
     <div className="overflow-hidden rounded-xl border">
@@ -145,6 +148,17 @@ function ImageSlot({
             <span className="text-xs">Chưa có ảnh</span>
           </div>
         )}
+
+        {canPreviewImage ? (
+          <button
+            type="button"
+            onClick={() => onPreview?.(displayUrl!, label)}
+            aria-label={`Xem ảnh ${label}`}
+            className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-foreground shadow hover:bg-white"
+          >
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : null}
 
         <label htmlFor={inputId}
           className="absolute bottom-2 right-2 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-foreground shadow hover:bg-white">
@@ -180,12 +194,14 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
   const [ocrBack, setOcrBack] = useState(false);
   const [ocrBhyt, setOcrBhyt] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
 
   // Load profile + signed URLs when opened
   useEffect(() => {
     if (!open || !profileId) return;
     setLoading(true);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
+    setLightbox(null);
 
     getPatientRecordById(supabase, profileId).then(async ({ record, error }) => {
       if (error || !record) { setLoading(false); return; }
@@ -318,8 +334,28 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
   };
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v && !saving) onClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
+    <>
+    <Dialog open={open} onOpenChange={v => {
+      if (!v) {
+        if (lightbox) {
+          setLightbox(null);
+          return;
+        }
+        if (!saving) onClose();
+      }
+    }}>
+      <DialogContent
+        className="max-h-[92vh] max-w-4xl overflow-y-auto"
+        onPointerDownOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onFocusOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onInteractOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => {
+          if (lightbox) {
+            e.preventDefault();
+            setLightbox(null);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5 text-primary" />
@@ -356,15 +392,18 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                 <ImageSlot inputId="edit-id-front" label="CCCD mặt trước"
                   existingUrl={idUrl} storagePath={profile?.id_document_storage_path ?? null}
                   newFile={idFile} onFileSelect={f => f && f.size <= MAX_SIZE ? setIdFile(f) : toast.error("File quá lớn")}
-                  onOcr={() => runOcr("front")} ocrRunning={ocrFront} />
+                  onOcr={() => runOcr("front")} ocrRunning={ocrFront}
+                  onPreview={(url, label) => setLightbox({ url, label })} />
                 <ImageSlot inputId="edit-id-back" label="CCCD mặt sau"
                   existingUrl={idBackUrl} storagePath={profile?.id_document_back_storage_path ?? null}
                   newFile={idBackFile} onFileSelect={f => f && f.size <= MAX_SIZE ? setIdBackFile(f) : toast.error("File quá lớn")}
-                  onOcr={() => runOcr("back")} ocrRunning={ocrBack} />
+                  onOcr={() => runOcr("back")} ocrRunning={ocrBack}
+                  onPreview={(url, label) => setLightbox({ url, label })} />
                 <ImageSlot inputId="edit-card" label="Thẻ BHYT"
                   existingUrl={cardUrl} storagePath={profile?.card_front_storage_path ?? null}
                   newFile={cardFile} onFileSelect={f => f && f.size <= MAX_SIZE ? setCardFile(f) : toast.error("File quá lớn")}
-                  onOcr={() => runOcr("bhyt")} ocrRunning={ocrBhyt} />
+                  onOcr={() => runOcr("bhyt")} ocrRunning={ocrBhyt}
+                  onPreview={(url, label) => setLightbox({ url, label })} />
               </div>
             </section>
 
@@ -463,5 +502,13 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
         </div>
       </DialogContent>
     </Dialog>
+    {lightbox ? (
+      <DocImageLightbox
+        url={lightbox.url}
+        label={lightbox.label}
+        onClose={() => setLightbox(null)}
+      />
+    ) : null}
+    </>
   );
 }

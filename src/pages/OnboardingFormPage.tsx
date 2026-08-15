@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ScanLine, ShieldCheck, XCircle } from "lucide-react";
+import { AlertTriangle, ScanLine, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import OnboardingActions from "@/components/onboarding/OnboardingActions";
 import UploadCard from "@/components/onboarding/UploadCard";
@@ -28,7 +28,12 @@ const fieldErrorClass = "border-destructive ring-1 ring-destructive/30";
 const FieldErr = ({ msg }: { msg?: string }) =>
   msg ? <p className="mt-1 text-xs text-destructive">{msg}</p> : null;
 
+const RequiredStar = () => (
+  <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>
+);
+
 const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+const REQUIRED_EMPTY = "Vui lòng nhập";
 
 const OnboardingFormPage = () => {
   const navigate = useNavigate();
@@ -256,14 +261,11 @@ const OnboardingFormPage = () => {
 
   const validateForm = (): boolean => {
     const { legalFirstName, legalLastName, dateOfBirth, phoneNumber, email } = data.personal;
-    const { idNumber, expirationDate, residentialAddress, issuedDate, issuer, idFileName, idBackFileName } = data.identity;
-    const { provider, memberId, groupNumber, cardFrontFileName } = data.insurance;
-    const R = "Trường này là bắt buộc.";
+    const { idNumber, expirationDate, residentialAddress, issuedDate, issuer } = data.identity;
+    const { provider, memberId, groupNumber } = data.insurance;
+    const R = REQUIRED_EMPTY;
 
     const errs: Record<string, string> = {};
-    if (!idFileName) errs.idFile = "Vui lòng tải ảnh CCCD mặt trước.";
-    if (!idBackFileName) errs.idBackFile = "Vui lòng tải ảnh CCCD mặt sau.";
-    if (!cardFrontFileName) errs.cardFrontFile = "Vui lòng tải ảnh thẻ BHYT.";
     if (!idNumber) errs.idNumber = R;
     if (!expirationDate) errs.expirationDate = R;
     if (!residentialAddress) errs.residentialAddress = R;
@@ -338,19 +340,19 @@ const OnboardingFormPage = () => {
         Chào mừng đến với Rcare Plus
       </h1>
       <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-        Tải ảnh CCCD và thẻ BHYT, chạy OCR (nếu có), điền thông tin và gửi một lần.
+        Có thể tải ảnh CCCD và thẻ BHYT để OCR, hoặc bỏ trống và nhập thông tin thủ công.
       </p>
 
       <section className="mt-8 rounded-2xl border bg-card p-5 md:p-6">
-        <h2 className="mb-2 text-lg font-semibold text-foreground">Tải ảnh giấy tờ</h2>
+        <h2 className="mb-2 text-lg font-semibold text-foreground">Tải ảnh giấy tờ để OCR (tùy chọn)</h2>
         <p className="mb-5 text-sm text-muted-foreground">
-          CCCD mặt trước, CCCD mặt sau và thẻ bảo hiểm y tế (BHYT).
+          Không bắt buộc. Có thể bỏ trống và nhập thông tin thủ công. Nếu tải ảnh, hệ thống sẽ tự động trích xuất thông tin.
         </p>
         <div className="grid gap-4 md:grid-cols-3">
           <UploadCard
             id="identityUploadFront"
             title="Nhấn để tải lên hoặc kéo thả"
-            hint="CCCD — mặt trước"
+            hint="CCCD — mặt trước (tùy chọn)"
             fileName={data.identity.idFileName}
             file={uploadFiles.idFile}
             onFileSelect={(f) => { clearFieldError("idFile"); setOcrFrontQuality(null); pickFile(f, (n) => updateIdentity({ idFileName: n }), setIdFile); }}
@@ -363,7 +365,7 @@ const OnboardingFormPage = () => {
           <UploadCard
             id="identityUploadBack"
             title="Nhấn để tải lên hoặc kéo thả"
-            hint="CCCD — mặt sau"
+            hint="CCCD — mặt sau (tùy chọn)"
             fileName={data.identity.idBackFileName}
             file={uploadFiles.idBackFile}
             onFileSelect={(f) => { clearFieldError("idBackFile"); setOcrBackQuality(null); pickFile(f, (n) => updateIdentity({ idBackFileName: n }), setIdBackFile); }}
@@ -376,7 +378,7 @@ const OnboardingFormPage = () => {
           <UploadCard
             id="insuranceFrontUpload"
             title="Nhấn để tải lên hoặc kéo thả"
-            hint="Bảo hiểm y tế (BHYT)"
+            hint="Bảo hiểm y tế (BHYT) (tùy chọn)"
             fileName={data.insurance.cardFrontFileName}
             file={uploadFiles.cardFrontFile}
             onFileSelect={(f) => { clearFieldError("cardFrontFile"); setOcrBhytQuality(null); pickFile(f, (n) => updateInsurance({ cardFrontFileName: n }), setCardFrontFile); }}
@@ -420,7 +422,7 @@ const OnboardingFormPage = () => {
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="idNumber" className={labelClass}>Số CCCD</label>
+            <label htmlFor="idNumber" className={labelClass}>Số CCCD<RequiredStar /></label>
             <input
               id="idNumber" type="text"
               value={data.identity.idNumber}
@@ -437,14 +439,14 @@ const OnboardingFormPage = () => {
             ) : <FieldErr msg={fieldErrors.idNumber} />}
           </div>
           <div>
-            <label htmlFor="expirationDate" className={labelClass}>Ngày hết hạn</label>
+            <label htmlFor="expirationDate" className={labelClass}>Ngày hết hạn<RequiredStar /></label>
             <input id="expirationDate" type="date" value={data.identity.expirationDate}
               onChange={(e) => { clearFieldError("expirationDate"); updateIdentity({ expirationDate: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.expirationDate ? fieldErrorClass : ""}`} />
             <FieldErr msg={fieldErrors.expirationDate} />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="residentialAddress" className={labelClass}>Địa chỉ thường trú</label>
+            <label htmlFor="residentialAddress" className={labelClass}>Địa chỉ thường trú<RequiredStar /></label>
             <input id="residentialAddress" type="text" value={data.identity.residentialAddress}
               onChange={(e) => { clearFieldError("residentialAddress"); updateIdentity({ residentialAddress: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.residentialAddress ? fieldErrorClass : ""}`}
@@ -452,14 +454,14 @@ const OnboardingFormPage = () => {
             <FieldErr msg={fieldErrors.residentialAddress} />
           </div>
           <div>
-            <label htmlFor="issuedDate" className={labelClass}>Ngày cấp</label>
+            <label htmlFor="issuedDate" className={labelClass}>Ngày cấp<RequiredStar /></label>
             <input id="issuedDate" type="date" value={data.identity.issuedDate}
               onChange={(e) => { clearFieldError("issuedDate"); updateIdentity({ issuedDate: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.issuedDate ? fieldErrorClass : ""}`} />
             <FieldErr msg={fieldErrors.issuedDate} />
           </div>
           <div>
-            <label htmlFor="issuer" className={labelClass}>Nơi cấp</label>
+            <label htmlFor="issuer" className={labelClass}>Nơi cấp<RequiredStar /></label>
             <input id="issuer" type="text" value={data.identity.issuer}
               onChange={(e) => { clearFieldError("issuer"); updateIdentity({ issuer: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.issuer ? fieldErrorClass : ""}`}
@@ -473,7 +475,7 @@ const OnboardingFormPage = () => {
         <h2 className="mb-4 text-lg font-semibold text-foreground">Thông tin cá nhân</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="legalFirstName" className={labelClass}>Họ (theo giấy tờ)</label>
+            <label htmlFor="legalFirstName" className={labelClass}>Họ (theo giấy tờ)<RequiredStar /></label>
             <input
               id="legalFirstName" type="text"
               value={data.personal.legalFirstName}
@@ -488,7 +490,7 @@ const OnboardingFormPage = () => {
             <FieldErr msg={fieldErrors.legalFirstName} />
           </div>
           <div>
-            <label htmlFor="legalLastName" className={labelClass}>Tên (theo giấy tờ)</label>
+            <label htmlFor="legalLastName" className={labelClass}>Tên (theo giấy tờ)<RequiredStar /></label>
             <input
               id="legalLastName" type="text"
               value={data.personal.legalLastName}
@@ -503,7 +505,7 @@ const OnboardingFormPage = () => {
             <FieldErr msg={fieldErrors.legalLastName} />
           </div>
           <div>
-            <label htmlFor="dateOfBirth" className={labelClass}>Ngày sinh</label>
+            <label htmlFor="dateOfBirth" className={labelClass}>Ngày sinh<RequiredStar /></label>
             <input
               id="dateOfBirth" type="date"
               value={data.personal.dateOfBirth}
@@ -517,7 +519,7 @@ const OnboardingFormPage = () => {
             <FieldErr msg={fieldErrors.dateOfBirth} />
           </div>
           <div>
-            <label htmlFor="phoneNumber" className={labelClass}>Số điện thoại</label>
+            <label htmlFor="phoneNumber" className={labelClass}>Số điện thoại<RequiredStar /></label>
             <input
               id="phoneNumber" type="tel"
               value={data.personal.phoneNumber}
@@ -550,7 +552,7 @@ const OnboardingFormPage = () => {
             </div>
           ) : null}
           <div className="md:col-span-2">
-            <label htmlFor="emailAddress" className={labelClass}>Địa chỉ Email</label>
+            <label htmlFor="emailAddress" className={labelClass}>Địa chỉ Email<RequiredStar /></label>
             <input id="emailAddress" type="email" value={data.personal.email}
               onChange={(e) => { clearFieldError("email"); updatePersonal({ email: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.email ? fieldErrorClass : ""}`}
@@ -583,7 +585,7 @@ const OnboardingFormPage = () => {
         <h2 className="mb-4 text-lg font-semibold text-foreground">Thông tin bảo hiểm</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label htmlFor="insuranceProvider" className={labelClass}>Đơn vị bảo hiểm</label>
+            <label htmlFor="insuranceProvider" className={labelClass}>Đơn vị bảo hiểm<RequiredStar /></label>
             <input id="insuranceProvider" type="text" value={data.insurance.provider}
               onChange={(e) => { clearFieldError("provider"); updateInsurance({ provider: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.provider ? fieldErrorClass : ""}`}
@@ -591,7 +593,7 @@ const OnboardingFormPage = () => {
             <FieldErr msg={fieldErrors.provider} />
           </div>
           <div>
-            <label htmlFor="memberId" className={labelClass}>Số thẻ BHYT</label>
+            <label htmlFor="memberId" className={labelClass}>Số thẻ BHYT<RequiredStar /></label>
             <input id="memberId" type="text" value={data.insurance.memberId}
               onChange={(e) => { clearFieldError("memberId"); updateInsurance({ memberId: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.memberId ? fieldErrorClass : ""}`}
@@ -599,7 +601,7 @@ const OnboardingFormPage = () => {
             <FieldErr msg={fieldErrors.memberId} />
           </div>
           <div>
-            <label htmlFor="groupNumber" className={labelClass}>Mã nhóm</label>
+            <label htmlFor="groupNumber" className={labelClass}>Mã nhóm<RequiredStar /></label>
             <input id="groupNumber" type="text" value={data.insurance.groupNumber}
               onChange={(e) => { clearFieldError("groupNumber"); updateInsurance({ groupNumber: e.target.value }); }}
               className={`${fieldClass} ${fieldErrors.groupNumber ? fieldErrorClass : ""}`}
@@ -658,14 +660,10 @@ const OnboardingFormPage = () => {
         <div>
           <label htmlFor="privacyConsent" className="cursor-pointer text-sm text-muted-foreground">
             Tôi xác nhận tất cả thông tin đã cung cấp là chính xác và đồng ý cho phép xử lý dữ liệu an toàn để phục vụ công tác chăm sóc sức khỏe.
+            <RequiredStar />
           </label>
           <FieldErr msg={fieldErrors.privacy} />
         </div>
-      </div>
-
-      <div className="mt-4 flex items-center gap-2 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
-        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-        Sẵn sàng gửi hồ sơ khi đã tải đủ 3 ảnh và xác nhận đồng ý.
       </div>
 
       {errorMessage ? (

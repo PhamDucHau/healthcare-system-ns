@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import TopNav from '@/components/TopNav';
 import Sidebar from '@/components/Sidebar';
 import BookingStep1 from '@/components/patient/booking/BookingStep1';
 import BookingStep2 from '@/components/patient/booking/BookingStep2';
 import BookingStep3 from '@/components/patient/booking/BookingStep3';
 import type { Specialty, AppointmentSlot } from '@/types/appointment';
+import { useAuth } from '@/hooks/use-auth';
+import {
+  bookingBlockedMessage,
+  canPatientSelfBook,
+  fetchPatientProfile,
+} from '@/lib/appointment-api';
 
 type BookingState = {
   specialty: Specialty | null;
@@ -18,12 +24,30 @@ const STEPS = ['Chuyên khoa', 'Ngày & Giờ', 'Xác nhận'];
 
 const BookAppointment = () => {
   const navigate = useNavigate();
+  const { session, isLoading: authLoading } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [booking, setBooking] = useState<BookingState>({
     specialty: null,
     date: null,
     slot: null,
   });
+  const [profileStatus, setProfileStatus] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!session?.user.id) {
+      setProfileStatus(null);
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    fetchPatientProfile(session.user.id)
+      .then((profile) => setProfileStatus(profile?.status ?? null))
+      .finally(() => setProfileLoading(false));
+  }, [session?.user.id, authLoading]);
+
+  const canBook = canPatientSelfBook(profileStatus);
 
   function handleSpecialtySelected(specialty: Specialty) {
     setBooking((b) => ({ ...b, specialty }));
@@ -94,25 +118,39 @@ const BookAppointment = () => {
             </div>
 
             <div className="mt-6">
-              {step === 1 && (
-                <BookingStep1 onSelect={handleSpecialtySelected} />
+              {profileLoading || authLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : !canBook ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+                  <p className="text-sm font-medium text-foreground">
+                    {bookingBlockedMessage()}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {step === 1 && (
+                    <BookingStep1 onSelect={handleSpecialtySelected} />
+                  )}
+                  {step === 2 && booking.specialty && (
+                    <BookingStep2
+                      specialty={booking.specialty}
+                      onSelect={handleDateSlotSelected}
+                    />
+                  )}
+                  {step === 3 &&
+                    booking.specialty &&
+                    booking.date &&
+                    booking.slot && (
+                      <BookingStep3
+                        specialty={booking.specialty}
+                        date={booking.date}
+                        slot={booking.slot}
+                      />
+                    )}
+                </>
               )}
-              {step === 2 && booking.specialty && (
-                <BookingStep2
-                  specialty={booking.specialty}
-                  onSelect={handleDateSlotSelected}
-                />
-              )}
-              {step === 3 &&
-                booking.specialty &&
-                booking.date &&
-                booking.slot && (
-                  <BookingStep3
-                    specialty={booking.specialty}
-                    date={booking.date}
-                    slot={booking.slot}
-                  />
-                )}
             </div>
           </div>
         </main>

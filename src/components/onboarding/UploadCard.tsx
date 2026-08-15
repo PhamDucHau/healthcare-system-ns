@@ -1,9 +1,10 @@
 import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Camera, Edit3, ScanLine, UploadCloud } from "lucide-react";
+import { AlertTriangle, Camera, Edit3, Eye, ScanLine, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { OcrQualityResult } from "@/lib/cccd-ocr";
 import { ID_IMAGE_TYPE_ERROR, isAllowedIdImageFile } from "@/lib/id-image-upload";
+import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +27,9 @@ type UploadCardProps = {
   ocrQuality?: OcrQualityResult | null;
   onManualInput?: () => void;
   error?: string;
+  required?: boolean;
   className?: string;
+  onPreview?: (url: string, label: string) => void;
 };
 
 const UploadCard = ({
@@ -41,18 +44,22 @@ const UploadCard = ({
   ocrQuality,
   onManualInput,
   error,
+  required = false,
   className,
+  onPreview,
 }: UploadCardProps) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [hovered, setHovered] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
   const [typeErrorOpen, setTypeErrorOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const isImageFile = useMemo(() => Boolean(file?.type.startsWith("image/")), [file]);
   const displayError = typeError ?? error;
 
   useEffect(() => {
     if (!file || !isImageFile) {
       setPreviewUrl("");
+      setLightboxOpen(false);
       return;
     }
 
@@ -115,6 +122,14 @@ const UploadCard = ({
     }
   };
 
+  const handlePreviewClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!previewUrl) return;
+    if (onPreview) onPreview(previewUrl, hint);
+    else setLightboxOpen(true);
+  };
+
   const isLowQuality = ocrQuality?.isLowQuality ?? false;
 
   return (
@@ -156,7 +171,10 @@ const UploadCard = ({
           </span>
         )}
         <p className="text-base font-semibold text-foreground">{title}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {hint}
+          {required ? <span className="ml-0.5 text-destructive" aria-hidden="true">*</span> : null}
+        </p>
         <p className="mt-3 text-xs text-muted-foreground">
           Chỉ chấp nhận file ảnh (JPG, PNG) — tối đa 10MB
         </p>
@@ -202,6 +220,17 @@ const UploadCard = ({
         </div>
       ) : null}
 
+      {previewUrl ? (
+        <button
+          type="button"
+          onClick={handlePreviewClick}
+          aria-label={`Xem ảnh ${hint}`}
+          className="absolute bottom-3 left-3 flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-foreground shadow hover:bg-white"
+        >
+          <Eye className="h-4 w-4" aria-hidden="true" />
+        </button>
+      ) : null}
+
       {onOcr && file && (hovered || isOcrRunning) && !isLowQuality ? (
         <button
           type="button"
@@ -218,6 +247,14 @@ const UploadCard = ({
           <ScanLine className={cn("h-3.5 w-3.5", isOcrRunning && "animate-spin")} aria-hidden="true" />
           {isOcrRunning ? "Đang đọc…" : "OCR"}
         </button>
+      ) : null}
+
+      {lightboxOpen && previewUrl && !onPreview ? (
+        <DocImageLightbox
+          url={previewUrl}
+          label={hint}
+          onClose={() => setLightboxOpen(false)}
+        />
       ) : null}
 
       <AlertDialog open={typeErrorOpen} onOpenChange={setTypeErrorOpen}>

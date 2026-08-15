@@ -9,7 +9,15 @@ import QrCodeDisplay from '@/components/common/QrCodeDisplay';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { fetchMyAppointments, cancelAppointment, mapBookingError } from '@/lib/appointment-api';
+import {
+  fetchMyAppointments,
+  cancelAppointment,
+  mapBookingError,
+  fetchPatientProfile,
+  canPatientSelfBook,
+  bookingBlockedMessage,
+} from '@/lib/appointment-api';
+import { useAuth } from '@/hooks/use-auth';
 import {
   STATUS_LABELS, STATUS_COLORS, formatSlotTime,
   type Appointment, type AppointmentStatus,
@@ -20,6 +28,7 @@ const PAST_STATUSES:   AppointmentStatus[] = ['COMPLETED', 'CANCELLED', 'NO_SHOW
 
 export default function AppointmentsContent() {
   const navigate = useNavigate();
+  const { session, isLoading: authLoading } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -30,6 +39,21 @@ export default function AppointmentsContent() {
       .catch((e: Error) => toast.error(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleBookClick() {
+    if (authLoading) return;
+    const userId = session?.user.id;
+    if (!userId) {
+      toast.error(bookingBlockedMessage());
+      return;
+    }
+    const profile = await fetchPatientProfile(userId);
+    if (!canPatientSelfBook(profile?.status)) {
+      toast.error(bookingBlockedMessage());
+      return;
+    }
+    navigate('/appointments/book');
+  }
 
   async function handleCancel(id: string) {
     setCancelling(id);
@@ -63,7 +87,7 @@ export default function AppointmentsContent() {
           </div>
           {!loading && upcoming.length > 0 && (
             <Button
-              onClick={() => navigate('/appointments/book')}
+              onClick={() => void handleBookClick()}
               className="mt-4 sm:mt-0"
             >
               <Plus className="h-4 w-4" />
@@ -83,7 +107,7 @@ export default function AppointmentsContent() {
               {upcoming.length === 0 ? (
                 <EmptyState
                   message="Bạn chưa có lịch hẹn nào."
-                  action={{ label: 'Đặt lịch ngay', onClick: () => navigate('/appointments/book') }}
+                  action={{ label: 'Đặt lịch ngay', onClick: () => void handleBookClick() }}
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

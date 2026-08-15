@@ -72,4 +72,23 @@ describe("UploadCard file type validation (PAT-PRP-005)", () => {
     expect(toastError).not.toHaveBeenCalled();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
+
+  it("should show an eye preview after a JPG is selected", () => {
+    const jpg = new File(["img"], "front.jpg", { type: "image/jpeg" });
+    render(
+      <UploadCard
+        id="identityUploadFront"
+        title="Nhấn để tải lên"
+        hint="CCCD — mặt trước (tùy chọn)"
+        file={jpg}
+        onFileSelect={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" }));
+    expect(screen.getByRole("dialog", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Đóng xem ảnh" }));
+    expect(screen.queryByRole("dialog", { name: "Xem ảnh CCCD — mặt trước (tùy chọn)" })).not.toBeInTheDocument();
+  });
 });

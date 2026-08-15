@@ -17,37 +17,36 @@ export async function submitPatientProfile(
   form: OnboardingFormData,
   files: PatientOnboardingUploadFiles,
 ): Promise<{ error: Error | null }> {
-  if (!files.idFile || !files.idBackFile || !files.cardFrontFile) {
-    return {
-      error: new Error(
-        "Missing uploads. Go back and re-select both sides of your ID and your insurance card.",
-      ),
-    };
+  const ts = Date.now();
+  let idPath: string | null = null;
+  let idBackPath: string | null = null;
+  let frontPath: string | null = null;
+
+  if (files.idFile) {
+    idPath = `${userId}/id_front_${ts}_${sanitizeStorageSegment(files.idFile.name)}`;
+    const { error } = await supabase.storage.from("identity-documents").upload(idPath, files.idFile, {
+      upsert: true,
+      cacheControl: "3600",
+    });
+    if (error) return { error: new Error(error.message) };
   }
 
-  const ts = Date.now();
-  const idPath = `${userId}/id_front_${ts}_${sanitizeStorageSegment(files.idFile.name)}`;
-  const idBackPath = `${userId}/id_back_${ts}_${sanitizeStorageSegment(files.idBackFile.name)}`;
-  const frontPath = `${userId}/card_front_${ts}_${sanitizeStorageSegment(files.cardFrontFile.name)}`;
+  if (files.idBackFile) {
+    idBackPath = `${userId}/id_back_${ts}_${sanitizeStorageSegment(files.idBackFile.name)}`;
+    const { error } = await supabase.storage.from("identity-documents").upload(idBackPath, files.idBackFile, {
+      upsert: true,
+      cacheControl: "3600",
+    });
+    if (error) return { error: new Error(error.message) };
+  }
 
-  const [idUpload, idBackUpload, frontUpload] = await Promise.all([
-    supabase.storage.from("identity-documents").upload(idPath, files.idFile, {
+  if (files.cardFrontFile) {
+    frontPath = `${userId}/card_front_${ts}_${sanitizeStorageSegment(files.cardFrontFile.name)}`;
+    const { error } = await supabase.storage.from("insurance-cards").upload(frontPath, files.cardFrontFile, {
       upsert: true,
       cacheControl: "3600",
-    }),
-    supabase.storage.from("identity-documents").upload(idBackPath, files.idBackFile, {
-      upsert: true,
-      cacheControl: "3600",
-    }),
-    supabase.storage.from("insurance-cards").upload(frontPath, files.cardFrontFile, {
-      upsert: true,
-      cacheControl: "3600",
-    }),
-  ]);
-
-  const uploadErr = idUpload.error ?? idBackUpload.error ?? frontUpload.error;
-  if (uploadErr) {
-    return { error: new Error(uploadErr.message) };
+    });
+    if (error) return { error: new Error(error.message) };
   }
 
   const submittedAt = new Date().toISOString();

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import UploadCard from "@/components/onboarding/UploadCard";
+import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 import DuplicatePatientAlert from "@/components/common/DuplicatePatientAlert";
 import { supabase } from "@/lib/supabase";
 import { createAdminUser, listAdminRoles } from "@/lib/admin-api";
@@ -78,7 +79,7 @@ function F({ id, label, value, onChange, type = "text", placeholder, col2, requi
 }) {
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
-      <label htmlFor={id} className={lc}>{label}{required && <span className="text-destructive ml-0.5">*</span>}</label>
+      <label htmlFor={id} className={lc}>{label}{required && <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>}</label>
       <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder} className={`${fc} ${error ? fc_err : ""}`} />
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
@@ -128,6 +129,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
     setTimeout(() => first?.focus(), 100);
   };
   const [saving, setSaving] = useState(false);
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [dupResult, setDupResult] = useState<DupCheckResult | null>(null);
   const [dupBypassed, setDupBypassed] = useState(false);
@@ -148,6 +150,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
     setDupResult(null); setDupBypassed(false);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
     setOcrFrontQuality(null); setOcrBackQuality(null); setOcrBhytQuality(null);
+    setLightbox(null);
     onClose();
   };
 
@@ -204,10 +207,10 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
 
   const validate = (): boolean => {
     const errs: Partial<Record<keyof FormData, string>> = {};
-    if (!form.legalLastName.trim()) errs.legalLastName = "Bắt buộc";
-    if (!form.legalFirstName.trim()) errs.legalFirstName = "Bắt buộc";
-    if (!form.dateOfBirth.trim()) errs.dateOfBirth = "Bắt buộc";
-    if (!form.phoneNumber.trim()) errs.phoneNumber = "Bắt buộc";
+    if (!form.legalLastName.trim()) errs.legalLastName = "Vui lòng nhập";
+    if (!form.legalFirstName.trim()) errs.legalFirstName = "Vui lòng nhập";
+    if (!form.dateOfBirth.trim()) errs.dateOfBirth = "Vui lòng nhập";
+    if (!form.phoneNumber.trim()) errs.phoneNumber = "Vui lòng nhập";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -413,8 +416,29 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   const hasAnyFile = Boolean(idFile || idBackFile || cardFile);
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v && !saving) handleClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto" hideOverlay={nested}>
+    <>
+    <Dialog open={open} onOpenChange={v => {
+      if (!v) {
+        if (lightbox) {
+          setLightbox(null);
+          return;
+        }
+        if (!saving) handleClose();
+      }
+    }}>
+      <DialogContent
+        className="max-h-[92vh] max-w-4xl overflow-y-auto"
+        hideOverlay={nested}
+        onPointerDownOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onFocusOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onInteractOutside={(e) => { if (lightbox) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => {
+          if (lightbox) {
+            e.preventDefault();
+            setLightbox(null);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserRoundPlus className="h-5 w-5 text-primary" />
@@ -433,15 +457,18 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               <UploadCard id="new-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước (tùy chọn)"
                 file={idFile} onFileSelect={f => { setOcrFrontQuality(null); pickFile(f, setIdFile); }}
                 onOcr={() => runOcr("front")} isOcrRunning={ocrFront} ocrQuality={ocrFrontQuality}
-                onManualInput={focusFirstEmptyCccdField} />
+                onManualInput={focusFirstEmptyCccdField}
+                onPreview={(url, label) => setLightbox({ url, label })} />
               <UploadCard id="new-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau (tùy chọn)"
                 file={idBackFile} onFileSelect={f => { setOcrBackQuality(null); pickFile(f, setIdBackFile); }}
                 onOcr={() => runOcr("back")} isOcrRunning={ocrBack} ocrQuality={ocrBackQuality}
-                onManualInput={focusFirstEmptyCccdField} />
+                onManualInput={focusFirstEmptyCccdField}
+                onPreview={(url, label) => setLightbox({ url, label })} />
               <UploadCard id="new-card" title="Nhấn để tải lên" hint="Thẻ BHYT (tùy chọn)"
                 file={cardFile} onFileSelect={f => { setOcrBhytQuality(null); pickFile(f, setCardFile); }}
                 onOcr={() => runOcr("bhyt")} isOcrRunning={ocrBhyt} ocrQuality={ocrBhytQuality}
-                onManualInput={focusFirstEmptyBhytField} />
+                onManualInput={focusFirstEmptyBhytField}
+                onPreview={(url, label) => setLightbox({ url, label })} />
             </div>
             <div className="mt-3 flex justify-end">
               <Button type="button" size="sm" disabled={ocrRunning || !hasAnyFile}
@@ -556,5 +583,13 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
         </div>
       </DialogContent>
     </Dialog>
+    {lightbox ? (
+      <DocImageLightbox
+        url={lightbox.url}
+        label={lightbox.label}
+        onClose={() => setLightbox(null)}
+      />
+    ) : null}
+    </>
   );
 }

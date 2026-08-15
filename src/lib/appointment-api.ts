@@ -130,6 +130,17 @@ export async function fetchPatientProfile(userId: string) {
   };
 }
 
+export const BOOKING_BLOCKED_MESSAGE =
+  'Hồ sơ của bạn đang chờ xác minh, vui lòng chờ...';
+
+export function canPatientSelfBook(status: string | null | undefined): boolean {
+  return status === 'ACTIVE';
+}
+
+export function bookingBlockedMessage(): string {
+  return BOOKING_BLOCKED_MESSAGE;
+}
+
 /** Maps Supabase RPC error codes to user-facing messages */
 export function mapBookingError(message: string): string {
   if (message.includes('SLOT_UNAVAILABLE'))
@@ -137,7 +148,7 @@ export function mapBookingError(message: string): string {
   if (message.includes('DUPLICATE_SESSION'))
     return 'Bạn đã có lịch trong buổi này (sáng/chiều). Vui lòng chọn buổi khác.';
   if (message.includes('PROFILE_UNVERIFIED'))
-    return 'Hồ sơ chưa được phê duyệt.';
+    return bookingBlockedMessage();
   if (message.includes('PROFILE_NOT_FOUND'))
     return 'Không tìm thấy hồ sơ bệnh nhân.';
   if (message.includes('SLOT_IN_PAST'))
