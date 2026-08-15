@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
-  Calendar, Plus, Loader2, QrCode, XCircle, Stethoscope, ClipboardList, CheckCircle2,
+  Calendar, Plus, Loader2, XCircle, Stethoscope, ClipboardList, CheckCircle2,
 } from 'lucide-react';
-import CheckinButton from '@/components/patient/booking/CheckinButton';
 import QrCodeDisplay from '@/components/common/QrCodeDisplay';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -200,16 +199,6 @@ function UpcomingCard({
       {/* Actions */}
       {apt.status === 'CONFIRMED' && (
         <div className="flex items-center gap-4 flex-wrap">
-          {/* Check-in button — only shown for today's appointments */}
-          <CheckinButton
-            appointmentId={apt.id}
-            slotDate={apt.slot_date}
-            status={apt.status}
-            onCheckedIn={() => {
-              // Optimistically update status in the list
-            }}
-          />
-
           {/* Pre-consultation */}
           <button
             onClick={() => navigate(`/appointments/${apt.id}/pre-consultation`)}

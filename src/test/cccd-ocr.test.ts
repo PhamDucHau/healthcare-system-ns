@@ -7,7 +7,32 @@ import {
   mergeOcrFillEmpty,
   checkCccdOcrQuality,
   checkBhytOcrQuality,
+  normalizeOcrGender,
 } from "@/lib/cccd-ocr";
+
+describe("normalizeOcrGender", () => {
+  it("should map Nam and male to Nam", () => {
+    expect(normalizeOcrGender("Nam")).toBe("Nam");
+    expect(normalizeOcrGender("male")).toBe("Nam");
+    expect(normalizeOcrGender("m")).toBe("Nam");
+  });
+
+  it("should map Nữ and female to Nữ", () => {
+    expect(normalizeOcrGender("Nữ")).toBe("Nữ");
+    expect(normalizeOcrGender("nu")).toBe("Nữ");
+    expect(normalizeOcrGender("female")).toBe("Nữ");
+  });
+
+  it("should return empty when OCR gender is khác or other", () => {
+    expect(normalizeOcrGender("khác")).toBe("");
+    expect(normalizeOcrGender("khac")).toBe("");
+    expect(normalizeOcrGender("other")).toBe("");
+  });
+
+  it("should return empty for unrecognized gender text", () => {
+    expect(normalizeOcrGender("unknown")).toBe("");
+  });
+});
 
 describe("isOcrTargetFieldEmpty", () => {
   it("treats empty and whitespace as empty", () => {
@@ -135,6 +160,31 @@ describe("applyBhytParsedFillEmpty", () => {
     expect(result.memberId).toBe("DN1234567890");
     expect(result.bhytName).toBe("LÊ THỊ THU VÂN");
     expect(result.bhytDob).toBe("1989-03-21");
+  });
+
+  it("fills empty bhytAddress from OCR address when kcb is also present", () => {
+    const current = {
+      provider: "",
+      bhytKcb: "",
+      bhytAddress: "",
+    };
+    const result = applyBhytParsedFillEmpty(current, {
+      address: "Công ty TNHH Trung tâm y khoa Hợp Nhân",
+      kcb: "Phòng khám đa khoa (thuộc CN1 - Cty TNHH TTYK Hợp Nhân)",
+    });
+    expect(result.bhytAddress).toBe("Công ty TNHH Trung tâm y khoa Hợp Nhân");
+    expect(result.bhytKcb).toBe("Phòng khám đa khoa (thuộc CN1 - Cty TNHH TTYK Hợp Nhân)");
+    expect(result.provider).toBe("Phòng khám đa khoa (thuộc CN1 - Cty TNHH TTYK Hợp Nhân)");
+  });
+
+  it("does not overwrite existing bhytAddress", () => {
+    const current = {
+      bhytAddress: "Đơn vị đã nhập",
+    };
+    const result = applyBhytParsedFillEmpty(current, {
+      address: "Công ty TNHH Trung tâm y khoa Hợp Nhân",
+    });
+    expect(result.bhytAddress).toBe("Đơn vị đã nhập");
   });
 });
 

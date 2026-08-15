@@ -342,9 +342,8 @@ export default function AdminCreateProfileDialog({
                     <SelectValue placeholder="Chọn giới tính" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Nam">Anh / Nam</SelectItem>
-                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
-                    <SelectItem value="Khác">Khác</SelectItem>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -369,9 +368,8 @@ export default function AdminCreateProfileDialog({
                     <SelectValue placeholder="Chọn giới tính" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Nam">Anh / Nam</SelectItem>
-                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
-                    <SelectItem value="Khác">Khác</SelectItem>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,7 +1,18 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Camera, Edit3, ScanLine, UploadCloud } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { OcrQualityResult } from "@/lib/cccd-ocr";
+import { ID_IMAGE_TYPE_ERROR, isAllowedIdImageFile } from "@/lib/id-image-upload";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type UploadCardProps = {
   id: string;
@@ -34,7 +45,10 @@ const UploadCard = ({
 }: UploadCardProps) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [hovered, setHovered] = useState(false);
+  const [typeError, setTypeError] = useState<string | null>(null);
+  const [typeErrorOpen, setTypeErrorOpen] = useState(false);
   const isImageFile = useMemo(() => Boolean(file?.type.startsWith("image/")), [file]);
+  const displayError = typeError ?? error;
 
   useEffect(() => {
     if (!file || !isImageFile) {
@@ -47,9 +61,42 @@ const UploadCard = ({
     return () => URL.revokeObjectURL(objectUrl);
   }, [file, isImageFile]);
 
+  const acceptFile = (selectedFile: File | null) => {
+    if (!selectedFile) {
+      onFileSelect(null);
+      return false;
+    }
+    if (!isAllowedIdImageFile(selectedFile)) {
+      setTypeError(ID_IMAGE_TYPE_ERROR);
+      setTypeErrorOpen(true);
+      toast.error(ID_IMAGE_TYPE_ERROR);
+      return false;
+    }
+    setTypeError(null);
+    onFileSelect(selectedFile);
+    return true;
+  };
+
+  const resetInput = () => {
+    const input = document.getElementById(id) as HTMLInputElement | null;
+    if (input) input.value = "";
+  };
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] ?? null;
-    onFileSelect(selectedFile);
+    if (!acceptFile(selectedFile)) resetInput();
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropped = event.dataTransfer.files?.[0] ?? null;
+    if (!acceptFile(dropped)) resetInput();
   };
 
   const handleOcrClick = (e: React.MouseEvent) => {
@@ -73,22 +120,26 @@ const UploadCard = ({
   return (
     <div
       className="relative"
+      data-testid={`${id}-dropzone`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onDragEnter={handleDragOver}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <label
         htmlFor={id}
         className={cn(
           "flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-6 py-8 text-center transition-colors hover:border-primary/40 hover:bg-accent/20 focus-within:ring-2 focus-within:ring-primary/30",
-          error ? "border-destructive ring-1 ring-destructive/30" : isLowQuality ? "border-warning ring-1 ring-warning/30" : "border-border",
+          displayError ? "border-destructive ring-1 ring-destructive/30" : isLowQuality ? "border-warning ring-1 ring-warning/30" : "border-border",
           className,
         )}
       >
         <input
           id={id}
           type="file"
-          accept=".png,.jpg,.jpeg,.pdf"
-          className="sr-only"
+          accept=".png,.jpg,.jpeg"
+          className="sr-only pointer-events-none"
           onChange={handleFileChange}
         />
         {previewUrl ? (
@@ -106,11 +157,13 @@ const UploadCard = ({
         )}
         <p className="text-base font-semibold text-foreground">{title}</p>
         <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-        <p className="mt-3 text-xs text-muted-foreground">PNG, JPG, JPEG, PDF (tối đa 10MB)</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Chỉ chấp nhận file ảnh (JPG, PNG) — tối đa 10MB
+        </p>
       </label>
 
-      {error ? (
-        <p className="mt-1.5 text-xs text-destructive">{error}</p>
+      {displayError ? (
+        <p className="mt-1.5 text-xs text-destructive" role="alert">{displayError}</p>
       ) : null}
 
       {isLowQuality && ocrQuality?.message ? (
@@ -166,6 +219,18 @@ const UploadCard = ({
           {isOcrRunning ? "Đang đọc…" : "OCR"}
         </button>
       ) : null}
+
+      <AlertDialog open={typeErrorOpen} onOpenChange={setTypeErrorOpen}>
+        <AlertDialogContent className="z-[70]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>File không hợp lệ</AlertDialogTitle>
+            <AlertDialogDescription>{ID_IMAGE_TYPE_ERROR}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Đã hiểu</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

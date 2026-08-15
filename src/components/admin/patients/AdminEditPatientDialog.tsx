@@ -382,9 +382,8 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                       <SelectValue placeholder="Chọn giới tính" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Nam">Anh / Nam</SelectItem>
-                      <SelectItem value="Nữ">Chị / Nữ</SelectItem>
-                      <SelectItem value="Khác">Khác</SelectItem>
+                      <SelectItem value="Nam">Nam</SelectItem>
+                      <SelectItem value="Nữ">Nữ</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -421,9 +420,8 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                       <SelectValue placeholder="Chọn giới tính" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Nam">Anh / Nam</SelectItem>
-                      <SelectItem value="Nữ">Chị / Nữ</SelectItem>
-                      <SelectItem value="Khác">Khác</SelectItem>
+                      <SelectItem value="Nam">Nam</SelectItem>
+                      <SelectItem value="Nữ">Nữ</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

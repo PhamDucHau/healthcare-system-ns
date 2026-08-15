@@ -215,14 +215,13 @@ export async function fetchBhytOcr(image: File): Promise<BhytOcrResponse> {
   return (await res.json()) as BhytOcrResponse;
 }
 
-/** Normalize OCR gender text to Nam / Nữ / Khác for admin patient forms. */
+/** Normalize OCR gender text to Nam / Nữ for admin patient forms. */
 export function normalizeOcrGender(raw: string): string {
   const t = raw.trim().toLowerCase();
   if (!t) return "";
   if (t === "nam" || t === "male" || t === "m") return "Nam";
   if (t === "nữ" || t === "nu" || t === "female" || t === "f") return "Nữ";
-  if (t === "khác" || t === "khac" || t === "other") return "Khác";
-  return raw.trim();
+  return "";
 }
 
 /** Maps OCR `parsed` into onboarding field updates (user can edit after). */
@@ -267,6 +266,7 @@ export function mapBhytParsedToInsuranceUpdates(parsed: BhytParsed): Partial<Onb
   }
   if (parsed.name?.trim()) updates.bhytName = parsed.name.trim();
   if (parsed.gender?.trim()) updates.bhytGender = parsed.gender.trim();
+  if (parsed.address?.trim()) updates.bhytAddress = parsed.address.trim();
   if (parsed.kcb?.trim()) updates.bhytKcb = parsed.kcb.trim();
   if (parsed.kcb_code?.trim()) updates.bhytKcbCode = parsed.kcb_code.trim();
 

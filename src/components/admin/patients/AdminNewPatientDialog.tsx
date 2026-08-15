@@ -425,16 +425,16 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
         <div className="space-y-5 pb-2">
           {/* Upload section */}
           <section className="rounded-2xl border bg-card p-4">
-            <h3 className="mb-1 text-sm font-semibold">Tải ảnh giấy tờ để OCR</h3>
+            <h3 className="mb-1 text-sm font-semibold">Tải ảnh giấy tờ để OCR (tùy chọn)</h3>
             <p className="mb-4 text-xs text-muted-foreground">
-              Kéo thả hoặc nhấn để chọn. Hệ thống sẽ tự động trích xuất thông tin.
+              Không bắt buộc. Có thể bỏ trống và nhập thông tin thủ công. Nếu tải ảnh, hệ thống sẽ tự động trích xuất thông tin.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
-              <UploadCard id="new-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước"
+              <UploadCard id="new-id-front" title="Nhấn để tải lên" hint="CCCD — mặt trước (tùy chọn)"
                 file={idFile} onFileSelect={f => { setOcrFrontQuality(null); pickFile(f, setIdFile); }}
                 onOcr={() => runOcr("front")} isOcrRunning={ocrFront} ocrQuality={ocrFrontQuality}
                 onManualInput={focusFirstEmptyCccdField} />
-              <UploadCard id="new-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau"
+              <UploadCard id="new-id-back" title="Nhấn để tải lên" hint="CCCD — mặt sau (tùy chọn)"
                 file={idBackFile} onFileSelect={f => { setOcrBackQuality(null); pickFile(f, setIdBackFile); }}
                 onOcr={() => runOcr("back")} isOcrRunning={ocrBack} ocrQuality={ocrBackQuality}
                 onManualInput={focusFirstEmptyCccdField} />
@@ -475,9 +475,8 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
                     <SelectValue placeholder="Chọn giới tính" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Nam">Anh / Nam</SelectItem>
-                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
-                    <SelectItem value="Khác">Khác</SelectItem>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -526,9 +525,8 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
                     <SelectValue placeholder="Chọn giới tính" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Nam">Anh / Nam</SelectItem>
-                    <SelectItem value="Nữ">Chị / Nữ</SelectItem>
-                    <SelectItem value="Khác">Khác</SelectItem>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
