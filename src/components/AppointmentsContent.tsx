@@ -10,6 +10,15 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   fetchMyAppointments,
   cancelAppointment,
   mapBookingError,
@@ -32,6 +41,7 @@ export default function AppointmentsContent() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyAppointments()
@@ -63,6 +73,7 @@ export default function AppointmentsContent() {
         prev.map((a) => (a.id === id ? { ...a, status: 'CANCELLED' as const } : a)),
       );
       toast.success('Đã hủy lịch hẹn.');
+      setPendingCancelId(null);
     } catch (e) {
       toast.error(mapBookingError((e as Error).message));
     } finally {
@@ -116,7 +127,7 @@ export default function AppointmentsContent() {
                       key={apt.id}
                       apt={apt}
                       cancelling={cancelling === apt.id}
-                      onCancel={() => handleCancel(apt.id)}
+                      onCancel={() => setPendingCancelId(apt.id)}
                     />
                   ))}
                 </div>
@@ -150,6 +161,38 @@ export default function AppointmentsContent() {
           </>
         )}
       </div>
+
+      <AlertDialog
+        open={pendingCancelId !== null}
+        onOpenChange={(open) => {
+          if (!open && !cancelling) setPendingCancelId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc muốn hủy lịch hẹn này?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Lịch hẹn sẽ chuyển sang trạng thái Đã hủy.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!cancelling}>Đóng</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!!cancelling || !pendingCancelId}
+              onClick={() => {
+                if (pendingCancelId) void handleCancel(pendingCancelId);
+              }}
+            >
+              {cancelling ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : null}
+              Xác nhận hủy
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
