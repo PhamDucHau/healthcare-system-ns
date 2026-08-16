@@ -76,15 +76,22 @@ const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
 const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ id, label, value, onChange, type = "text", placeholder, col2, required, error, invalid }: {
+function F({ id, label, value, onChange, type = "text", placeholder, col2, required, error, invalid, multiline }: {
   id?: string; label: string; value: string; onChange: (v: string) => void;
   type?: string; placeholder?: string; col2?: boolean; required?: boolean; error?: string; invalid?: boolean;
+  multiline?: boolean;
 }) {
+  const fieldClass = `${fc} ${error || invalid ? fc_err : ""}`;
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
       <label htmlFor={id} className={lc}>{label}{required && <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>}</label>
-      <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} className={`${fc} ${error || invalid ? fc_err : ""}`} />
+      {multiline ? (
+        <textarea id={id} rows={3} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} className={`${fieldClass} py-2 overflow-y-auto resize-none`} />
+      ) : (
+        <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} className={fieldClass} />
+      )}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
@@ -105,7 +112,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   const focusFirstEmptyCccdField = () => {
     const fields = ["legalLastName", "legalFirstName", "dateOfBirth", "idNumber", "expirationDate", "issuedDate", "issuer", "residentialAddress", "phoneNumber"];
     for (const id of fields) {
-      const el = document.getElementById(id) as HTMLInputElement | null;
+      const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
       if (el && !el.value?.trim()) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         setTimeout(() => el.focus(), 100);
@@ -120,7 +127,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   const focusFirstEmptyBhytField = () => {
     const fields = ["provider", "memberId", "groupNumber", "bhytName", "bhytDob", "bhytKcbCode", "bhytKcb"];
     for (const id of fields) {
-      const el = document.getElementById(id) as HTMLInputElement | null;
+      const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
       if (el && !el.value?.trim()) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         setTimeout(() => el.focus(), 100);
@@ -545,7 +552,7 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
                 type="date" />
               <F id="issuedDate" label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
               <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")}
-                placeholder="Cục cảnh sát QLHC về TTXH" />
+                placeholder="Cục cảnh sát QLHC về TTXH" multiline />
               <F id="residentialAddress" label="Địa chỉ thường trú" value={form.residentialAddress}
                 onChange={set("residentialAddress")}
                 placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2 />

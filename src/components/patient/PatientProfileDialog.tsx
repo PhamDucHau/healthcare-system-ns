@@ -219,6 +219,7 @@ function EditField({
   onBlur,
   type = "text",
   highlight,
+  multiline,
 }: {
   label: string;
   value: string;
@@ -226,6 +227,7 @@ function EditField({
   onBlur?: () => void;
   type?: string;
   highlight?: "error" | "warn";
+  multiline?: boolean;
 }) {
   const borderClass =
     highlight === "error"
@@ -233,16 +235,27 @@ function EditField({
       : highlight === "warn"
         ? "border-warning/60 bg-warning/5"
         : "border-primary/40 bg-primary/5";
+  const fieldClass = "mt-0.5 w-full bg-transparent text-sm font-medium text-foreground outline-none";
   return (
     <div className={`rounded-lg border px-3 py-2 ${borderClass}`}>
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        className="mt-0.5 w-full bg-transparent text-sm font-medium text-foreground outline-none"
-      />
+      {multiline ? (
+        <textarea
+          rows={3}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          className={`${fieldClass} py-1 overflow-y-auto resize-none`}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          className={fieldClass}
+        />
+      )}
     </div>
   );
 }
@@ -849,7 +862,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                       <span><strong>Trùng CCCD.</strong> Số CCCD này đã có hồ sơ khác trong hệ thống. Không thể lưu.</span>
                     </div>
                   ) : null}
-                  <EditField label="Nơi cấp" value={editData.idIssuer} onChange={set("idIssuer")} />
+                  <EditField label="Nơi cấp" value={editData.idIssuer} onChange={set("idIssuer")} multiline />
                   <EditField label="Ngày cấp" value={editData.idIssuedDate} onChange={set("idIssuedDate")} type="date" />
                   <EditField label="Ngày hết hạn" value={editData.idExpirationDate} onChange={set("idExpirationDate")} type="date" />
                   <div className="sm:col-span-2">

@@ -482,9 +482,9 @@ const OnboardingFormPage = () => {
           </div>
           <div>
             <label htmlFor="issuer" className={labelClass}>Nơi cấp<RequiredStar /></label>
-            <input id="issuer" type="text" value={data.identity.issuer}
+            <textarea id="issuer" rows={3} value={data.identity.issuer}
               onChange={(e) => { clearFieldError("issuer"); updateIdentity({ issuer: e.target.value }); }}
-              className={`${fieldClass} ${fieldErrors.issuer ? fieldErrorClass : ""}`}
+              className={`${fieldClass} py-2 overflow-y-auto resize-none ${fieldErrors.issuer ? fieldErrorClass : ""}`}
               placeholder="Cục cảnh sát QLHC về TTXH" />
             <FieldErr msg={fieldErrors.issuer} />
           </div>

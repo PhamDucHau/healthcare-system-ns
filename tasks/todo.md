@@ -1,24 +1,16 @@
-# TODO: CCCD–BHYT Cross-Validation
+# TODO: Nơi cấp multiline textarea
 
-## Phase 1: Comparison helper
-- [x] Task 1.1: `compareCccdBhytIdentity` with Vietnamese name normalize, Levenshtein >20%, exact DOB
-- [x] Task 1.2: Unit tests in `src/test/cccd-bhyt-cross-validate.test.ts`
+## Phase 1: Tests
+- [x] Task 1.1: Failing prove-it test in `src/test/issuer-field-multiline.test.tsx`
 
-## Checkpoint: Helper complete
+## Checkpoint: RED confirmed
 
-## Phase 2: Onboarding UI
-- [x] Task 2.1: `CccdBhytMismatchBanner` + `useCccdBhytMismatch`
-- [x] Task 2.2: Wire into `OnboardingFormPage` (red warning, block submit until confirm)
-- [x] Task 2.3: UI tests in `src/test/onboarding-cccd-bhyt-mismatch.test.tsx`
-
-## Checkpoint: Patient onboarding complete
-
-## Phase 3: Admin dialogs
-- [x] Task 3.1: `AdminNewPatientDialog`
-- [x] Task 3.2: `AdminEditPatientDialog`
-- [x] Task 3.3: `AdminCreateProfileDialog`
+## Phase 2: Convert issuer fields
+- [x] Task 2.1: `OnboardingFormPage` Nơi cấp textarea
+- [x] Task 2.2: Admin `F` helpers (`multiline`) on new/edit/create-profile
+- [x] Task 2.3: `PatientProfileDialog` `EditField` multiline for Nơi cấp
 
 ## Checkpoint: Feature complete
 
-## Phase 4: Handoff
-- [x] Task 4.1: Update `.agent/SESSION.md` and `tasks/todo.md`
+## Phase 3: Verify
+- [x] Task 3.1: `npm test` — 204 passed

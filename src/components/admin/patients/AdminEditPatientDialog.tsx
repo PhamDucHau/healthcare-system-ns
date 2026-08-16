@@ -88,15 +88,21 @@ const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
 const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ label, value, onChange, type = "text", placeholder, col2, invalid }: {
-  label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; col2?: boolean; invalid?: boolean;
+function F({ id, label, value, onChange, type = "text", placeholder, col2, invalid, multiline }: {
+  id?: string; label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; col2?: boolean; invalid?: boolean; multiline?: boolean;
 }) {
+  const fieldClass = `${fc} ${invalid ? fc_err : ""}`;
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
-      <label className={lc}>{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} className={`${fc} ${invalid ? fc_err : ""}`} />
+      <label htmlFor={id} className={lc}>{label}</label>
+      {multiline ? (
+        <textarea id={id} rows={3} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} className={`${fieldClass} py-2 overflow-y-auto resize-none`} />
+      ) : (
+        <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder} className={fieldClass} />
+      )}
     </div>
   );
 }
@@ -461,7 +467,7 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                 <F label="Số CCCD" value={form.idNumber} onChange={set("idNumber")} placeholder="G-123-5678-9012" />
                 <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
                 <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
-                <F label="Nơi cấp" value={form.issuer} onChange={set("issuer")} />
+                <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")} multiline />
                 <F label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")} col2 />
               </div>
             </section>
