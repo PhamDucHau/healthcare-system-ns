@@ -16,12 +16,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import UploadCard from "@/components/onboarding/UploadCard";
+import CccdBhytMismatchBanner from "@/components/onboarding/CccdBhytMismatchBanner";
 import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 import DuplicatePatientAlert from "@/components/common/DuplicatePatientAlert";
 import { supabase } from "@/lib/supabase";
 import { createAdminUser, listAdminRoles } from "@/lib/admin-api";
 import { adminInsertPatientProfile, staffCreatePatientProfile } from "@/lib/admin-appointment-api";
 import { checkPatientDuplicate, logDedupAudit, type DupCheckResult } from "@/lib/duplicate-check";
+import { joinCccdFullName } from "@/lib/cccd-bhyt-cross-validate";
+import { useCccdBhytMismatch } from "@/hooks/useCccdBhytMismatch";
 import {
   fetchOcrSingle,
   applyBhytParsedFillEmpty,
@@ -73,15 +76,15 @@ const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
 const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ id, label, value, onChange, type = "text", placeholder, col2, required, error }: {
+function F({ id, label, value, onChange, type = "text", placeholder, col2, required, error, invalid }: {
   id?: string; label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; col2?: boolean; required?: boolean; error?: string;
+  type?: string; placeholder?: string; col2?: boolean; required?: boolean; error?: string; invalid?: boolean;
 }) {
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
       <label htmlFor={id} className={lc}>{label}{required && <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>}</label>
       <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} className={`${fc} ${error ? fc_err : ""}`} />
+        placeholder={placeholder} className={`${fc} ${error || invalid ? fc_err : ""}`} />
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
@@ -133,6 +136,18 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [dupResult, setDupResult] = useState<DupCheckResult | null>(null);
   const [dupBypassed, setDupBypassed] = useState(false);
+
+  const {
+    result: cccdBhytResult,
+    confirmed: cccdBhytConfirmed,
+    blocksSubmit: cccdBhytBlocksSubmit,
+    confirm: confirmCccdBhytMismatch,
+  } = useCccdBhytMismatch({
+    cccdName: joinCccdFullName(form.legalLastName, form.legalFirstName),
+    cccdDob: form.dateOfBirth,
+    bhytName: form.bhytName,
+    bhytDob: form.bhytDob,
+  });
 
   const set = (k: keyof FormData) => (v: string) => {
     setForm(p => ({ ...p, [k]: v }));
@@ -217,6 +232,10 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
 
   const handleSave = async (bypassReason?: string) => {
     if (!validate()) { toast.error("Vui lòng điền đầy đủ các trường bắt buộc"); return; }
+    if (cccdBhytBlocksSubmit) {
+      toast.error("CCCD và thẻ BHYT không khớp. Vui lòng xác nhận hoặc tải lại giấy tờ.");
+      return;
+    }
 
     const fullName = `${form.legalLastName.trim()} ${form.legalFirstName.trim()}`;
 
@@ -490,11 +509,11 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <F id="legalLastName" label="Họ" value={form.legalLastName} onChange={set("legalLastName")}
-                required error={errors.legalLastName} />
+                required error={errors.legalLastName} invalid={cccdBhytResult.nameMismatch} />
               <F id="legalFirstName" label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")}
-                required error={errors.legalFirstName} />
+                required error={errors.legalFirstName} invalid={cccdBhytResult.nameMismatch} />
               <F id="dateOfBirth" label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")}
-                type="date" required error={errors.dateOfBirth} />
+                type="date" required error={errors.dateOfBirth} invalid={cccdBhytResult.dobMismatch} />
               <div>
                 <label className={lc}>Giới tính</label>
                 <Select value={form.gender} onValueChange={set("gender")}>
@@ -543,8 +562,10 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               <F id="memberId" label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")}
                 placeholder="DN 4 79 791 101 31" />
               <F id="groupNumber" label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
-              <F id="bhytName" label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
-              <F id="bhytDob" label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
+              <F id="bhytName" label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")}
+                invalid={cccdBhytResult.nameMismatch} />
+              <F id="bhytDob" label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date"
+                invalid={cccdBhytResult.dobMismatch} />
               <div>
                 <label className={lc}>Giới tính</label>
                 <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
@@ -572,11 +593,17 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
               onCancel={() => setDupResult(null)}
             />
           )}
+
+          <CccdBhytMismatchBanner
+            result={cccdBhytResult}
+            confirmed={cccdBhytConfirmed}
+            onConfirm={confirmCccdBhytMismatch}
+          />
         </div>
 
         <div className="flex items-center justify-between border-t pt-3">
           <Button variant="outline" onClick={handleClose} disabled={saving}>Hủy</Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+          <Button onClick={() => void handleSave()} disabled={saving || cccdBhytBlocksSubmit}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Tạo hồ sơ
           </Button>

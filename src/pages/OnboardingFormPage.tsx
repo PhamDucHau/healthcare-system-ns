@@ -2,12 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ScanLine, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import CccdBhytMismatchBanner from "@/components/onboarding/CccdBhytMismatchBanner";
 import OnboardingActions from "@/components/onboarding/OnboardingActions";
 import UploadCard from "@/components/onboarding/UploadCard";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
+import { useCccdBhytMismatch } from "@/hooks/useCccdBhytMismatch";
 import { useOnboardingForm } from "@/hooks/useOnboardingForm";
 import { useDuplicateCheck } from "@/hooks/useDuplicateCheck";
+import { joinCccdFullName } from "@/lib/cccd-bhyt-cross-validate";
 import {
   fetchOcrSingle,
   mapBhytParsedToInsuranceUpdates,
@@ -62,6 +65,18 @@ const OnboardingFormPage = () => {
     checkCccd, checkPhone, checkNameDob, checkAll,
     bypassPhone, bypassNameDob,
   } = useDuplicateCheck(userId, "onboarding");
+
+  const {
+    result: cccdBhytResult,
+    confirmed: cccdBhytConfirmed,
+    blocksSubmit: cccdBhytBlocksSubmit,
+    confirm: confirmCccdBhytMismatch,
+  } = useCccdBhytMismatch({
+    cccdName: joinCccdFullName(data.personal.legalLastName, data.personal.legalFirstName),
+    cccdDob: data.personal.dateOfBirth,
+    bhytName: data.insurance.bhytName,
+    bhytDob: data.insurance.bhytDob,
+  });
 
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -293,6 +308,11 @@ const OnboardingFormPage = () => {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    if (cccdBhytBlocksSubmit) {
+      setErrorMessage("CCCD và thẻ BHYT không khớp. Vui lòng xác nhận hoặc tải lại giấy tờ.");
+      return;
+    }
+
     if (!userId) {
       setErrorMessage("Bạn cần đăng nhập để gửi hồ sơ.");
       return;
@@ -484,7 +504,7 @@ const OnboardingFormPage = () => {
                 const name = [data.personal.legalFirstName, data.personal.legalLastName].filter(Boolean).join(" ");
                 void checkNameDob(name, data.personal.dateOfBirth);
               }}
-              className={`${fieldClass} ${fieldErrors.legalFirstName ? fieldErrorClass : ""}`}
+              className={`${fieldClass} ${cccdBhytResult.nameMismatch || fieldErrors.legalFirstName ? fieldErrorClass : ""}`}
               placeholder="Nhập đúng như trên giấy tờ"
             />
             <FieldErr msg={fieldErrors.legalFirstName} />
@@ -499,7 +519,7 @@ const OnboardingFormPage = () => {
                 const name = [data.personal.legalFirstName, data.personal.legalLastName].filter(Boolean).join(" ");
                 void checkNameDob(name, data.personal.dateOfBirth);
               }}
-              className={`${fieldClass} ${fieldErrors.legalLastName ? fieldErrorClass : ""}`}
+              className={`${fieldClass} ${cccdBhytResult.nameMismatch || fieldErrors.legalLastName ? fieldErrorClass : ""}`}
               placeholder="Nhập đúng như trên giấy tờ"
             />
             <FieldErr msg={fieldErrors.legalLastName} />
@@ -514,7 +534,7 @@ const OnboardingFormPage = () => {
                 const name = [data.personal.legalFirstName, data.personal.legalLastName].filter(Boolean).join(" ");
                 void checkNameDob(name, data.personal.dateOfBirth);
               }}
-              className={`${fieldClass} ${dupState.nameDobMatchId && !bypassed.nameDob ? "border-warning ring-1 ring-warning/30" : fieldErrors.dateOfBirth ? fieldErrorClass : ""}`}
+              className={`${fieldClass} ${cccdBhytResult.dobMismatch || fieldErrors.dateOfBirth ? fieldErrorClass : dupState.nameDobMatchId && !bypassed.nameDob ? "border-warning ring-1 ring-warning/30" : ""}`}
             />
             <FieldErr msg={fieldErrors.dateOfBirth} />
           </div>
@@ -610,11 +630,11 @@ const OnboardingFormPage = () => {
           </div>
           <div>
             <label htmlFor="bhytName" className={labelClass}>Họ tên (BHYT)</label>
-            <input id="bhytName" type="text" value={data.insurance.bhytName} onChange={(e) => updateInsurance({ bhytName: e.target.value })} className={fieldClass} />
+            <input id="bhytName" type="text" value={data.insurance.bhytName} onChange={(e) => updateInsurance({ bhytName: e.target.value })} className={`${fieldClass} ${cccdBhytResult.nameMismatch ? fieldErrorClass : ""}`} />
           </div>
           <div>
             <label htmlFor="bhytDob" className={labelClass}>Ngày sinh (BHYT)</label>
-            <input id="bhytDob" type="date" value={data.insurance.bhytDob} onChange={(e) => updateInsurance({ bhytDob: e.target.value })} className={fieldClass} />
+            <input id="bhytDob" type="date" value={data.insurance.bhytDob} onChange={(e) => updateInsurance({ bhytDob: e.target.value })} className={`${fieldClass} ${cccdBhytResult.dobMismatch ? fieldErrorClass : ""}`} />
           </div>
           <div>
             <label htmlFor="bhytGender" className={labelClass}>Giới tính (BHYT)</label>
@@ -672,11 +692,23 @@ const OnboardingFormPage = () => {
         </p>
       ) : null}
 
+      <CccdBhytMismatchBanner
+        result={cccdBhytResult}
+        confirmed={cccdBhytConfirmed}
+        onConfirm={confirmCccdBhytMismatch}
+        onReupload={() => {
+          document.getElementById("identityUploadFront")?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }}
+      />
+
       <OnboardingActions
         nextLabel="Gửi hồ sơ bệnh nhân"
         onNext={handleSubmit}
         isSubmitting={isSubmitting || isDupChecking}
-        disabled={isBlocked || hasUnbypassedWarning}
+        disabled={isBlocked || hasUnbypassedWarning || cccdBhytBlocksSubmit}
       />
     </div>
   );

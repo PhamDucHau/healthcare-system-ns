@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { getPatientRecordById } from "@/lib/patient-records";
+import { joinCccdFullName } from "@/lib/cccd-bhyt-cross-validate";
+import { useCccdBhytMismatch } from "@/hooks/useCccdBhytMismatch";
 import {
   fetchOcrSingle,
   applyBhytParsedFillEmpty,
@@ -27,6 +29,7 @@ import {
 } from "@/lib/cccd-ocr";
 import type { PatientPortalDetail } from "@/types/patient-portal";
 import PatientRecordReviewActions from "@/components/patient-records/PatientRecordReviewActions";
+import CccdBhytMismatchBanner from "@/components/onboarding/CccdBhytMismatchBanner";
 import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -83,16 +86,17 @@ interface Props {
 
 const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
+const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ label, value, onChange, type = "text", placeholder, col2 }: {
+function F({ label, value, onChange, type = "text", placeholder, col2, invalid }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; col2?: boolean;
+  type?: string; placeholder?: string; col2?: boolean; invalid?: boolean;
 }) {
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
       <label className={lc}>{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} className={fc} />
+        placeholder={placeholder} className={`${fc} ${invalid ? fc_err : ""}`} />
     </div>
   );
 }
@@ -196,6 +200,18 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
   const [saving, setSaving] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
 
+  const {
+    result: cccdBhytResult,
+    confirmed: cccdBhytConfirmed,
+    blocksSubmit: cccdBhytBlocksSubmit,
+    confirm: confirmCccdBhytMismatch,
+  } = useCccdBhytMismatch({
+    cccdName: joinCccdFullName(form?.legalLastName ?? "", form?.legalFirstName ?? ""),
+    cccdDob: form?.dateOfBirth ?? "",
+    bhytName: form?.bhytName ?? "",
+    bhytDob: form?.bhytDob ?? "",
+  });
+
   // Load profile + signed URLs when opened
   useEffect(() => {
     if (!open || !profileId) return;
@@ -271,6 +287,10 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
 
   const handleSave = async () => {
     if (!form || !profile) return;
+    if (cccdBhytBlocksSubmit) {
+      toast.error("CCCD và thẻ BHYT không khớp. Vui lòng xác nhận hoặc tải lại giấy tờ.");
+      return;
+    }
     setSaving(true);
     try {
       const userId = profile.user_id;
@@ -411,9 +431,12 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
             <section className="rounded-2xl border bg-muted/30 p-4">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thông tin cá nhân</h3>
               <div className="grid gap-3 sm:grid-cols-2">
-                <F label="Họ" value={form.legalLastName} onChange={set("legalLastName")} />
-                <F label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")} />
-                <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
+                <F label="Họ" value={form.legalLastName} onChange={set("legalLastName")}
+                  invalid={cccdBhytResult.nameMismatch} />
+                <F label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")}
+                  invalid={cccdBhytResult.nameMismatch} />
+                <F label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date"
+                  invalid={cccdBhytResult.dobMismatch} />
                 <div>
                   <label className={lc}>Giới tính</label>
                   <Select value={form.gender} onValueChange={set("gender")}>
@@ -450,8 +473,10 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                 <F label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
                 <F label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")} />
                 <F label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
-                <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
-                <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
+                <F label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")}
+                  invalid={cccdBhytResult.nameMismatch} />
+                <F label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date"
+                  invalid={cccdBhytResult.dobMismatch} />
                 <div>
                   <label className={lc}>Giới tính</label>
                   <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
@@ -471,6 +496,12 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
                 <F label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
               </div>
             </section>
+
+            <CccdBhytMismatchBanner
+              result={cccdBhytResult}
+              confirmed={cccdBhytConfirmed}
+              onConfirm={confirmCccdBhytMismatch}
+            />
           </div>
         )}
 
@@ -493,7 +524,7 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
               />
             ) : null}
             {form && (
-              <Button onClick={() => void handleSave()} disabled={saving || loading}>
+              <Button onClick={() => void handleSave()} disabled={saving || loading || cccdBhytBlocksSubmit}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Lưu thay đổi
               </Button>

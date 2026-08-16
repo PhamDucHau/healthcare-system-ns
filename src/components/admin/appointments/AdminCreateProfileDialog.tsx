@@ -16,8 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import UploadCard from "@/components/onboarding/UploadCard";
+import CccdBhytMismatchBanner from "@/components/onboarding/CccdBhytMismatchBanner";
 import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 import { supabase } from "@/lib/supabase";
+import { joinCccdFullName } from "@/lib/cccd-bhyt-cross-validate";
+import { useCccdBhytMismatch } from "@/hooks/useCccdBhytMismatch";
 import {
   fetchOcrSingle,
   applyBhytParsedFillEmpty,
@@ -68,16 +71,17 @@ interface Props {
 
 const lc = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
+const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ id, label, value, onChange, type = "text", placeholder, col2 }: {
+function F({ id, label, value, onChange, type = "text", placeholder, col2, invalid }: {
   id?: string; label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; col2?: boolean;
+  type?: string; placeholder?: string; col2?: boolean; invalid?: boolean;
 }) {
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
       <label htmlFor={id} className={lc}>{label}</label>
       <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} className={fc} />
+        placeholder={placeholder} className={`${fc} ${invalid ? fc_err : ""}`} />
     </div>
   );
 }
@@ -97,6 +101,18 @@ export default function AdminCreateProfileDialog({
   const [ocrBhytQuality, setOcrBhytQuality] = useState<OcrQualityResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+
+  const {
+    result: cccdBhytResult,
+    confirmed: cccdBhytConfirmed,
+    blocksSubmit: cccdBhytBlocksSubmit,
+    confirm: confirmCccdBhytMismatch,
+  } = useCccdBhytMismatch({
+    cccdName: joinCccdFullName(form.legalLastName, form.legalFirstName),
+    cccdDob: form.dateOfBirth,
+    bhytName: form.bhytName,
+    bhytDob: form.bhytDob,
+  });
 
   const focusFirstEmptyCccdField = () => {
     const fields = ["idNumber", "expirationDate", "residentialAddress", "issuedDate", "issuer"];
@@ -196,6 +212,10 @@ export default function AdminCreateProfileDialog({
   };
 
   const handleSave = async () => {
+    if (cccdBhytBlocksSubmit) {
+      toast.error("CCCD và thẻ BHYT không khớp. Vui lòng xác nhận hoặc tải lại giấy tờ.");
+      return;
+    }
     setSaving(true);
     try {
       const ts = Date.now();
@@ -357,9 +377,12 @@ export default function AdminCreateProfileDialog({
               Thông tin cá nhân
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              <F id="legalLastName" label="Họ" value={form.legalLastName} onChange={set("legalLastName")} />
-              <F id="legalFirstName" label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")} />
-              <F id="dateOfBirth" label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date" />
+              <F id="legalLastName" label="Họ" value={form.legalLastName} onChange={set("legalLastName")}
+                invalid={cccdBhytResult.nameMismatch} />
+              <F id="legalFirstName" label="Tên" value={form.legalFirstName} onChange={set("legalFirstName")}
+                invalid={cccdBhytResult.nameMismatch} />
+              <F id="dateOfBirth" label="Ngày sinh" value={form.dateOfBirth} onChange={set("dateOfBirth")} type="date"
+                invalid={cccdBhytResult.dobMismatch} />
               <F id="phoneNumber" label="Số điện thoại" value={form.phoneNumber} onChange={set("phoneNumber")} type="tel" placeholder="0912 345 678" />
               <F id="email" label="Email" value={form.email} onChange={set("email")} type="email" placeholder="example@email.com" />
               <div>
@@ -386,8 +409,10 @@ export default function AdminCreateProfileDialog({
               <F id="provider" label="Nhà cung cấp" value={form.provider} onChange={set("provider")} col2 />
               <F id="memberId" label="Mã thành viên / BHYT" value={form.memberId} onChange={set("memberId")} placeholder="DN 4 79 791 101 31" />
               <F id="groupNumber" label="Mã nhóm" value={form.groupNumber} onChange={set("groupNumber")} />
-              <F id="bhytName" label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")} />
-              <F id="bhytDob" label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date" />
+              <F id="bhytName" label="Họ tên trên BHYT" value={form.bhytName} onChange={set("bhytName")}
+                invalid={cccdBhytResult.nameMismatch} />
+              <F id="bhytDob" label="Ngày sinh (BHYT)" value={form.bhytDob} onChange={set("bhytDob")} type="date"
+                invalid={cccdBhytResult.dobMismatch} />
               <div>
                 <label className={lc}>Giới tính</label>
                 <Select value={form.bhytGender} onValueChange={set("bhytGender")}>
@@ -407,12 +432,18 @@ export default function AdminCreateProfileDialog({
               <F id="bhytFiveYear" label="Ngày 5 năm liên tục" value={form.bhytFiveYear} onChange={set("bhytFiveYear")} type="date" />
             </div>
           </section>
+
+          <CccdBhytMismatchBanner
+            result={cccdBhytResult}
+            confirmed={cccdBhytConfirmed}
+            onConfirm={confirmCccdBhytMismatch}
+          />
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t pt-3">
           <Button variant="outline" onClick={handleClose} disabled={saving}>Hủy</Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+          <Button onClick={() => void handleSave()} disabled={saving || cccdBhytBlocksSubmit}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Lưu hồ sơ
           </Button>
