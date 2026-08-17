@@ -33,7 +33,7 @@ import {
   checkBhytOcrQuality,
   type OcrQualityResult,
 } from "@/lib/cccd-ocr";
-import type { PatientSearchResult } from "@/types/admin-appointment";
+import { CCCD_REQUIRED_EMPTY, validateCccdRequired } from "@/lib/cccd-required";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -228,11 +228,13 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
   };
 
   const validate = (): boolean => {
-    const errs: Partial<Record<keyof FormData, string>> = {};
-    if (!form.legalLastName.trim()) errs.legalLastName = "Vui lòng nhập";
-    if (!form.legalFirstName.trim()) errs.legalFirstName = "Vui lòng nhập";
-    if (!form.dateOfBirth.trim()) errs.dateOfBirth = "Vui lòng nhập";
-    if (!form.phoneNumber.trim()) errs.phoneNumber = "Vui lòng nhập";
+    const errs: Partial<Record<keyof FormData, string>> = {
+      ...validateCccdRequired(form),
+    };
+    if (!form.legalLastName.trim()) errs.legalLastName = CCCD_REQUIRED_EMPTY;
+    if (!form.legalFirstName.trim()) errs.legalFirstName = CCCD_REQUIRED_EMPTY;
+    if (!form.dateOfBirth.trim()) errs.dateOfBirth = CCCD_REQUIRED_EMPTY;
+    if (!form.phoneNumber.trim()) errs.phoneNumber = CCCD_REQUIRED_EMPTY;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -547,15 +549,17 @@ export default function AdminNewPatientDialog({ open, onClose, onSuccess, portal
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <F id="idNumber" label="Số CCCD" value={form.idNumber} onChange={set("idNumber")}
-                placeholder="G-123-5678-9012" />
+                placeholder="G-123-5678-9012" required error={errors.idNumber} />
               <F id="expirationDate" label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")}
-                type="date" />
-              <F id="issuedDate" label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
+                type="date" required error={errors.expirationDate} />
+              <F id="issuedDate" label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date"
+                required error={errors.issuedDate} />
               <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")}
-                placeholder="Cục cảnh sát QLHC về TTXH" multiline />
+                placeholder="Cục cảnh sát QLHC về TTXH" multiline required error={errors.issuer} />
               <F id="residentialAddress" label="Địa chỉ thường trú" value={form.residentialAddress}
                 onChange={set("residentialAddress")}
-                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2 />
+                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" col2
+                required error={errors.residentialAddress} />
             </div>
           </section>
 

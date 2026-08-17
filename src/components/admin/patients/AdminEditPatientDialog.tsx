@@ -27,7 +27,7 @@ import {
   checkBhytOcrQuality,
   type OcrQualityResult,
 } from "@/lib/cccd-ocr";
-import type { PatientPortalDetail } from "@/types/patient-portal";
+import { validateCccdRequired } from "@/lib/cccd-required";
 import PatientRecordReviewActions from "@/components/patient-records/PatientRecordReviewActions";
 import CccdBhytMismatchBanner from "@/components/onboarding/CccdBhytMismatchBanner";
 import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
@@ -88,14 +88,15 @@ const lc = "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted
 const fc = "min-h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-primary/30";
 const fc_err = "border-destructive ring-1 ring-destructive/30";
 
-function F({ id, label, value, onChange, type = "text", placeholder, col2, invalid, multiline }: {
+function F({ id, label, value, onChange, type = "text", placeholder, col2, required, error, invalid, multiline }: {
   id?: string; label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; col2?: boolean; invalid?: boolean; multiline?: boolean;
+  type?: string; placeholder?: string; col2?: boolean; required?: boolean; error?: string; invalid?: boolean;
+  multiline?: boolean;
 }) {
-  const fieldClass = `${fc} ${invalid ? fc_err : ""}`;
+  const fieldClass = `${fc} ${error || invalid ? fc_err : ""}`;
   return (
     <div className={col2 ? "sm:col-span-2" : ""}>
-      <label htmlFor={id} className={lc}>{label}</label>
+      <label htmlFor={id} className={lc}>{label}{required && <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>}</label>
       {multiline ? (
         <textarea id={id} rows={3} value={value} onChange={e => onChange(e.target.value)}
           placeholder={placeholder} className={`${fieldClass} py-2 overflow-y-auto resize-none`} />
@@ -103,6 +104,7 @@ function F({ id, label, value, onChange, type = "text", placeholder, col2, inval
         <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)}
           placeholder={placeholder} className={fieldClass} />
       )}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -205,6 +207,7 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
   const [ocrBhyt, setOcrBhyt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
   const {
     result: cccdBhytResult,
@@ -224,6 +227,7 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
     setLoading(true);
     setIdFile(null); setIdBackFile(null); setCardFile(null);
     setLightbox(null);
+    setErrors({});
 
     getPatientRecordById(supabase, profileId).then(async ({ record, error }) => {
       if (error || !record) { setLoading(false); return; }
@@ -293,6 +297,12 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
 
   const handleSave = async () => {
     if (!form || !profile) return;
+    const cccdErrs = validateCccdRequired(form);
+    setErrors(cccdErrs);
+    if (Object.keys(cccdErrs).length > 0) {
+      toast.error("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
     if (cccdBhytBlocksSubmit) {
       toast.error("CCCD và thẻ BHYT không khớp. Vui lòng xác nhận hoặc tải lại giấy tờ.");
       return;
@@ -464,11 +474,16 @@ export default function AdminEditPatientDialog({ profileId, open, onClose, onSuc
             <section className="rounded-2xl border bg-muted/30 p-4">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Giấy tờ tùy thân (CCCD)</h3>
               <div className="grid gap-3 sm:grid-cols-2">
-                <F label="Số CCCD" value={form.idNumber} onChange={set("idNumber")} placeholder="G-123-5678-9012" />
-                <F label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date" />
-                <F label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date" />
-                <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")} multiline />
-                <F label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")} col2 />
+                <F id="idNumber" label="Số CCCD" value={form.idNumber} onChange={set("idNumber")} placeholder="G-123-5678-9012"
+                  required error={errors.idNumber} />
+                <F id="expirationDate" label="Ngày hết hạn" value={form.expirationDate} onChange={set("expirationDate")} type="date"
+                  required error={errors.expirationDate} />
+                <F id="issuedDate" label="Ngày cấp" value={form.issuedDate} onChange={set("issuedDate")} type="date"
+                  required error={errors.issuedDate} />
+                <F id="issuer" label="Nơi cấp" value={form.issuer} onChange={set("issuer")} multiline
+                  required error={errors.issuer} />
+                <F id="residentialAddress" label="Địa chỉ thường trú" value={form.residentialAddress} onChange={set("residentialAddress")} col2
+                  required error={errors.residentialAddress} />
               </div>
             </section>
 

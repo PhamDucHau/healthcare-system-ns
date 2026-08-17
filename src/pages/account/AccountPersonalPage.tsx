@@ -235,13 +235,6 @@ const AccountPersonalPage = () => {
             <Button asChild className="min-w-[160px]">
               <Link to="/onboarding">Tạo hồ sơ bằng AI</Link>
             </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="min-w-[160px] border-primary/40 text-primary hover:bg-primary/5"
-            >
-              <Link to="/onboarding">Tải lên CCCD/ID (AI Nhận diện)</Link>
-            </Button>
           </div>
         </div>
       )}

@@ -19,6 +19,7 @@ import {
   checkBhytOcrQuality,
   type OcrQualityResult,
 } from "@/lib/cccd-ocr";
+import { CCCD_REQUIRED_EMPTY, validateCccdRequired } from "@/lib/cccd-required";
 import { submitPatientProfile } from "@/lib/patient-onboarding";
 import { supabase } from "@/lib/supabase";
 
@@ -36,7 +37,7 @@ const RequiredStar = () => (
 );
 
 const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
-const REQUIRED_EMPTY = "Vui lòng nhập";
+const REQUIRED_EMPTY = CCCD_REQUIRED_EMPTY;
 
 const OnboardingFormPage = () => {
   const navigate = useNavigate();
@@ -276,16 +277,12 @@ const OnboardingFormPage = () => {
 
   const validateForm = (): boolean => {
     const { legalFirstName, legalLastName, dateOfBirth, phoneNumber, email } = data.personal;
-    const { idNumber, expirationDate, residentialAddress, issuedDate, issuer } = data.identity;
     const { provider, memberId, groupNumber } = data.insurance;
     const R = REQUIRED_EMPTY;
 
-    const errs: Record<string, string> = {};
-    if (!idNumber) errs.idNumber = R;
-    if (!expirationDate) errs.expirationDate = R;
-    if (!residentialAddress) errs.residentialAddress = R;
-    if (!issuedDate) errs.issuedDate = R;
-    if (!issuer) errs.issuer = R;
+    const errs: Record<string, string> = {
+      ...validateCccdRequired(data.identity),
+    };
     if (!legalFirstName) errs.legalFirstName = R;
     if (!legalLastName) errs.legalLastName = R;
     if (!dateOfBirth) errs.dateOfBirth = R;

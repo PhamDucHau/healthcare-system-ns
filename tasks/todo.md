@@ -1,16 +1,17 @@
-# TODO: Nơi cấp multiline textarea
+# TODO: Sync CCCD required fields + image preview
 
-## Phase 1: Tests
-- [x] Task 1.1: Failing prove-it test in `src/test/issuer-field-multiline.test.tsx`
+## Phase 1: Shared validation
+- [x] Task 1.1: `validateCccdRequired` helper + onboarding reuse
 
-## Checkpoint: RED confirmed
+## Checkpoint: Helper complete
 
-## Phase 2: Convert issuer fields
-- [x] Task 2.1: `OnboardingFormPage` Nơi cấp textarea
-- [x] Task 2.2: Admin `F` helpers (`multiline`) on new/edit/create-profile
-- [x] Task 2.3: `PatientProfileDialog` `EditField` multiline for Nơi cấp
+## Phase 2: Create / update forms
+- [x] Task 2.1: AdminNewPatientDialog required CCCD + tests
+- [x] Task 2.2: AdminCreateProfileDialog required CCCD + tests
+- [x] Task 2.3: AdminEditPatientDialog required CCCD + tests
+- [x] Task 2.4: PatientProfileDialog required CCCD + eye/lightbox; PatientRecordDetailPanel lightbox
 
 ## Checkpoint: Feature complete
 
 ## Phase 3: Verify
-- [x] Task 3.1: `npm test` — 204 passed
+- [x] Task 3.1: `npm test` — 220 passed

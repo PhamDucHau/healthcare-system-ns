@@ -1,7 +1,9 @@
-import { FileText, Loader2, UserRound } from "lucide-react";
+import { Eye, FileText, Loader2, UserRound } from "lucide-react";
+import { useState } from "react";
 import { formatPatientProfileStatus } from "@/config/ui-labels";
 import type { PatientPortalDetail } from "@/types/patient-portal";
 import PatientRecordReviewActions from "@/components/patient-records/PatientRecordReviewActions";
+import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 
 function formatDob(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -19,21 +21,36 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DocImage({ url, label, storagePath }: { url: string; label: string; storagePath?: string | null }) {
+function DocImage({
+  url, label, storagePath, onPreview,
+}: {
+  url: string; label: string; storagePath?: string | null;
+  onPreview?: (url: string, label: string) => void;
+}) {
   const isPdf = (storagePath ?? "").toLowerCase().endsWith(".pdf");
   return (
     <div className="overflow-hidden rounded-lg border">
       <p className="bg-muted/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      {isPdf ? (
-        <a href={url} target="_blank" rel="noopener noreferrer"
-          className="flex h-32 items-center justify-center gap-2 bg-muted/20 text-sm font-medium text-primary hover:underline">
-          <FileText className="h-5 w-5" />Xem PDF
-        </a>
-      ) : (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          <img src={url} alt={label} className="h-32 w-full object-cover transition-opacity hover:opacity-90" />
-        </a>
-      )}
+      <div className="relative">
+        {isPdf ? (
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="flex h-32 items-center justify-center gap-2 bg-muted/20 text-sm font-medium text-primary hover:underline">
+            <FileText className="h-5 w-5" />Xem PDF
+          </a>
+        ) : (
+          <img src={url} alt={label} className="h-32 w-full object-cover" />
+        )}
+        {!isPdf ? (
+          <button
+            type="button"
+            onClick={() => onPreview?.(url, label)}
+            aria-label={`Xem ảnh ${label}`}
+            className="absolute bottom-2 left-2 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-foreground shadow hover:bg-white"
+          >
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -61,6 +78,8 @@ const PatientRecordDetailPanel = ({
   canReview = false,
   onReviewed,
 }: PatientRecordDetailPanelProps) => {
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
@@ -86,6 +105,7 @@ const PatientRecordDetailPanel = ({
     profile.id_number?.trim() || `QC-${profile.id.slice(0, 8).toUpperCase()}`;
 
   return (
+    <>
     <div className="space-y-5">
       <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-primary to-primary/80 p-4 text-primary-foreground">
         <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-foreground/20">
@@ -157,13 +177,16 @@ const PatientRecordDetailPanel = ({
           <h3 className="mb-2 text-sm font-semibold text-foreground">Ảnh giấy tờ</h3>
           <div className="grid gap-3 sm:grid-cols-3">
             {imageUrls.idFront && (
-              <DocImage url={imageUrls.idFront} label="CCCD mặt trước" storagePath={profile.id_document_storage_path} />
+              <DocImage url={imageUrls.idFront} label="CCCD mặt trước" storagePath={profile.id_document_storage_path}
+                onPreview={(url, label) => setLightbox({ url, label })} />
             )}
             {imageUrls.idBack && (
-              <DocImage url={imageUrls.idBack} label="CCCD mặt sau" storagePath={profile.id_document_back_storage_path} />
+              <DocImage url={imageUrls.idBack} label="CCCD mặt sau" storagePath={profile.id_document_back_storage_path}
+                onPreview={(url, label) => setLightbox({ url, label })} />
             )}
             {imageUrls.card && (
-              <DocImage url={imageUrls.card} label="Thẻ BHYT" storagePath={profile.card_front_storage_path} />
+              <DocImage url={imageUrls.card} label="Thẻ BHYT" storagePath={profile.card_front_storage_path}
+                onPreview={(url, label) => setLightbox({ url, label })} />
             )}
           </div>
         </section>
@@ -178,6 +201,14 @@ const PatientRecordDetailPanel = ({
         />
       ) : null}
     </div>
+    {lightbox ? (
+      <DocImageLightbox
+        url={lightbox.url}
+        label={lightbox.label}
+        onClose={() => setLightbox(null)}
+      />
+    ) : null}
+    </>
   );
 };
 

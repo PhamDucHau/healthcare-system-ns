@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { hasPatientRecord, useMyPatientProfile } from "@/hooks/useMyPatientProfile";
 import {
   AlertTriangle,
+  Eye,
   FileText,
   FileUser,
   Loader2,
@@ -24,6 +25,7 @@ import {
   type BhytParsed,
   type CccdParsed,
 } from "@/lib/cccd-ocr";
+import { validateCccdRequired } from "@/lib/cccd-required";
 import { supabase } from "@/lib/supabase";
 import { type PatientPortalDetail } from "@/types/patient-portal";
 import {
@@ -34,6 +36,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import DocImageLightbox from "@/components/onboarding/DocImageLightbox";
 
 type PatientProfileDialogProps = {
   open: boolean;
@@ -213,6 +216,7 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 function EditField({
+  id,
   label,
   value,
   onChange,
@@ -220,7 +224,10 @@ function EditField({
   type = "text",
   highlight,
   multiline,
+  required,
+  error,
 }: {
+  id?: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -228,9 +235,11 @@ function EditField({
   type?: string;
   highlight?: "error" | "warn";
   multiline?: boolean;
+  required?: boolean;
+  error?: string;
 }) {
   const borderClass =
-    highlight === "error"
+    error || highlight === "error"
       ? "border-destructive/60 bg-destructive/5"
       : highlight === "warn"
         ? "border-warning/60 bg-warning/5"
@@ -238,9 +247,12 @@ function EditField({
   const fieldClass = "mt-0.5 w-full bg-transparent text-sm font-medium text-foreground outline-none";
   return (
     <div className={`rounded-lg border px-3 py-2 ${borderClass}`}>
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}{required ? <span className="ml-0.5 text-destructive" aria-hidden="true">*</span> : null}
+      </label>
       {multiline ? (
         <textarea
+          id={id}
           rows={3}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -249,6 +261,7 @@ function EditField({
         />
       ) : (
         <input
+          id={id}
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -256,32 +269,48 @@ function EditField({
           className={fieldClass}
         />
       )}
+      {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }
 
-function DocPreview({ url, label, storagePath }: { url: string; label: string; storagePath: string | null }) {
+function DocPreview({
+  url, label, storagePath, onPreview,
+}: {
+  url: string; label: string; storagePath: string | null;
+  onPreview?: (url: string, label: string) => void;
+}) {
   const isPdf = (storagePath ?? "").toLowerCase().endsWith(".pdf");
   return (
     <div className="overflow-hidden rounded-lg border">
       <p className="bg-muted/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-      {isPdf ? (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex h-32 items-center justify-center gap-2 bg-muted/20 text-sm font-medium text-primary hover:underline"
-        >
-          <FileText className="h-5 w-5" />
-          Xem PDF
-        </a>
-      ) : (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          <img src={url} alt={label} className="h-32 w-full object-cover transition-opacity hover:opacity-90" />
-        </a>
-      )}
+      <div className="relative">
+        {isPdf ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-32 items-center justify-center gap-2 bg-muted/20 text-sm font-medium text-primary hover:underline"
+          >
+            <FileText className="h-5 w-5" />
+            Xem PDF
+          </a>
+        ) : (
+          <img src={url} alt={label} className="h-32 w-full object-cover" />
+        )}
+        {!isPdf ? (
+          <button
+            type="button"
+            onClick={() => onPreview?.(url, label)}
+            aria-label={`Xem ảnh ${label}`}
+            className="absolute bottom-2 left-2 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-foreground shadow hover:bg-white"
+          >
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -296,6 +325,7 @@ function EditableDocPreview({
   onOcr,
   ocrLoading,
   ocrDisabled,
+  onPreview,
 }: {
   inputId: string;
   label: string;
@@ -306,6 +336,7 @@ function EditableDocPreview({
   onOcr?: () => void;
   ocrLoading?: boolean;
   ocrDisabled?: boolean;
+  onPreview?: (url: string, label: string) => void;
 }) {
   const [previewUrl, setPreviewUrl] = useState("");
 
@@ -324,12 +355,30 @@ function EditableDocPreview({
   const showNewPdf = newFile && !newFile.type.startsWith("image/");
   const displayImageUrl = previewUrl || (!newFile ? existingUrl : null);
   const hasImage = Boolean(newFile || existingUrl);
+  const canPreviewImage = Boolean(displayImageUrl) && !showExistingPdf && !showNewPdf;
 
   return (
     <div className="overflow-hidden rounded-lg border border-primary/30">
-      <p className="bg-primary/5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
+      <div className="flex items-center justify-between bg-primary/5 px-2 py-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        {onOcr && hasImage ? (
+          <button
+            type="button"
+            onClick={onOcr}
+            disabled={ocrLoading || ocrDisabled}
+            className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+          >
+            {ocrLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <ScanSearch className="h-3 w-3" aria-hidden="true" />
+            )}
+            {ocrLoading ? "OCR…" : "OCR lại"}
+          </button>
+        ) : null}
+      </div>
 
       <div className="relative">
         {showExistingPdf || showNewPdf ? (
@@ -350,34 +399,17 @@ function EditableDocPreview({
           </div>
         )}
 
-        {/* Hover overlay to trigger upload */}
-        <label
-          htmlFor={inputId}
-          className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/0 transition-colors hover:bg-black/30"
-        >
-          <span className="rounded-lg bg-white/0 px-3 py-1.5 text-xs font-semibold text-transparent transition-all hover:bg-white/90 hover:text-foreground group-hover:text-foreground">
-            Thay ảnh
-          </span>
-        </label>
-        {onOcr && hasImage ? (
+        {canPreviewImage ? (
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOcr();
-            }}
-            disabled={ocrLoading || ocrDisabled}
-            className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-primary shadow hover:bg-white disabled:opacity-50"
+            onClick={() => onPreview?.(displayImageUrl!, label)}
+            aria-label={`Xem ảnh ${label}`}
+            className="absolute bottom-2 left-2 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-foreground shadow hover:bg-white"
           >
-            {ocrLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-            ) : (
-              <ScanSearch className="h-3 w-3" aria-hidden="true" />
-            )}
-            {ocrLoading ? "OCR…" : "OCR lại"}
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         ) : null}
+
         <label
           htmlFor={inputId}
           className="absolute bottom-2 right-2 z-10 flex cursor-pointer items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-foreground shadow hover:bg-white"
@@ -414,6 +446,8 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
   const [editData, setEditData] = useState<EditData | null>(null);
   const [editFiles, setEditFiles] = useState<EditFiles>(emptyEditFiles);
   const [ocrSlot, setOcrSlot] = useState<OcrSlot | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
   const {
     dupState, bypassed,
@@ -501,6 +535,8 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     setEditData(profileToEditData(data));
     setEditFiles(emptyEditFiles);
     setOcrSlot(null);
+    setErrors({});
+    setLightbox(null);
     setIsEditing(true);
   };
 
@@ -509,6 +545,8 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
     setEditData(null);
     setEditFiles(emptyEditFiles);
     setOcrSlot(null);
+    setErrors({});
+    setLightbox(null);
     resetDup();
   };
 
@@ -611,6 +649,26 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
 
   const handleSave = async () => {
     if (!userId || !editData) return;
+
+    const cccdErrs = validateCccdRequired({
+      idNumber: editData.idNumber,
+      expirationDate: editData.idExpirationDate,
+      residentialAddress: editData.residentialAddress,
+      issuedDate: editData.idIssuedDate,
+      issuer: editData.idIssuer,
+    });
+    if (Object.keys(cccdErrs).length > 0) {
+      setErrors({
+        idNumber: cccdErrs.idNumber,
+        expirationDate: cccdErrs.expirationDate,
+        residentialAddress: cccdErrs.residentialAddress,
+        issuedDate: cccdErrs.issuedDate,
+        issuer: cccdErrs.issuer,
+      });
+      toast.error("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
+    setErrors({});
 
     // Final duplicate check before saving
     const fullName = [editData.legalFirstName, editData.legalLastName].filter(Boolean).join(" ");
@@ -723,6 +781,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
   };
 
   return (
+    <>
     <Sheet
       open={open}
       onOpenChange={(v) => {
@@ -852,9 +911,11 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
               {isEditing && editData ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <EditField
+                    id="idNumber"
                     label="Số CCCD/ID" value={editData.idNumber} onChange={set("idNumber")}
                     onBlur={() => void checkCccd(editData.idNumber)}
                     highlight={dupState.cccdMatchId ? "error" : undefined}
+                    required error={errors.idNumber}
                   />
                   {dupState.cccdMatchId ? (
                     <div className="sm:col-span-2 -mt-1 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -862,11 +923,15 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                       <span><strong>Trùng CCCD.</strong> Số CCCD này đã có hồ sơ khác trong hệ thống. Không thể lưu.</span>
                     </div>
                   ) : null}
-                  <EditField label="Nơi cấp" value={editData.idIssuer} onChange={set("idIssuer")} multiline />
-                  <EditField label="Ngày cấp" value={editData.idIssuedDate} onChange={set("idIssuedDate")} type="date" />
-                  <EditField label="Ngày hết hạn" value={editData.idExpirationDate} onChange={set("idExpirationDate")} type="date" />
+                  <EditField id="issuer" label="Nơi cấp" value={editData.idIssuer} onChange={set("idIssuer")} multiline
+                    required error={errors.issuer} />
+                  <EditField id="issuedDate" label="Ngày cấp" value={editData.idIssuedDate} onChange={set("idIssuedDate")} type="date"
+                    required error={errors.issuedDate} />
+                  <EditField id="expirationDate" label="Ngày hết hạn" value={editData.idExpirationDate} onChange={set("idExpirationDate")} type="date"
+                    required error={errors.expirationDate} />
                   <div className="sm:col-span-2">
-                    <EditField label="Địa chỉ" value={editData.residentialAddress} onChange={set("residentialAddress")} />
+                    <EditField id="residentialAddress" label="Địa chỉ" value={editData.residentialAddress} onChange={set("residentialAddress")}
+                      required error={errors.residentialAddress} />
                   </div>
                 </div>
               ) : (
@@ -898,6 +963,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                     onOcr={() => void handleOcrSlot("front")}
                     ocrLoading={ocrSlot === "front" || ocrSlot === "all"}
                     ocrDisabled={Boolean(ocrSlot)}
+                    onPreview={(url, label) => setLightbox({ url, label })}
                   />
                   <EditableDocPreview
                     inputId="edit-id-back"
@@ -909,6 +975,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                     onOcr={() => void handleOcrSlot("back")}
                     ocrLoading={ocrSlot === "back" || ocrSlot === "all"}
                     ocrDisabled={Boolean(ocrSlot)}
+                    onPreview={(url, label) => setLightbox({ url, label })}
                   />
                   <EditableDocPreview
                     inputId="edit-card-front"
@@ -920,6 +987,7 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                     onOcr={() => void handleOcrSlot("bhyt")}
                     ocrLoading={ocrSlot === "bhyt" || ocrSlot === "all"}
                     ocrDisabled={Boolean(ocrSlot)}
+                    onPreview={(url, label) => setLightbox({ url, label })}
                   />
                 </div>
                 <div className="mt-3 flex justify-end">
@@ -953,13 +1021,16 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
                 <h3 className="mb-2 text-sm font-semibold text-foreground">Ảnh giấy tờ đã tải lên</h3>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {idImageUrl ? (
-                    <DocPreview url={idImageUrl} label="CCCD mặt trước" storagePath={profile.id_document_storage_path} />
+                    <DocPreview url={idImageUrl} label="CCCD mặt trước" storagePath={profile.id_document_storage_path}
+                      onPreview={(url, label) => setLightbox({ url, label })} />
                   ) : null}
                   {idBackImageUrl ? (
-                    <DocPreview url={idBackImageUrl} label="CCCD mặt sau" storagePath={profile.id_document_back_storage_path} />
+                    <DocPreview url={idBackImageUrl} label="CCCD mặt sau" storagePath={profile.id_document_back_storage_path}
+                      onPreview={(url, label) => setLightbox({ url, label })} />
                   ) : null}
                   {cardImageUrl ? (
-                    <DocPreview url={cardImageUrl} label="Thẻ BHYT" storagePath={profile.card_front_storage_path} />
+                    <DocPreview url={cardImageUrl} label="Thẻ BHYT" storagePath={profile.card_front_storage_path}
+                      onPreview={(url, label) => setLightbox({ url, label })} />
                   ) : null}
                 </div>
               </section>
@@ -1034,6 +1105,14 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
         </div>
       </SheetContent>
     </Sheet>
+    {lightbox ? (
+      <DocImageLightbox
+        url={lightbox.url}
+        label={lightbox.label}
+        onClose={() => setLightbox(null)}
+      />
+    ) : null}
+    </>
   );
 };
 

@@ -42,6 +42,11 @@ function fillRequiredTextFields() {
   fireEvent.change(document.getElementById("legalFirstName")!, { target: { value: "An" } });
   fireEvent.change(document.getElementById("dateOfBirth")!, { target: { value: "1990-01-15" } });
   fireEvent.change(document.getElementById("phoneNumber")!, { target: { value: "0912345678" } });
+  fireEvent.change(document.getElementById("idNumber")!, { target: { value: "012345678901" } });
+  fireEvent.change(document.getElementById("expirationDate")!, { target: { value: "2030-01-01" } });
+  fireEvent.change(document.getElementById("residentialAddress")!, { target: { value: "Hà Nội" } });
+  fireEvent.change(document.getElementById("issuedDate")!, { target: { value: "2020-01-01" } });
+  fireEvent.change(document.getElementById("issuer")!, { target: { value: "Cục cảnh sát QLHC về TTXH" } });
 }
 
 describe("AdminNewPatientDialog optional document uploads", () => {
@@ -72,15 +77,23 @@ describe("AdminNewPatientDialog optional document uploads", () => {
     expect(screen.getByText(/Thẻ BHYT \(tùy chọn\)/)).toBeInTheDocument();
   });
 
-  it("should show Vui lòng nhập under empty required fields and leave CCCD optional", () => {
+  it("should show Vui lòng nhập under empty required fields including CCCD text fields", () => {
     render(<AdminNewPatientDialog open onClose={() => undefined} onSuccess={() => undefined} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
 
-    expect(screen.getAllByText("Vui lòng nhập").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByText("Vui lòng nhập").length).toBeGreaterThanOrEqual(9);
     expect(screen.queryByText("Bắt buộc")).not.toBeInTheDocument();
-    expect(document.querySelector('label[for="idNumber"]')?.textContent).toBe("Số CCCD");
+    expect(document.querySelector('label[for="idNumber"]')?.textContent).toMatch(/Số CCCD\s*\*/);
+    expect(document.querySelector('label[for="expirationDate"]')?.textContent).toMatch(/Ngày hết hạn\s*\*/);
+    expect(document.querySelector('label[for="residentialAddress"]')?.textContent).toMatch(/Địa chỉ thường trú\s*\*/);
+    expect(document.querySelector('label[for="issuedDate"]')?.textContent).toMatch(/Ngày cấp\s*\*/);
+    expect(document.querySelector('label[for="issuer"]')?.textContent).toMatch(/Nơi cấp\s*\*/);
     expect(document.querySelector('label[for="legalLastName"]')?.textContent).toMatch(/Họ\s*\*/);
+
+    for (const id of ["idNumber", "expirationDate", "residentialAddress", "issuedDate", "issuer"]) {
+      expect(document.getElementById(id)?.parentElement, id).toHaveTextContent("Vui lòng nhập");
+    }
   });
 
   it("should create a patient record when no CCCD or BHYT images are uploaded", async () => {
@@ -97,7 +110,7 @@ describe("AdminNewPatientDialog optional document uploads", () => {
       "Nguyễn",
       "0912345678",
       "1990-01-15",
-      null,
+      "012345678901",
     );
     expect(upsert).toHaveBeenCalled();
     expect(upload).not.toHaveBeenCalled();
