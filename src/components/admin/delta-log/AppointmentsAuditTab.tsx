@@ -179,7 +179,7 @@ export default function AppointmentsAuditTab() {
 
   return (
     <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
+      <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
@@ -250,39 +250,79 @@ export default function AppointmentsAuditTab() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          {/* Mobile card view */}
+          <div className="md:hidden divide-y divide-border/30">
+            {entries.map((e) => (
+              <div key={e.id} className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi })}
+                  </span>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_COLORS[e.action] ?? 'bg-muted text-muted-foreground'}`}>
+                    {ACTION_LABELS[e.action] ?? e.action}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{e.performed_by_name ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground">{e.specialty_name ?? '—'}</p>
+                  </div>
+                  {e.new_status && (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium shrink-0 ${STATUS_COLORS[e.new_status] ?? 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
+                      {STATUS_LABELS[e.new_status] ?? e.new_status}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailId(e.appointment_id)}
+                  className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  Xem chi tiết
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table view */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-card">
                 <tr className="border-b border-border/30">
-                  {['Thời gian', 'Hành động', 'Chuyên khoa', 'Người thực hiện', 'Trạng thái', 'Ghi chú', 'Chi tiết'].map((h) => (
-                    <th key={h} className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{h}</th>
-                  ))}
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Chuyên khoa</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người thực hiện</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trạng thái</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden xl:table-cell">Ghi chú</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chi tiết</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {entries.map((e) => (
                   <tr key={e.id} className="hover:bg-muted/30 transition-colors h-14">
-                    <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
                       {format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi })}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 lg:px-6 py-4">
                       <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${ACTION_COLORS[e.action] ?? 'bg-muted text-muted-foreground'}`}>
                         {ACTION_LABELS[e.action] ?? e.action}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm">{e.specialty_name ?? '—'}</td>
-                    <td className="px-6 py-4 text-sm">{e.performed_by_name ?? '—'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 lg:px-6 py-4 text-sm hidden lg:table-cell">{e.specialty_name ?? '—'}</td>
+                    <td className="px-4 lg:px-6 py-4 text-sm">{e.performed_by_name ?? '—'}</td>
+                    <td className="px-4 lg:px-6 py-4">
                       {e.new_status ? (
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[e.new_status] ?? 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
                           {STATUS_LABELS[e.new_status] ?? e.new_status}
                         </span>
                       ) : '—'}
                     </td>
-                    <td className="px-6 py-4 text-xs text-muted-foreground max-w-[200px] truncate">
+                    <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground max-w-[200px] truncate hidden xl:table-cell">
                       {e.notes ?? '—'}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 lg:px-6 py-4">
                       <button
                         type="button"
                         onClick={() => setDetailId(e.appointment_id)}
@@ -299,7 +339,7 @@ export default function AppointmentsAuditTab() {
           </div>
 
           {total > query.pageSize && (
-            <div className="px-6 py-4 flex items-center justify-between border-t border-border/30">
+            <div className="px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/30">
               <p className="text-xs text-muted-foreground">
                 Hiển thị {from} đến {to} của {total} bản ghi
               </p>

@@ -185,7 +185,7 @@ export default function SystemAuditTab() {
 
   return (
     <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
+      <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
@@ -256,28 +256,50 @@ export default function SystemAuditTab() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          {/* Mobile card view */}
+          <div className="md:hidden divide-y divide-border/30">
+            {entries.map((e) => (
+              <div key={e.id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi })}
+                  </span>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${EVENT_COLORS[e.event_type] ?? 'bg-muted text-muted-foreground'}`}>
+                    {EVENT_LABELS[e.event_type] ?? e.event_type}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{e.user_name ?? '—'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{e.email ?? '—'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table view */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-card">
                 <tr className="border-b border-border/30">
-                  {['Thời gian', 'Sự kiện', 'Email', 'Người dùng'].map((h) => (
-                    <th key={h} className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{h}</th>
-                  ))}
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sự kiện</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người dùng</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {entries.map((e) => (
                   <tr key={e.id} className="hover:bg-muted/30 transition-colors h-14">
-                    <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
                       {format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi })}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 lg:px-6 py-4">
                       <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${EVENT_COLORS[e.event_type] ?? 'bg-muted text-muted-foreground'}`}>
                         {EVENT_LABELS[e.event_type] ?? e.event_type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm">{e.email ?? '—'}</td>
-                    <td className="px-6 py-4 text-sm">{e.user_name ?? '—'}</td>
+                    <td className="px-4 lg:px-6 py-4 text-sm">{e.email ?? '—'}</td>
+                    <td className="px-4 lg:px-6 py-4 text-sm">{e.user_name ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -285,7 +307,7 @@ export default function SystemAuditTab() {
           </div>
 
           {total > query.pageSize && (
-            <div className="px-6 py-4 flex items-center justify-between border-t border-border/30">
+            <div className="px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/30">
               <p className="text-xs text-muted-foreground">
                 Hiển thị {from} đến {to} của {total} bản ghi
               </p>
