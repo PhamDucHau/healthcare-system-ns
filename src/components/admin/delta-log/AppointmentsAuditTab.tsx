@@ -1,0 +1,356 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { listAppointmentsAuditLog } from '@/lib/delta-log-api';
+import type { AppointmentsAuditEntry, AppointmentAction } from '@/types/delta-log';
+import { exportRowsToCsv } from '@/lib/csv-export';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import AppointmentDetailDialog from './AppointmentDetailDialog';
+
+const SEARCH_DEBOUNCE_MS = 300;
+const PAGE_SIZE = 10;
+
+const ACTION_FILTER_OPTIONS: { value: AppointmentAction | ''; label: string }[] = [
+  { value: '', label: 'Tất cả' },
+  { value: 'CREATE_WALKIN', label: 'Tạo walk-in' },
+  { value: 'CHECKIN', label: 'Check-in' },
+  { value: 'CANCEL', label: 'Hủy' },
+  { value: 'RESCHEDULE', label: 'Đổi lịch' },
+  { value: 'BULK_CANCEL', label: 'Hủy hàng loạt' },
+];
+
+const ACTION_LABELS: Record<string, string> = {
+  CREATE_WALKIN: 'Tạo walk-in',
+  CHECKIN: 'Check-in',
+  CANCEL: 'Hủy lịch',
+  RESCHEDULE: 'Đổi lịch',
+  BULK_CANCEL: 'Hủy hàng loạt',
+};
+
+const ACTION_COLORS: Record<string, string> = {
+  CREATE_WALKIN: 'bg-green-100 text-green-700',
+  CHECKIN: 'bg-blue-100 text-blue-700',
+  CANCEL: 'bg-red-100 text-red-700',
+  RESCHEDULE: 'bg-yellow-100 text-yellow-700',
+  BULK_CANCEL: 'bg-red-100 text-red-700',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  SCHEDULED: 'Đã đặt',
+  CONFIRMED: 'Đã xác nhận',
+  CHECKED_IN: 'Đã check-in',
+  IN_PROGRESS: 'Đang khám',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã hủy',
+  NO_SHOW: 'Không đến',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  SCHEDULED: 'bg-blue-50 text-blue-700 border border-blue-200',
+  CONFIRMED: 'bg-blue-50 text-blue-700 border border-blue-200',
+  CHECKED_IN: 'bg-teal-50 text-teal-700 border border-teal-200',
+  IN_PROGRESS: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+  COMPLETED: 'bg-green-50 text-green-700 border border-green-200',
+  CANCELLED: 'bg-gray-50 text-gray-600 border border-gray-200',
+  NO_SHOW: 'bg-red-50 text-red-700 border border-red-200',
+};
+
+const EXPORT_COLUMNS = [
+  { key: 'time', label: 'Thời gian' },
+  { key: 'action', label: 'Hành động' },
+  { key: 'performed_by', label: 'Người thực hiện' },
+  { key: 'old_status', label: 'Trạng thái cũ' },
+  { key: 'new_status', label: 'Trạng thái mới' },
+  { key: 'notes', label: 'Ghi chú' },
+];
+
+type Query = {
+  search: string;
+  page: number;
+  pageSize: number;
+};
+
+export default function AppointmentsAuditTab() {
+  const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
+  const [filterAction, setFilterAction] = useState<AppointmentAction | ''>('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [entries, setEntries] = useState<AppointmentsAuditEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(query.search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query.search]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listAppointmentsAuditLog({
+      search: debouncedSearch || undefined,
+      page: query.page,
+      limit: query.pageSize,
+      action: filterAction || undefined,
+    })
+      .then(({ rows, total: nextTotal }) => {
+        if (!cancelled) {
+          setEntries(rows);
+          setTotal(nextTotal);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) {
+          setEntries([]);
+          setTotal(0);
+          toast.error(e.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [debouncedSearch, query.page, query.pageSize, filterAction]);
+
+  const onQueryChange = useCallback((patch: Partial<Query>) => {
+    setQuery((current) => ({
+      ...current,
+      ...patch,
+      page: patch.page ?? (patch.search !== undefined ? 1 : current.page),
+    }));
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+  const safePage = Math.min(query.page, totalPages);
+  const from = total === 0 ? 0 : (safePage - 1) * query.pageSize + 1;
+  const to = Math.min(safePage * query.pageSize, total);
+
+  useEffect(() => {
+    if (query.page > totalPages) onQueryChange({ page: totalPages });
+  }, [query.page, totalPages, onQueryChange]);
+
+  const visiblePages = useMemo(() => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (safePage > 3) pages.push('ellipsis');
+      const start = Math.max(2, safePage - 1);
+      const end = Math.min(totalPages - 1, safePage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (safePage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [totalPages, safePage]);
+
+  const filterLabel = ACTION_FILTER_OPTIONS.find((o) => o.value === filterAction)?.label ?? 'Tất cả';
+  const searchNorm = query.search.trim().toLowerCase();
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const { rows } = await listAppointmentsAuditLog({
+        search: debouncedSearch || undefined,
+        page: 1,
+        limit: 1000,
+        action: filterAction || undefined,
+      });
+      const data = rows.map((e) => ({
+        time: format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi }),
+        action: ACTION_LABELS[e.action] ?? e.action,
+        performed_by: e.performed_by_name ?? '—',
+        old_status: e.old_status ? STATUS_LABELS[e.old_status] ?? e.old_status : '—',
+        new_status: e.new_status ? STATUS_LABELS[e.new_status] ?? e.new_status : '—',
+        notes: e.notes ?? '—',
+      }));
+      exportRowsToCsv('lich-hen-audit.csv', EXPORT_COLUMNS, data);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="search"
+            value={query.search}
+            onChange={(e) => onQueryChange({ search: e.target.value })}
+            placeholder="Tìm kiếm lịch hẹn..."
+            className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={`p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors ${
+                    filterAction ? 'border-primary text-primary bg-accent/20' : ''
+                  }`}
+                  title="Lọc theo hành động"
+                >
+                  <Filter className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-48 p-2">
+                <p className="px-3 py-1 text-[10px] font-semibold uppercase text-muted-foreground">Lọc theo hành động</p>
+                {ACTION_FILTER_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { setFilterAction(o.value); setFilterOpen(false); onQueryChange({ page: 1 }); }}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                      filterAction === o.value
+                        ? 'bg-accent/30 text-primary font-semibold'
+                        : 'hover:bg-muted text-foreground'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+            {filterAction && (
+              <span className="text-xs text-muted-foreground hidden sm:inline">{filterLabel}</span>
+            )}
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={total === 0 || exporting}
+              className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+              title="Xuất CSV"
+            >
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+      ) : total === 0 ? (
+        <div className="p-12 text-center text-sm text-muted-foreground">
+          {searchNorm || filterAction
+            ? searchNorm
+              ? `Không tìm thấy kết quả cho "${query.search.trim()}".`
+              : 'Không có bản ghi phù hợp với bộ lọc.'
+            : 'Chưa có nhật ký lịch hẹn.'}
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-card">
+                <tr className="border-b border-border/30">
+                  {['Thời gian', 'Hành động', 'Chuyên khoa', 'Người thực hiện', 'Trạng thái', 'Ghi chú', 'Chi tiết'].map((h) => (
+                    <th key={h} className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {entries.map((e) => (
+                  <tr key={e.id} className="hover:bg-muted/30 transition-colors h-14">
+                    <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                      {format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${ACTION_COLORS[e.action] ?? 'bg-muted text-muted-foreground'}`}>
+                        {ACTION_LABELS[e.action] ?? e.action}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm">{e.specialty_name ?? '—'}</td>
+                    <td className="px-6 py-4 text-sm">{e.performed_by_name ?? '—'}</td>
+                    <td className="px-6 py-4">
+                      {e.new_status ? (
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[e.new_status] ?? 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
+                          {STATUS_LABELS[e.new_status] ?? e.new_status}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-muted-foreground max-w-[200px] truncate">
+                      {e.notes ?? '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => setDetailId(e.appointment_id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        Xem chi tiết
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {total > query.pageSize && (
+            <div className="px-6 py-4 flex items-center justify-between border-t border-border/30">
+              <p className="text-xs text-muted-foreground">
+                Hiển thị {from} đến {to} của {total} bản ghi
+              </p>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => onQueryChange({ page: safePage - 1 })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {visiblePages.map((n, idx) => (
+                  n === 'ellipsis' ? (
+                    <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-muted-foreground">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => onQueryChange({ page: n })}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
+                        n === safePage
+                          ? 'bg-primary text-primary-foreground'
+                          : 'border border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  )
+                ))}
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => onQueryChange({ page: safePage + 1 })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <AppointmentDetailDialog
+        appointmentId={detailId}
+        open={!!detailId}
+        onOpenChange={(open) => { if (!open) setDetailId(null); }}
+      />
+    </div>
+  );
+}

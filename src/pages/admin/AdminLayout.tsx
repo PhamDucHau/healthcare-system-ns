@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Users, Search,
-  LogOut, Menu, Loader2, FileUser, FolderOpen, CalendarDays, ClipboardList, Brain, KeyRound, UserRound, Stethoscope, Shield,
+  LogOut, Menu, Loader2, FileUser, FolderOpen, CalendarDays, ClipboardList, Brain, KeyRound, UserRound, Stethoscope, Shield, ScrollText,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ const sidebarItems = [
   { icon: KeyRound,      label: "Danh sách quyền",     path: "/admin/permissions" },
   { icon: Shield,        label: "Quản lý vai trò",     path: "/admin/roles" },
   { icon: Brain,         label: "Độ chính xác AI",     path: "/admin/ai-accuracy" },
+  { icon: ScrollText,    label: "Nhật ký hệ thống",    path: "/admin/delta-log" },
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>

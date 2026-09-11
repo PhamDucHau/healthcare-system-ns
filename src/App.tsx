@@ -55,6 +55,7 @@ import ExaminationPage from "./pages/provider/ExaminationPage.tsx";
 import DoctorProfilePage from "./pages/provider/DoctorProfilePage.tsx";
 import ClinicalTasksContent from "./components/provider/ClinicalTasksContent.tsx";
 import AdminAiAccuracyPage from "./pages/admin/AdminAiAccuracyPage.tsx";
+import DeltaLogPage from "./pages/admin/DeltaLogPage.tsx";
 import CustomerPortal from "./pages/customer/CustomerPortal.tsx";
 import CustomerOverviewPage from "./pages/customer/CustomerOverviewPage.tsx";
 import CustomerPermissionGuard from "./pages/customer/CustomerPermissionGuard.tsx";
@@ -256,7 +257,7 @@ const App = () => (
               <Route path="permissions" element={<AdminPermissionsContent />} />
               <Route path="roles" element={<AdminRolesContent />} />
               <Route path="tasks" element={<ClinicalTasksContent portal="admin" />} />
-              <Route path="logs" element={<AdminSectionPlaceholder title="System Logs" />} />
+              <Route path="delta-log" element={<DeltaLogPage />} />
               <Route path="settings" element={<AdminSectionPlaceholder title="Settings" />} />
               <Route path="question-library" element={<QuestionLibraryPage />} />
               <Route path="question-library/new" element={<QuestionnaireBuilderPage />} />
