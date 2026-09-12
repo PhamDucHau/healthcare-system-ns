@@ -4,6 +4,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { analyzeTranscript, suggestIcd10 } from '@/lib/stt-nlp-api';
+import { decrypt, encrypt } from '@/lib/crypto';
 import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
 import type {
   MedicalExamination,
@@ -12,6 +13,33 @@ import type {
   SignExaminationResult,
   AiIcdSuggestion,
 } from '@/types/emr';
+
+// Helper to decrypt SOAP fields
+async function decryptSoapFields(row: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const decrypted = { ...row };
+  for (const field of ['s_text', 'o_text', 'a_text', 'p_text']) {
+    const value = row[field];
+    if (value && typeof value === 'string') {
+      decrypted[field] = await decrypt(value);
+    }
+  }
+  return decrypted;
+}
+
+// Helper to encrypt SOAP fields before saving
+async function encryptSoapFields(fields: {
+  s_text?: string;
+  o_text?: string;
+  a_text?: string;
+  p_text?: string;
+}): Promise<typeof fields> {
+  const encrypted: typeof fields = {};
+  if (fields.s_text) encrypted.s_text = await encrypt(fields.s_text);
+  if (fields.o_text) encrypted.o_text = await encrypt(fields.o_text);
+  if (fields.a_text) encrypted.a_text = await encrypt(fields.a_text);
+  if (fields.p_text) encrypted.p_text = await encrypt(fields.p_text);
+  return encrypted;
+}
 
 // ─── Row Mappers ──────────────────────────────────────────────────────────────
 
@@ -31,8 +59,11 @@ function mapIcdRow(row: Record<string, unknown>): SoapIcdCode {
   };
 }
 
-function mapExamRow(row: Record<string, unknown>): MedicalExamination {
-  const rawIcds = row.icd_codes;
+async function mapExamRow(row: Record<string, unknown>): Promise<MedicalExamination> {
+  // Decrypt SOAP fields
+  const decrypted = await decryptSoapFields(row);
+
+  const rawIcds = decrypted.icd_codes;
   let icdCodes: SoapIcdCode[] = [];
   if (Array.isArray(rawIcds)) {
     icdCodes = rawIcds.map((i) => mapIcdRow(i as Record<string, unknown>));
@@ -48,20 +79,20 @@ function mapExamRow(row: Record<string, unknown>): MedicalExamination {
   }
 
   return {
-    id: String(row.id),
-    appointment_id: String(row.appointment_id),
-    patient_id: String(row.patient_id),
-    doctor_id: String(row.doctor_id),
-    s_text: row.s_text != null ? String(row.s_text) : null,
-    o_text: row.o_text != null ? String(row.o_text) : null,
-    a_text: row.a_text != null ? String(row.a_text) : null,
-    p_text: row.p_text != null ? String(row.p_text) : null,
-    status: row.status as MedicalExamination['status'],
-    is_addendum: Boolean(row.is_addendum),
-    parent_exam_id: row.parent_exam_id != null ? String(row.parent_exam_id) : null,
-    auto_saved_at: row.auto_saved_at != null ? String(row.auto_saved_at) : null,
-    created_at: String(row.created_at),
-    updated_at: String(row.updated_at),
+    id: String(decrypted.id),
+    appointment_id: String(decrypted.appointment_id),
+    patient_id: String(decrypted.patient_id),
+    doctor_id: String(decrypted.doctor_id),
+    s_text: decrypted.s_text != null ? String(decrypted.s_text) : null,
+    o_text: decrypted.o_text != null ? String(decrypted.o_text) : null,
+    a_text: decrypted.a_text != null ? String(decrypted.a_text) : null,
+    p_text: decrypted.p_text != null ? String(decrypted.p_text) : null,
+    status: decrypted.status as MedicalExamination['status'],
+    is_addendum: Boolean(decrypted.is_addendum),
+    parent_exam_id: decrypted.parent_exam_id != null ? String(decrypted.parent_exam_id) : null,
+    auto_saved_at: decrypted.auto_saved_at != null ? String(decrypted.auto_saved_at) : null,
+    created_at: String(decrypted.created_at),
+    updated_at: String(decrypted.updated_at),
     icd_codes: icdCodes,
   };
 }
@@ -92,7 +123,7 @@ export async function getExaminationByAppointment(
   if (error) throw new Error(mapEmrError(error.message));
   const rows = data as Record<string, unknown>[] | null;
   if (!rows || rows.length === 0) return null;
-  return mapExamRow(rows[0]);
+  return await mapExamRow(rows[0]);
 }
 
 /**
@@ -108,12 +139,15 @@ export async function saveSoapDraft(
     p_text?: string;
   }
 ): Promise<string> {
+  // Encrypt SOAP fields before saving
+  const encrypted = await encryptSoapFields(fields);
+
   const { data, error } = await supabase.rpc('save_soap_draft', {
     p_exam_id: examId,
-    p_s_text: fields.s_text ?? null,
-    p_o_text: fields.o_text ?? null,
-    p_a_text: fields.a_text ?? null,
-    p_p_text: fields.p_text ?? null,
+    p_s_text: encrypted.s_text ?? null,
+    p_o_text: encrypted.o_text ?? null,
+    p_a_text: encrypted.a_text ?? null,
+    p_p_text: encrypted.p_text ?? null,
   });
   if (error) throw new Error(mapEmrError(error.message));
   return data as string;

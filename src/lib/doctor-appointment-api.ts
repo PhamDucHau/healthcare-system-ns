@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { decrypt } from "@/lib/crypto";
 import type { AdminAppointment } from "@/types/admin-appointment";
 
 export type DoctorAppointmentFilters = {
@@ -30,7 +31,7 @@ type SearchDoctorAppointmentsRpcPayload = {
   rows?: Record<string, unknown>[] | null;
 };
 
-function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
+async function mapJoinedAppointmentRow(r: Record<string, unknown>): Promise<AdminAppointment> {
   const sl = r.appointment_slots as Record<string, unknown> | null;
   const pt = r.patient as Record<string, string> | null;
   const sp = r.specialties as Record<string, string> | null;
@@ -42,6 +43,9 @@ function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
   const vitalsRaw = r.vital_signs as unknown[] | null;
   const pcFlags = (pc?.flags as Record<string, unknown> | undefined) ?? {};
   const dpcFlags = (dpc?.flags as Record<string, unknown> | undefined) ?? {};
+
+  // Decrypt patient phone
+  const patientPhone = pt?.phone_number ? await decrypt(pt.phone_number) : null;
 
   return {
     id: r.id as string,
@@ -64,7 +68,7 @@ function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
     end_time: (sl?.end_time as string) ?? null,
     doctor_id: (sl?.doctor_id as string) ?? null,
     patient_name: [pt?.legal_last_name, pt?.legal_first_name].filter(Boolean).join(" ") || null,
-    patient_phone: pt?.phone_number ?? null,
+    patient_phone: patientPhone,
     patient_dob: pt?.date_of_birth ?? null,
     doctor_name: doc?.full_name ?? null,
     pre_consult_status: !pc ? "none" : pc.status === "SUBMITTED" ? "submitted" : "draft",
@@ -75,10 +79,13 @@ function mapJoinedAppointmentRow(r: Record<string, unknown>): AdminAppointment {
   };
 }
 
-export function mapRpcDoctorAppointmentRow(r: Record<string, unknown>): AdminAppointment {
+export async function mapRpcDoctorAppointmentRow(r: Record<string, unknown>): Promise<AdminAppointment> {
   const pcFlags = (r.pre_consult_flags as Record<string, unknown> | null) ?? {};
   const dpcFlags = (r.pre_consult_doctor_flags as Record<string, unknown> | null) ?? {};
   const preConsultRaw = r.pre_consult_status_raw as string | null;
+
+  // Decrypt patient phone
+  const patientPhone = r.patient_phone ? await decrypt(r.patient_phone as string) : null;
 
   return {
     id: r.id as string,
@@ -101,7 +108,7 @@ export function mapRpcDoctorAppointmentRow(r: Record<string, unknown>): AdminApp
     end_time: (r.end_time as string) ?? null,
     doctor_id: (r.doctor_id as string) ?? null,
     patient_name: (r.patient_name as string) ?? null,
-    patient_phone: (r.patient_phone as string) ?? null,
+    patient_phone: patientPhone,
     patient_dob: (r.patient_dob as string) ?? null,
     doctor_name: (r.doctor_name as string) ?? null,
     pre_consult_status: !preConsultRaw
@@ -166,7 +173,9 @@ export async function searchDoctorAppointments(
   }
 
   const payload = (data ?? {}) as SearchDoctorAppointmentsRpcPayload;
-  const rows = (payload.rows ?? []).map((row) => mapRpcDoctorAppointmentRow(row));
+  const rows = await Promise.all(
+    (payload.rows ?? []).map((row) => mapRpcDoctorAppointmentRow(row))
+  );
 
   return {
     rows,
@@ -235,7 +244,7 @@ export async function fetchDoctorAppointments(
     });
   }
 
-  return rows.map(mapJoinedAppointmentRow);
+  return Promise.all(rows.map(mapJoinedAppointmentRow));
 }
 
 export async function sendPreConsultReminder(

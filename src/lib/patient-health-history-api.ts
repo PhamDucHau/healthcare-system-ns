@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { decrypt } from '@/lib/crypto';
 import {
   mapHealthHistoryRow,
   mapHealthChartViewRow,
@@ -11,6 +12,19 @@ import {
   type PatientHealthHistory,
   type PatientHealthChartView,
 } from '@/types/patient-health-history';
+
+// Decrypt sensitive fields in medical charts
+async function decryptChartFields(row: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const decrypted = { ...row };
+  const sensitiveFields = ['emergency_contact_phone', 'emergency_contact_name', 'clinical_note'];
+  for (const field of sensitiveFields) {
+    const value = row[field];
+    if (value && typeof value === 'string') {
+      decrypted[field] = await decrypt(value);
+    }
+  }
+  return decrypted;
+}
 
 const CHART_SELECT =
   'id, patient_user_id, full_name, blood_type, preferred_language, emergency_contact_name, emergency_contact_phone, allergies, medications, diagnoses, surgeries, immunizations, affirmations, updated_at';
@@ -101,7 +115,9 @@ export async function fetchPatientHealthChartByUserId(
 ): Promise<PatientHealthChartView | null> {
   const data = await selectChartByUserId(patientUserId, CHART_SELECT_STAFF);
   if (!data) return null;
-  return mapHealthChartViewRow(data);
+  // Decrypt sensitive fields before mapping
+  const decrypted = await decryptChartFields(data);
+  return mapHealthChartViewRow(decrypted);
 }
 
 export type HealthHistoryPatch = Partial<{
@@ -134,7 +150,9 @@ export async function fetchMyHealthHistory(): Promise<PatientHealthHistory> {
 
   const data = await selectMyChart(user.id);
   if (!data) return ensureChart();
-  return mapHealthHistoryRow(data);
+  // Decrypt sensitive fields before mapping
+  const decrypted = await decryptChartFields(data);
+  return mapHealthHistoryRow(decrypted);
 }
 
 export async function updateHealthHistory(patch: HealthHistoryPatch): Promise<PatientHealthHistory> {
@@ -146,6 +164,15 @@ export async function updateHealthHistory(patch: HealthHistoryPatch): Promise<Pa
   const payload: Record<string, unknown> = { ...patch };
   if (patch.affirmations) payload.affirmations = patch.affirmations;
 
+  // Encrypt sensitive fields before saving
+  const { encrypt } = await import('@/lib/crypto');
+  if (patch.emergency_contact_phone) {
+    payload.emergency_contact_phone = await encrypt(patch.emergency_contact_phone);
+  }
+  if (patch.emergency_contact_name) {
+    payload.emergency_contact_name = await encrypt(patch.emergency_contact_name);
+  }
+
   const { data, error } = await supabase
     .from('patient_medical_charts')
     .update(payload)
@@ -154,7 +181,9 @@ export async function updateHealthHistory(patch: HealthHistoryPatch): Promise<Pa
     .single();
 
   if (error) throw new Error(error.message);
-  return mapHealthHistoryRow(data as Record<string, unknown>);
+  // Decrypt before returning
+  const decrypted = await decryptChartFields(data as Record<string, unknown>);
+  return mapHealthHistoryRow(decrypted);
 }
 
 export async function addAllergy(item: Omit<HealthAllergy, 'id'>): Promise<PatientHealthHistory> {

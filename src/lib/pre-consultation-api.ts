@@ -4,6 +4,38 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { decrypt, encrypt } from '@/lib/crypto';
+
+// Pre-consultation sensitive fields
+const PRE_CONSULT_SENSITIVE_FIELDS = [
+  'chief_complaint',
+  'surgical_history',
+  'otc_supplements',
+  'smoking_frequency',
+  'alcohol_frequency',
+] as const;
+
+async function decryptPreConsultFields(row: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const decrypted = { ...row };
+  for (const field of PRE_CONSULT_SENSITIVE_FIELDS) {
+    const value = row[field];
+    if (value && typeof value === 'string') {
+      decrypted[field] = await decrypt(value);
+    }
+  }
+  return decrypted;
+}
+
+async function encryptPreConsultFields(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const encrypted = { ...input };
+  for (const field of PRE_CONSULT_SENSITIVE_FIELDS) {
+    const value = input[field];
+    if (value && typeof value === 'string') {
+      encrypted[field] = await encrypt(value);
+    }
+  }
+  return encrypted;
+}
 import type {
   PreConsultation,
   DoctorPreConsultation,
@@ -57,48 +89,51 @@ function parseStringArray(value: unknown): string[] {
 
 // ─── Row Mapper ──────────────────────────────────────────────────────────────
 
-function mapPreConsultationRow(row: Record<string, unknown>): PreConsultation {
+async function mapPreConsultationRow(row: Record<string, unknown>): Promise<PreConsultation> {
+  // Decrypt sensitive fields
+  const decrypted = await decryptPreConsultFields(row);
+
   return {
-    id: String(row.id),
-    appointment_id: String(row.appointment_id),
-    patient_id: String(row.patient_id),
-    status: row.status as PreConsultationStatus,
+    id: String(decrypted.id),
+    appointment_id: String(decrypted.appointment_id),
+    patient_id: String(decrypted.patient_id),
+    status: decrypted.status as PreConsultationStatus,
 
     // Nhóm 1: Triệu chứng
-    chief_complaint: row.chief_complaint != null ? String(row.chief_complaint) : null,
-    symptom_duration: row.symptom_duration != null ? Number(row.symptom_duration) : null,
-    symptom_duration_unit: row.symptom_duration_unit as SymptomDurationUnit | null,
-    symptom_onset_at: row.symptom_onset_at != null ? String(row.symptom_onset_at) : null,
-    pain_scale: row.pain_scale != null ? Number(row.pain_scale) : null,
-    symptom_tags: parseStringArray(row.symptom_tags),
+    chief_complaint: decrypted.chief_complaint != null ? String(decrypted.chief_complaint) : null,
+    symptom_duration: decrypted.symptom_duration != null ? Number(decrypted.symptom_duration) : null,
+    symptom_duration_unit: decrypted.symptom_duration_unit as SymptomDurationUnit | null,
+    symptom_onset_at: decrypted.symptom_onset_at != null ? String(decrypted.symptom_onset_at) : null,
+    pain_scale: decrypted.pain_scale != null ? Number(decrypted.pain_scale) : null,
+    symptom_tags: parseStringArray(decrypted.symptom_tags),
 
     // Nhóm 2: Bệnh sử
-    medical_history: parseJsonArray<MedicalHistoryItem>(row.medical_history),
-    surgical_history: row.surgical_history != null ? String(row.surgical_history) : null,
-    family_history: parseJsonArray<FamilyHistoryItem>(row.family_history),
+    medical_history: parseJsonArray<MedicalHistoryItem>(decrypted.medical_history),
+    surgical_history: decrypted.surgical_history != null ? String(decrypted.surgical_history) : null,
+    family_history: parseJsonArray<FamilyHistoryItem>(decrypted.family_history),
 
     // Nhóm 3: Thuốc
-    current_medications: parseJsonArray<MedicationItem>(row.current_medications),
-    otc_supplements: row.otc_supplements != null ? String(row.otc_supplements) : null,
+    current_medications: parseJsonArray<MedicationItem>(decrypted.current_medications),
+    otc_supplements: decrypted.otc_supplements != null ? String(decrypted.otc_supplements) : null,
 
     // Nhóm 4: Dị ứng
-    drug_allergies: parseJsonArray<DrugAllergyItem>(row.drug_allergies),
-    food_allergies: parseJsonArray<FoodAllergyItem>(row.food_allergies),
+    drug_allergies: parseJsonArray<DrugAllergyItem>(decrypted.drug_allergies),
+    food_allergies: parseJsonArray<FoodAllergyItem>(decrypted.food_allergies),
 
     // Nhóm 5: Lối sống
-    smoking: row.smoking as SmokingStatus | null,
-    smoking_frequency: row.smoking_frequency != null ? String(row.smoking_frequency) : null,
-    alcohol: row.alcohol as AlcoholStatus | null,
-    alcohol_frequency: row.alcohol_frequency != null ? String(row.alcohol_frequency) : null,
-    exercise: row.exercise as ExerciseStatus | null,
-    exercise_frequency: row.exercise_frequency != null ? String(row.exercise_frequency) : null,
+    smoking: decrypted.smoking as SmokingStatus | null,
+    smoking_frequency: decrypted.smoking_frequency != null ? String(decrypted.smoking_frequency) : null,
+    alcohol: decrypted.alcohol as AlcoholStatus | null,
+    alcohol_frequency: decrypted.alcohol_frequency != null ? String(decrypted.alcohol_frequency) : null,
+    exercise: decrypted.exercise as ExerciseStatus | null,
+    exercise_frequency: decrypted.exercise_frequency != null ? String(decrypted.exercise_frequency) : null,
 
     // Metadata
-    flags: parseFlags(row.flags),
-    submitted_at: row.submitted_at != null ? String(row.submitted_at) : null,
-    submitted_by_user_id: row.submitted_by_user_id != null ? String(row.submitted_by_user_id) : null,
-    created_at: String(row.created_at),
-    updated_at: String(row.updated_at),
+    flags: parseFlags(decrypted.flags),
+    submitted_at: decrypted.submitted_at != null ? String(decrypted.submitted_at) : null,
+    submitted_by_user_id: decrypted.submitted_by_user_id != null ? String(decrypted.submitted_by_user_id) : null,
+    created_at: String(decrypted.created_at),
+    updated_at: String(decrypted.updated_at),
   };
 }
 
@@ -140,12 +175,12 @@ function mapDoctorPreConsultationRow(row: Record<string, unknown>): DoctorPreCon
   };
 }
 
-function mapBundlePayload(raw: Record<string, unknown>): PreConsultationBundle {
+async function mapBundlePayload(raw: Record<string, unknown>): Promise<PreConsultationBundle> {
   const patientRaw = raw.patient as Record<string, unknown> | null;
   const doctorRaw = raw.doctor as Record<string, unknown> | null;
 
   return {
-    patient: patientRaw ? mapPreConsultationRow(patientRaw) : null,
+    patient: patientRaw ? await mapPreConsultationRow(patientRaw) : null,
     doctor: doctorRaw ? mapDoctorPreConsultationRow(doctorRaw) : null,
     patientCreatorName: raw.patient_creator_name != null ? String(raw.patient_creator_name) : null,
     doctorCreatorName: raw.doctor_creator_name != null ? String(raw.doctor_creator_name) : null,
@@ -204,7 +239,7 @@ export async function getPreConsultation(id: string): Promise<PreConsultation | 
 
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return mapPreConsultationRow(data as Record<string, unknown>);
+  return await mapPreConsultationRow(data as Record<string, unknown>);
 }
 
 /**
@@ -221,7 +256,7 @@ export async function getPreConsultationByAppointment(
 
   const rows = data as Record<string, unknown>[] | null;
   if (!rows || rows.length === 0) return null;
-  return mapPreConsultationRow(rows[0]);
+  return await mapPreConsultationRow(rows[0]);
 }
 
 /**
@@ -292,7 +327,9 @@ export async function getMyPreConsultations(): Promise<PreConsultation[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map(mapPreConsultationRow);
+  return Promise.all(
+    ((data ?? []) as Record<string, unknown>[]).map(row => mapPreConsultationRow(row))
+  );
 }
 
 /**
@@ -338,7 +375,7 @@ export async function getPreConsultationBundle(
   });
 
   if (error) throw new Error(mapApiError(error.message));
-  return mapBundlePayload((data ?? {}) as Record<string, unknown>);
+  return await mapBundlePayload((data ?? {}) as Record<string, unknown>);
 }
 
 /**

@@ -6,6 +6,20 @@ import {
   type PatientPortalDetail,
   type PatientRecordListRow,
 } from "@/types/patient-portal";
+import { decryptFields } from "@/lib/crypto";
+
+// Sensitive patient fields that need decryption
+const PATIENT_SENSITIVE_FIELDS = [
+  'id_number',
+  'phone_number',
+  'residential_address',
+  'member_id',
+  'bhyt_address',
+] as const;
+
+async function decryptPatientRow<T extends Record<string, unknown>>(row: T): Promise<T> {
+  return decryptFields(row, PATIENT_SENSITIVE_FIELDS as unknown as (keyof T)[]);
+}
 
 /** Maps PostgREST/Postgres delete errors to user-facing Vietnamese copy. */
 export function mapPatientRecordDeleteError(message: string): string {
@@ -184,7 +198,12 @@ async function searchPatientRecordsFallback(
     return { rows: [], total: 0, error: new Error(error.message) };
   }
 
-  const rows = (data ?? []).map((row) =>
+  // Decrypt sensitive fields before mapping
+  const decryptedData = await Promise.all(
+    (data ?? []).map(row => decryptPatientRow(row as Record<string, unknown>))
+  );
+
+  const rows = decryptedData.map((row) =>
     mapPatientRecordListRow(row as Record<string, unknown>),
   );
   return { rows, total: count ?? rows.length, error: null };
@@ -226,7 +245,13 @@ export async function searchPatientRecords(
   }
 
   const payload = (data ?? {}) as SearchPatientsRpcPayload;
-  const rows = (payload.rows ?? []).map((row) =>
+
+  // Decrypt sensitive fields before mapping
+  const decryptedRows = await Promise.all(
+    (payload.rows ?? []).map(row => decryptPatientRow(row as Record<string, unknown>))
+  );
+
+  const rows = decryptedRows.map((row) =>
     mapPatientRecordListRow(row as Record<string, unknown>),
   );
 
@@ -284,8 +309,10 @@ export async function getPatientRecordById(
   if (!error && data) {
     const row = Array.isArray(data) ? data[0] : data;
     if (row) {
+      // Decrypt sensitive fields before mapping
+      const decrypted = await decryptPatientRow(row as Record<string, unknown>);
       return {
-        record: mapPatientPortalRow(row as Record<string, unknown>),
+        record: mapPatientPortalRow(decrypted),
         error: null,
       };
     }
@@ -303,5 +330,7 @@ export async function getPatientRecordById(
   if (!direct) {
     return { record: null, error: null };
   }
-  return { record: mapPatientPortalRow(direct as Record<string, unknown>), error: null };
+  // Decrypt sensitive fields before mapping
+  const decrypted = await decryptPatientRow(direct as Record<string, unknown>);
+  return { record: mapPatientPortalRow(decrypted), error: null };
 }

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { decrypt } from "@/lib/crypto";
 import type {
   AdminAppointment,
   AdminAppointmentFilters,
@@ -7,40 +8,52 @@ import type {
   PatientSearchResult,
 } from "@/types/admin-appointment";
 
+// Helper to decrypt patient sensitive fields from appointment data
+async function decryptAppointmentPatientFields(r: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const decrypted = { ...r };
+  if (r.patient_phone && typeof r.patient_phone === 'string') {
+    decrypted.patient_phone = await decrypt(r.patient_phone);
+  }
+  return decrypted;
+}
+
 type SearchAdminAppointmentsRpcPayload = {
   total?: number;
   rows?: Record<string, unknown>[] | null;
 };
 
-export function mapRpcAdminAppointmentRow(r: Record<string, unknown>): AdminAppointment {
-  const pcFlags = (r.pre_consult_flags as Record<string, unknown> | null) ?? {};
-  const dpcFlags = (r.pre_consult_doctor_flags as Record<string, unknown> | null) ?? {};
-  const preConsultRaw = r.pre_consult_status_raw as string | null;
+export async function mapRpcAdminAppointmentRow(r: Record<string, unknown>): Promise<AdminAppointment> {
+  // Decrypt sensitive patient fields
+  const decrypted = await decryptAppointmentPatientFields(r);
+
+  const pcFlags = (decrypted.pre_consult_flags as Record<string, unknown> | null) ?? {};
+  const dpcFlags = (decrypted.pre_consult_doctor_flags as Record<string, unknown> | null) ?? {};
+  const preConsultRaw = decrypted.pre_consult_status_raw as string | null;
 
   return {
-    id: r.id as string,
-    patient_id: r.patient_id as string,
-    profile_id: r.profile_id as string,
-    specialty_id: r.specialty_id as string,
-    slot_id: (r.slot_id as string) ?? null,
-    status: r.status as AdminAppointment["status"],
-    note: (r.note as string) ?? null,
-    walk_in: Boolean(r.walk_in),
-    cancel_reason: (r.cancel_reason as string) ?? null,
-    cancelled_at: (r.cancelled_at as string) ?? null,
-    cancelled_by: (r.cancelled_by as "patient" | "admin") ?? null,
-    created_at: r.created_at as string,
-    updated_at: r.updated_at as string,
-    specialty_name: (r.specialty_name as string) ?? null,
-    specialty_icon: (r.specialty_icon as string) ?? null,
-    slot_date: (r.slot_date as string) ?? null,
-    start_time: (r.start_time as string) ?? null,
-    end_time: (r.end_time as string) ?? null,
-    doctor_id: (r.doctor_id as string) ?? null,
-    patient_name: (r.patient_name as string) ?? null,
-    patient_phone: (r.patient_phone as string) ?? null,
-    patient_dob: (r.patient_dob as string) ?? null,
-    doctor_name: (r.doctor_name as string) ?? null,
+    id: decrypted.id as string,
+    patient_id: decrypted.patient_id as string,
+    profile_id: decrypted.profile_id as string,
+    specialty_id: decrypted.specialty_id as string,
+    slot_id: (decrypted.slot_id as string) ?? null,
+    status: decrypted.status as AdminAppointment["status"],
+    note: (decrypted.note as string) ?? null,
+    walk_in: Boolean(decrypted.walk_in),
+    cancel_reason: (decrypted.cancel_reason as string) ?? null,
+    cancelled_at: (decrypted.cancelled_at as string) ?? null,
+    cancelled_by: (decrypted.cancelled_by as "patient" | "admin") ?? null,
+    created_at: decrypted.created_at as string,
+    updated_at: decrypted.updated_at as string,
+    specialty_name: (decrypted.specialty_name as string) ?? null,
+    specialty_icon: (decrypted.specialty_icon as string) ?? null,
+    slot_date: (decrypted.slot_date as string) ?? null,
+    start_time: (decrypted.start_time as string) ?? null,
+    end_time: (decrypted.end_time as string) ?? null,
+    doctor_id: (decrypted.doctor_id as string) ?? null,
+    patient_name: (decrypted.patient_name as string) ?? null,
+    patient_phone: (decrypted.patient_phone as string) ?? null,
+    patient_dob: (decrypted.patient_dob as string) ?? null,
+    doctor_name: (decrypted.doctor_name as string) ?? null,
     pre_consult_status: !preConsultRaw
       ? "none"
       : preConsultRaw === "SUBMITTED"
@@ -107,7 +120,9 @@ export async function searchAdminAppointments(
   }
 
   const payload = (data ?? {}) as SearchAdminAppointmentsRpcPayload;
-  const rows = (payload.rows ?? []).map((row) => mapRpcAdminAppointmentRow(row));
+  const rows = await Promise.all(
+    (payload.rows ?? []).map((row) => mapRpcAdminAppointmentRow(row))
+  );
 
   return {
     rows,
