@@ -53,6 +53,7 @@ import QuestionLibraryPage from "./pages/admin/clinical-logic/QuestionLibraryPag
 import QuestionnaireBuilderPage from "./pages/admin/clinical-logic/QuestionnaireBuilderPage.tsx";
 import ExaminationPage from "./pages/provider/ExaminationPage.tsx";
 import DoctorProfilePage from "./pages/provider/DoctorProfilePage.tsx";
+import DoctorMedicalHistoryPage from "./pages/provider/DoctorMedicalHistoryPage.tsx";
 import ClinicalTasksContent from "./components/provider/ClinicalTasksContent.tsx";
 import AdminAiAccuracyPage from "./pages/admin/AdminAiAccuracyPage.tsx";
 import DeltaLogPage from "./pages/admin/DeltaLogPage.tsx";
@@ -195,6 +196,7 @@ const App = () => (
               <Route path="appointments" element={<ProviderAppointmentsPage />} />
               <Route path="examination/:appointmentId" element={<ExaminationPage />} />
               <Route path="tasks" element={<ClinicalTasksContent portal="doctor" />} />
+              <Route path="medical-history" element={<DoctorMedicalHistoryPage />} />
               <Route path="profile" element={<DoctorProfilePage />} />
               <Route path="analytics" element={<ProviderSectionPlaceholder title="Analytics" />} />
             </Route>

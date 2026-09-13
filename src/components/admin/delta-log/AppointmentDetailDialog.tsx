@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
+import { decrypt } from '@/lib/crypto';
 
 type MedicalHistoryItem = string | { condition?: string; details?: string };
 type MedicationItem = string | { name?: string; dose?: string; frequency?: string };
@@ -54,6 +55,15 @@ type AppointmentDetail = {
     status: string;
   } | null;
 };
+
+async function safeDecrypt(value: string | null): Promise<string | null> {
+  if (!value) return null;
+  try {
+    return await decrypt(value);
+  } catch {
+    return value;
+  }
+}
 
 function formatMedicalHistory(item: MedicalHistoryItem): string {
   if (typeof item === 'string') return item;
@@ -162,6 +172,23 @@ export default function AppointmentDetailDialog({ appointmentId, open, onOpenCha
           .eq('appointment_id', appointmentId)
           .maybeSingle();
 
+        // Decrypt sensitive fields
+        const [
+          decryptedPhone,
+          decryptedChiefComplaint,
+          decryptedSText,
+          decryptedOText,
+          decryptedAText,
+          decryptedPText,
+        ] = await Promise.all([
+          safeDecrypt(pt?.phone_number ?? null),
+          safeDecrypt(preConsult?.chief_complaint ?? null),
+          safeDecrypt(exam?.s_text ?? null),
+          safeDecrypt(exam?.o_text ?? null),
+          safeDecrypt(exam?.a_text ?? null),
+          safeDecrypt(exam?.p_text ?? null),
+        ]);
+
         if (!cancelled) {
           setData({
             id: appt.id,
@@ -171,7 +198,7 @@ export default function AppointmentDetailDialog({ appointmentId, open, onOpenCha
               id: pt.id,
               full_name: patientName,
               date_of_birth: pt.date_of_birth,
-              phone: pt.phone_number,
+              phone: decryptedPhone,
             } : null,
             doctor: {
               full_name: sl?.user_profiles?.full_name ?? null,
@@ -188,17 +215,17 @@ export default function AppointmentDetailDialog({ appointmentId, open, onOpenCha
               height: vitals.height,
             } : null,
             pre_consultation: preConsult ? {
-              chief_complaint: preConsult.chief_complaint,
+              chief_complaint: decryptedChiefComplaint,
               duration: preConsult.duration,
               associated_symptoms: preConsult.associated_symptoms,
               medical_history: preConsult.medical_history,
               current_medications: preConsult.current_medications,
             } : null,
             examination: exam ? {
-              s_text: exam.s_text,
-              o_text: exam.o_text,
-              a_text: exam.a_text,
-              p_text: exam.p_text,
+              s_text: decryptedSText,
+              o_text: decryptedOText,
+              a_text: decryptedAText,
+              p_text: decryptedPText,
               status: exam.status,
             } : null,
           });

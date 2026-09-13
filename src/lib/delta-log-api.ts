@@ -35,6 +35,23 @@ export async function listAppointmentsAuditLog(
   };
 }
 
+export async function listDoctorAppointmentsAuditLog(
+  params: AppointmentsAuditListParams = {},
+): Promise<DeltaLogListResult<AppointmentsAuditEntry>> {
+  const { data, error } = await supabase.rpc('list_doctor_appointments_audit_log', {
+    p_query: params.search?.trim() || null,
+    p_page: params.page ?? 1,
+    p_limit: params.limit ?? 10,
+    p_action: params.action?.trim() || null,
+  });
+  if (error) throw new Error(mapError(error.message));
+  const payload = (data ?? { total: 0, rows: [] }) as RpcListPayload;
+  return {
+    total: Number(payload.total ?? 0),
+    rows: (payload.rows ?? []) as AppointmentsAuditEntry[],
+  };
+}
+
 // ─── System Audit Log ────────────────────────────────────────────────────────
 
 export async function listSystemAuditLog(

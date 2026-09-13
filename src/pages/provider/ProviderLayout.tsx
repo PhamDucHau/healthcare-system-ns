@@ -4,6 +4,7 @@ import {
   FileUser,
   LayoutDashboard,
   LogOut,
+  ScrollText,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { path: "/provider-portal/patient-records", icon: FileUser, label: "Hồ sơ bệnh nhân" },
   { path: "/provider-portal/patients", icon: Users, label: "Bệnh nhân" },
   { path: "/provider-portal/appointments", icon: Calendar, label: "Lịch hẹn" },
+  { path: "/provider-portal/medical-history", icon: ScrollText, label: "Lịch sử khám bệnh" },
   { path: "/provider-portal/profile", icon: UserCircle, label: "Hồ sơ bác sĩ" },
 ] as const;
 
