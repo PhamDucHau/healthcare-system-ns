@@ -972,7 +972,7 @@ const ProviderPatientsPage = () => {
                 <div>
                   <h2 className="text-3xl font-bold">{displayName}</h2>
                   <p className="text-sm opacity-90">
-                    ID: {displayId} · DOB: {displayDob} · {pronouns}
+                    DOB: {displayDob} · {pronouns}
                   </p>
                 </div>
               </div>
