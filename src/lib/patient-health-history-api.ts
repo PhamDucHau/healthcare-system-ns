@@ -20,7 +20,12 @@ async function decryptChartFields(row: Record<string, unknown>): Promise<Record<
   for (const field of sensitiveFields) {
     const value = row[field];
     if (value && typeof value === 'string') {
-      decrypted[field] = await decrypt(value);
+      try {
+        decrypted[field] = await decrypt(value);
+      } catch {
+        // Keep original value if decryption fails (e.g., not encrypted or invalid format)
+        decrypted[field] = value;
+      }
     }
   }
   return decrypted;

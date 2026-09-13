@@ -20,6 +20,7 @@ import {
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { decryptRow } from "@/lib/crypto";
 import {
   mapPatientPortalRow,
   type PatientListItem,
@@ -609,7 +610,10 @@ const ProviderPatientsPage = () => {
       });
       if (!rpcErr && rpcRow) {
         const row = Array.isArray(rpcRow) ? rpcRow[0] : rpcRow;
-        if (row) return mapPatientPortalRow(row as Record<string, unknown>);
+        if (row) {
+          const decrypted = await decryptRow(row as Record<string, unknown>, 'patient');
+          return mapPatientPortalRow(decrypted);
+        }
       }
       const { data, error: fetchError } = await supabase
         .from("patient")
@@ -618,7 +622,8 @@ const ProviderPatientsPage = () => {
         .single();
 
       if (fetchError) throw fetchError;
-      return mapPatientPortalRow(data as Record<string, unknown>);
+      const decrypted = await decryptRow(data as Record<string, unknown>, 'patient');
+      return mapPatientPortalRow(decrypted);
     },
     enabled: Boolean(selectedId) && !isDemoPatientId(selectedId),
   });
