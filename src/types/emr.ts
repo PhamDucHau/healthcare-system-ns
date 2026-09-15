@@ -96,6 +96,22 @@ export type SoapValidationErrors = Partial<{
 export const SOAP_ASSESSMENT_REQUIRED_MESSAGE =
   'Vui lòng điền phần Đánh giá (A) trước khi ký xác nhận';
 
+export const PIN_SIGN_LOCK_MESSAGE = 'Vui lòng thử lại sau 10 phút';
+
+export function isDoctorPinLocked(pinLockedUntil: string | null, now = Date.now()): boolean {
+  if (!pinLockedUntil) return false;
+  const until = new Date(pinLockedUntil).getTime();
+  return Number.isFinite(until) && until > now;
+}
+
+export function isPinSignLockMessage(message: string): boolean {
+  return (
+    message.includes('PIN_FAILED_LOCKED') ||
+    message.includes('PIN_LOCKED') ||
+    message.includes(PIN_SIGN_LOCK_MESSAGE)
+  );
+}
+
 export function validateSoapForSave(data: SoapFormData): SoapValidationErrors {
   const errors: SoapValidationErrors = {};
   if (!data.s_text || data.s_text.trim() === '') {

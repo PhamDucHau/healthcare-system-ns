@@ -26,7 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useSoapNoteEditor } from '@/hooks/useSoapNoteEditor';
 import type { SoapIcdCode, AiIcdSuggestion } from '@/types/emr';
-import { validateSoapForSign } from '@/types/emr';
+import { isDoctorPinLocked, validateSoapForSign } from '@/types/emr';
 import IcdSearchPanel from './IcdSearchPanel';
 import DoctorSignOffDialog from './DoctorSignOffDialog';
 import SetupPinDialog from './SetupPinDialog';
@@ -88,7 +88,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
       toast.error(firstError);
       return;
     }
-    setShowSignOff(true);
+    void editor.refreshPinLock().then(() => setShowSignOff(true));
   };
 
   return (
@@ -658,12 +658,13 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
         open={showSignOff}
         onClose={() => setShowSignOff(false)}
         onSign={async (pin, ack) => {
-          const ok = await editor.sign({ pin, responsibilityAck: ack });
-          if (ok) setShowSignOff(false);
-          return ok;
+          const error = await editor.sign({ pin, responsibilityAck: ack });
+          if (!error) setShowSignOff(false);
+          return error;
         }}
         confirmedIcds={confirmedIcds}
         exam={editor.exam}
+        pinLocked={isDoctorPinLocked(editor.pinLockedUntil)}
       />
 
       <SetupPinDialog

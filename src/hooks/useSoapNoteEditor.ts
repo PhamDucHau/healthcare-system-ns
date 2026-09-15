@@ -56,13 +56,18 @@ import {
   recordAiSuccess,
   getAiCircuitCooldownRemaining,
 } from '@/lib/ai-circuit-breaker';
+import { getMyDoctorProfile } from '@/lib/doctor-profile-api';
 import type {
   MedicalExamination,
   SoapFormData,
   SoapIcdCode,
   AiIcdSuggestion,
 } from '@/types/emr';
-import { DEFAULT_SOAP_FORM, validateSoapForSign } from '@/types/emr';
+import {
+  DEFAULT_SOAP_FORM,
+  isPinSignLockMessage,
+  validateSoapForSign,
+} from '@/types/emr';
 
 const AUTO_SAVE_INTERVAL_MS = 30_000; // RULE-010d: 30 seconds
 const AI_DEBOUNCE_MS = 2_000;          // RULE-015: 2 second debounce
@@ -80,6 +85,8 @@ export type UseSoapNoteEditorReturn = {
   isLocked: boolean;
   autoSavedAt: Date | null;
   hasPinSet: boolean;
+  pinLockedUntil: string | null;
+  refreshPinLock: () => Promise<void>;
 
   // ICD suggestions
   aiSuggestions: AiIcdSuggestion[];
@@ -136,7 +143,7 @@ export type UseSoapNoteEditorReturn = {
   setIcdSearch: (query: string) => void;
 
   // Sign-off actions
-  sign: (params: { pin: string | null; responsibilityAck: boolean }) => Promise<boolean>;
+  sign: (params: { pin: string | null; responsibilityAck: boolean }) => Promise<string | null>;
   setupPin: (pin: string) => Promise<boolean>;
 };
 
@@ -149,6 +156,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const [error, setError] = useState<string | null>(null);
   const [autoSavedAt, setAutoSavedAt] = useState<Date | null>(null);
   const [hasPinSet, setHasPinSet] = useState(false);
+  const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null);
 
   // AI suggestions
   const [aiSuggestions, setAiSuggestions] = useState<AiIcdSuggestion[]>([]);
@@ -313,7 +321,13 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       setError(null);
 
       try {
-        setHasPinSet(await checkDoctorPinSet());
+        const profile = await getMyDoctorProfile().catch(() => null);
+        if (profile) {
+          setHasPinSet(profile.has_pin);
+          setPinLockedUntil(profile.pin_locked_until);
+        } else {
+          setHasPinSet(await checkDoctorPinSet());
+        }
 
         // Create or get exam
         const examId = await createOrGetExamination(appointmentId);
@@ -948,8 +962,8 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   // ─── Public: sign examination (with PIN) ───────────────────────────────────
 
   const sign = useCallback(
-    async (params: { pin: string | null; responsibilityAck: boolean }): Promise<boolean> => {
-      if (!examIdRef.current) return false;
+    async (params: { pin: string | null; responsibilityAck: boolean }): Promise<string | null> => {
+      if (!examIdRef.current) return 'Không tìm thấy hồ sơ khám.';
 
       // Validate before sending
       const currentIcds = exam?.icd_codes ?? [];
@@ -957,7 +971,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
       if (Object.keys(errors).length > 0) {
         const firstError = Object.values(errors)[0];
         toast.error(firstError);
-        return false;
+        return firstError;
       }
 
       setSubmitting(true);
@@ -990,16 +1004,30 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
           }
         }
         await reloadExam();
-        return true;
+        return null;
       } catch (e) {
-        toast.error((e as Error).message);
-        return false;
+        const message = (e as Error).message;
+        toast.error(message);
+        if (isPinSignLockMessage(message)) {
+          setPinLockedUntil(new Date(Date.now() + 10 * 60 * 1000).toISOString());
+        }
+        return message;
       } finally {
         setSubmitting(false);
       }
     },
     [exam, formData, reloadExam, appointmentId]
   );
+
+  const refreshPinLock = useCallback(async () => {
+    try {
+      const profile = await getMyDoctorProfile();
+      setHasPinSet(profile.has_pin);
+      setPinLockedUntil(profile.pin_locked_until);
+    } catch {
+      // keep last known lock state
+    }
+  }, []);
 
   // ─── Public: setup PIN ────────────────────────────────────────────────────
 
@@ -1025,6 +1053,8 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     isLocked: exam?.status === 'LOCKED',
     autoSavedAt,
     hasPinSet,
+    pinLockedUntil,
+    refreshPinLock,
 
     aiSuggestions,
     aiLoading,

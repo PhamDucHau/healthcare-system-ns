@@ -15,45 +15,56 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import type { MedicalExamination, SoapIcdCode } from '@/types/emr';
+import { isPinSignLockMessage, PIN_SIGN_LOCK_MESSAGE } from '@/types/emr';
 
 type DoctorSignOffDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSign: (pin: string | null, ack: boolean) => Promise<boolean>;
+  onSign: (pin: string, ack: boolean) => Promise<string | null>;
   confirmedIcds: SoapIcdCode[];
   exam: MedicalExamination | null;
+  pinLocked?: boolean;
 };
 
 export default function DoctorSignOffDialog({
-  open, onClose, onSign, confirmedIcds, exam,
+  open, onClose, onSign, confirmedIcds, exam, pinLocked = false,
 }: DoctorSignOffDialogProps) {
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [ack, setAck] = useState(false);
   const [signing, setSigning] = useState(false);
   const [pinError, setPinError] = useState('');
+  const [lockedByAttempt, setLockedByAttempt] = useState(false);
+
+  const isLocked = pinLocked || lockedByAttempt;
 
   useEffect(() => {
     if (open) {
       setPin('');
       setShowPin(false);
       setAck(false);
-      setPinError('');
+      setLockedByAttempt(false);
+      setPinError(pinLocked ? PIN_SIGN_LOCK_MESSAGE : '');
     }
-  }, [open]);
+  }, [open, pinLocked]);
 
-  const canSign = ack && confirmedIcds.length > 0;
+  const canSign = ack && confirmedIcds.length > 0 && pin.length === 6 && !isLocked;
 
   const handleSign = async () => {
     if (!canSign) return;
     setPinError('');
     setSigning(true);
     try {
-      const ok = await onSign(pin.trim() || null, ack);
-      if (ok) {
+      const error = await onSign(pin, ack);
+      if (!error) {
         setPin('');
         setShowPin(false);
         setAck(false);
+        return;
+      }
+      setPinError(error);
+      if (isPinSignLockMessage(error)) {
+        setLockedByAttempt(true);
       }
     } catch {
       // errors shown by toast in hook
@@ -68,6 +79,7 @@ export default function DoctorSignOffDialog({
     setShowPin(false);
     setAck(false);
     setPinError('');
+    setLockedByAttempt(false);
     onClose();
   };
 
@@ -82,7 +94,6 @@ export default function DoctorSignOffDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Summary */}
           <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
             <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
               Tóm tắt SOAP
@@ -101,7 +112,6 @@ export default function DoctorSignOffDialog({
             )}
           </div>
 
-          {/* ICD codes */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Chẩn đoán ({confirmedIcds.length} mã ICD đã xác nhận)
@@ -130,13 +140,21 @@ export default function DoctorSignOffDialog({
 
           <Separator />
 
-          {/* Responsibility checkbox */}
+          {isLocked && (
+            <Alert variant="destructive">
+              <Lock className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                {PIN_SIGN_LOCK_MESSAGE}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex items-start gap-3">
             <Checkbox
               id="responsibility"
               checked={ack}
               onCheckedChange={(c) => setAck(Boolean(c))}
-              disabled={signing}
+              disabled={signing || isLocked}
             />
             <Label htmlFor="responsibility" className="text-sm leading-relaxed cursor-pointer">
               Tôi đã kiểm tra và chịu trách nhiệm về nội dung hồ sơ khám này. Tôi hiểu rằng sau
@@ -144,7 +162,6 @@ export default function DoctorSignOffDialog({
             </Label>
           </div>
 
-          {/* PIN input */}
           <div className="space-y-1.5">
             <Label htmlFor="sign-pin" className="text-sm font-medium">
               Mã PIN ký duyệt (6 chữ số)
@@ -160,11 +177,11 @@ export default function DoctorSignOffDialog({
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, '');
                   setPin(val);
-                  setPinError('');
+                  if (!isLocked) setPinError('');
                 }}
                 placeholder="******"
                 className="text-center text-xl tracking-[0.5em] font-mono h-12 flex-1"
-                disabled={signing}
+                disabled={signing || isLocked}
                 autoComplete="off"
                 aria-describedby="sign-pin-hint"
                 onKeyDown={(e) => {
@@ -176,7 +193,7 @@ export default function DoctorSignOffDialog({
                 variant="outline"
                 size="icon"
                 className="h-12 w-12 shrink-0"
-                disabled={signing}
+                disabled={signing || isLocked}
                 onClick={() => setShowPin((v) => !v)}
                 aria-label={showPin ? 'Ẩn mã PIN' : 'Hiện mã PIN'}
               >
@@ -184,9 +201,12 @@ export default function DoctorSignOffDialog({
               </Button>
             </div>
             <p id="sign-pin-hint" className="text-xs text-muted-foreground">
-              Tạm thời bỏ qua xác thực PIN — chỉ cần tick xác nhận và bấm ký duyệt.
+              Nhập đủ 6 chữ số PIN để ký duyệt hồ sơ.
             </p>
-            {pinError && <p className="text-xs text-destructive">{pinError}</p>}
+            {pinError && !isLocked && <p className="text-xs text-destructive">{pinError}</p>}
+            {pinError && isLocked && pinError !== PIN_SIGN_LOCK_MESSAGE && (
+              <p className="text-xs text-destructive">{pinError}</p>
+            )}
           </div>
         </div>
 

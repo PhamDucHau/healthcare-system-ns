@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UseSoapNoteEditorReturn } from "@/hooks/useSoapNoteEditor";
 import type { MedicalExamination, SoapFormData } from "@/types/emr";
@@ -83,6 +83,8 @@ function mockEditor(overrides: Partial<UseSoapNoteEditorReturn> = {}): UseSoapNo
     isLocked: false,
     autoSavedAt: null,
     hasPinSet: true,
+    pinLockedUntil: null,
+    refreshPinLock: vi.fn().mockResolvedValue(undefined),
     aiSuggestions: [],
     aiLoading: false,
     icdSearch: "",
@@ -146,7 +148,7 @@ describe("SoapNoteEditor sign-off gate (TC-DLS-006)", () => {
     expect(screen.queryByText("Xác nhận & Ký duyệt hồ sơ")).not.toBeInTheDocument();
   });
 
-  it("should open PIN dialog when Assessment (A) is filled", () => {
+  it("should open PIN dialog when Assessment (A) is filled", async () => {
     editorState.mockReturnValue(
       mockEditor({
         formData: formData({ a_text: "Viêm họng cấp" }),
@@ -157,7 +159,9 @@ describe("SoapNoteEditor sign-off gate (TC-DLS-006)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Hoàn tất & Ký duyệt/i }));
 
-    expect(toastError).not.toHaveBeenCalled();
-    expect(screen.getByText("Xác nhận & Ký duyệt hồ sơ")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toastError).not.toHaveBeenCalled();
+      expect(screen.getByText("Xác nhận & Ký duyệt hồ sơ")).toBeInTheDocument();
+    });
   });
 });

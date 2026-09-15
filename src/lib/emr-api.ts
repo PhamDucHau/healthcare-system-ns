@@ -5,9 +5,11 @@
 import { supabase } from '@/lib/supabase';
 import { analyzeTranscript, suggestIcd10 } from '@/lib/stt-nlp-api';
 import { decrypt, encrypt } from '@/lib/crypto';
+import { formatPinInvalidMessage } from '@/lib/pin-attempts';
 import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
 import {
   SOAP_ASSESSMENT_REQUIRED_MESSAGE,
+  PIN_SIGN_LOCK_MESSAGE,
   type MedicalExamination,
   type SoapIcdCode,
   type IcdConfirmStatus,
@@ -319,13 +321,31 @@ export async function signExamination(params: {
 
   if (error) throw new Error(mapEmrError(error.message));
 
-  const rows = data as { exam_id: string; sig_id: string; data_hash: string }[] | null;
+  const rows = data as {
+    exam_id: string | null;
+    sig_id: string | null;
+    data_hash: string | null;
+    error_code?: string | null;
+    attempts_remaining?: number | null;
+  }[] | null;
   if (!rows || rows.length === 0) throw new Error('Không nhận được kết quả ký');
 
+  const row = rows[0];
+  if (row.error_code) {
+    if (row.error_code === 'PIN_INVALID' && row.attempts_remaining != null) {
+      throw new Error(formatPinInvalidMessage(Number(row.attempts_remaining)));
+    }
+    throw new Error(mapEmrError(row.error_code));
+  }
+
+  if (!row.exam_id || !row.sig_id || !row.data_hash) {
+    throw new Error('Không nhận được kết quả ký');
+  }
+
   return {
-    exam_id: String(rows[0].exam_id),
-    sig_id: String(rows[0].sig_id),
-    data_hash: String(rows[0].data_hash),
+    exam_id: String(row.exam_id),
+    sig_id: String(row.sig_id),
+    data_hash: String(row.data_hash),
   };
 }
 
@@ -567,13 +587,14 @@ function mapEmrError(message: string): string {
     return 'Cần ít nhất 1 chẩn đoán ICD-10 được xác nhận trước khi ký.';
   if (message.includes('PIN_NOT_SET'))
     return 'Bạn chưa thiết lập mã PIN. Vui lòng vào Cài đặt để thiết lập PIN ký duyệt.';
-  if (message.includes('PIN_LOCKED')) return 'Mã PIN bị khóa do nhập sai nhiều lần. Thử lại sau 10 phút.';
-  if (message.includes('PIN_FAILED_LOCKED'))
-    return 'Sai PIN 3 lần. Mã PIN bị khóa 10 phút.';
+  if (message.includes('PIN_FAILED_LOCKED') || message.includes('PIN_LOCKED'))
+    return PIN_SIGN_LOCK_MESSAGE;
   if (message.includes('PIN_INVALID')) {
     const match = message.match(/(\d+) attempts remaining/);
-    const remaining = match ? match[1] : '';
-    return `Mã PIN không đúng.${remaining ? ` Còn ${remaining} lần thử.` : ''}`;
+    const remaining = match ? Number(match[1]) : null;
+    return remaining != null
+      ? formatPinInvalidMessage(remaining)
+      : 'Mã PIN không đúng.';
   }
   if (message.includes('RESPONSIBILITY_NOT_ACKNOWLEDGED'))
     return 'Bạn phải xác nhận trách nhiệm trước khi ký.';
