@@ -11,6 +11,7 @@ import {
   createOrGetExamination,
   getExaminationByAppointment,
   saveSoapDraft,
+  listExaminationActivityLog,
   upsertIcdCode,
   confirmIcdCode,
   rejectIcdCode,
@@ -57,6 +58,8 @@ import {
   getAiCircuitCooldownRemaining,
 } from '@/lib/ai-circuit-breaker';
 import { getMyDoctorProfile } from '@/lib/doctor-profile-api';
+import type { ExamActivityLogEntry } from '@/lib/exam-activity-log';
+import { diffSoapFormFields } from '@/lib/exam-activity-log';
 import type {
   MedicalExamination,
   SoapFormData,
@@ -134,6 +137,7 @@ export type UseSoapNoteEditorReturn = {
   // Form actions
   updateField: (field: keyof SoapFormData, value: string) => void;
   saveDraft: () => Promise<void>;
+  activityLogs: ExamActivityLogEntry[];
 
   // ICD actions
   addIcdCode: (code: string, name: string, isManual?: boolean) => Promise<void>;
@@ -198,6 +202,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   // Patient risk score states
   const [riskAssessment, setRiskAssessment] = useState<RiskAssessment | null>(null);
   const [riskLoading, setRiskLoading] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<ExamActivityLogEntry[]>([]);
 
   // Refs for audio capturing
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -244,6 +249,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const icdSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSoapTextRef = useRef('');
+  const lastSavedFormRef = useRef<SoapFormData>(DEFAULT_SOAP_FORM);
 
   // ─── Helper: perform auto-save ────────────────────────────────────────────
 
@@ -251,6 +257,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     if (!examIdRef.current || !formData.s_text.trim()) return;
     try {
       await saveSoapDraft(examIdRef.current, formData);
+      lastSavedFormRef.current = { ...formData };
       setAutoSavedAt(new Date());
     } catch {
       // Silent fail for auto-save
@@ -295,6 +302,14 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
   // ─── Reload exam from server ──────────────────────────────────────────────
 
+  const reloadActivityLogs = useCallback(async (examId: string) => {
+    try {
+      setActivityLogs(await listExaminationActivityLog(examId));
+    } catch {
+      setActivityLogs([]);
+    }
+  }, []);
+
   const reloadExam = useCallback(async () => {
     try {
       const updated = await getExaminationByAppointment(appointmentId);
@@ -303,11 +318,12 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         if (updated.auto_saved_at) {
           setAutoSavedAt(new Date(updated.auto_saved_at));
         }
+        await reloadActivityLogs(updated.id);
       }
     } catch {
       // Non-critical
     }
-  }, [appointmentId]);
+  }, [appointmentId, reloadActivityLogs]);
 
   // ─── Recording audio playback ─────────────────────────────────────────────
 
@@ -343,9 +359,16 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
             a_text: loadedExam.a_text ?? '',
             p_text: loadedExam.p_text ?? '',
           });
+          lastSavedFormRef.current = {
+            s_text: loadedExam.s_text ?? '',
+            o_text: loadedExam.o_text ?? '',
+            a_text: loadedExam.a_text ?? '',
+            p_text: loadedExam.p_text ?? '',
+          };
           if (loadedExam.auto_saved_at) {
             setAutoSavedAt(new Date(loadedExam.auto_saved_at));
           }
+          await reloadActivityLogs(loadedExam.id);
         }
 
         // Load voice session transcript + recording history
@@ -447,15 +470,20 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     }
     setSaving(true);
     try {
-      await saveSoapDraft(examIdRef.current, formData);
+      await saveSoapDraft(examIdRef.current, formData, {
+        manual: true,
+        changedFields: diffSoapFormFields(lastSavedFormRef.current, formData),
+      });
+      lastSavedFormRef.current = { ...formData };
       setAutoSavedAt(new Date());
-      toast.success('Đã lưu nháp');
+      await reloadActivityLogs(examIdRef.current);
+      toast.success('Đã lưu hồ sơ');
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
-  }, [formData]);
+  }, [formData, reloadActivityLogs]);
 
   // ─── Public: add ICD code ─────────────────────────────────────────────────
 
@@ -1100,6 +1128,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
     updateField,
     saveDraft,
+    activityLogs,
 
     addIcdCode,
     confirmIcd,

@@ -1,0 +1,300 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight, Download, Loader2, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { listDoctorExaminationActivityLog } from '@/lib/delta-log-api';
+import type { DoctorExamActivityLogEntry, SoapChangedField } from '@/lib/exam-activity-log';
+import { exportRowsToCsv } from '@/lib/csv-export';
+import ExamSoapDetailDialog from '@/components/provider/medical-history/ExamSoapDetailDialog';
+
+const SEARCH_DEBOUNCE_MS = 300;
+const PAGE_SIZE = 10;
+
+const EXPORT_COLUMNS = [
+  { key: 'time', label: 'Thời gian' },
+  { key: 'action', label: 'Hành động' },
+  { key: 'patient_name', label: 'Bệnh nhân' },
+  { key: 'doctor_name', label: 'Bác sĩ' },
+  { key: 'message', label: 'Nội dung' },
+];
+
+type Query = {
+  search: string;
+  page: number;
+  pageSize: number;
+};
+
+export default function DoctorExamActivityLogTab() {
+  const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [entries, setEntries] = useState<DoctorExamActivityLogEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [detailExamId, setDetailExamId] = useState<string | null>(null);
+  const [detailPatientName, setDetailPatientName] = useState<string | null>(null);
+  const [detailChangedFields, setDetailChangedFields] = useState<SoapChangedField[]>([]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(query.search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query.search]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listDoctorExaminationActivityLog({
+      search: debouncedSearch || undefined,
+      page: query.page,
+      limit: query.pageSize,
+    })
+      .then(({ rows, total: nextTotal }) => {
+        if (!cancelled) {
+          setEntries(rows);
+          setTotal(nextTotal);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) {
+          setEntries([]);
+          setTotal(0);
+          toast.error(e.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [debouncedSearch, query.page, query.pageSize]);
+
+  const onQueryChange = useCallback((patch: Partial<Query>) => {
+    setQuery((current) => ({
+      ...current,
+      ...patch,
+      page: patch.page ?? (patch.search !== undefined ? 1 : current.page),
+    }));
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+  const safePage = Math.min(query.page, totalPages);
+  const from = total === 0 ? 0 : (safePage - 1) * query.pageSize + 1;
+  const to = Math.min(safePage * query.pageSize, total);
+
+  useEffect(() => {
+    if (query.page > totalPages) onQueryChange({ page: totalPages });
+  }, [query.page, totalPages, onQueryChange]);
+
+  const visiblePages = useMemo(() => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (safePage > 3) pages.push('ellipsis');
+      const start = Math.max(2, safePage - 1);
+      const end = Math.min(totalPages - 1, safePage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (safePage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [totalPages, safePage]);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const { rows } = await listDoctorExaminationActivityLog({
+        search: debouncedSearch || undefined,
+        page: 1,
+        limit: 1000,
+      });
+      exportRowsToCsv(
+        'nhat-ky-he-thong.csv',
+        EXPORT_COLUMNS,
+        rows.map((e) => ({
+          time: format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi }),
+          action: 'Cập nhật hồ sơ',
+          patient_name: e.patient_name ?? '—',
+          doctor_name: e.actor_name ?? '—',
+          message: e.message,
+        })),
+      );
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const searchNorm = query.search.trim().toLowerCase();
+
+  return (
+    <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
+      <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="search"
+            value={query.search}
+            onChange={(e) => onQueryChange({ search: e.target.value })}
+            placeholder="Tìm bệnh nhân hoặc bác sĩ..."
+            className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={total === 0 || exporting}
+          className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 self-end sm:self-auto"
+          title="Xuất CSV"
+        >
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+      ) : total === 0 ? (
+        <div className="p-12 text-center text-sm text-muted-foreground">
+          {searchNorm
+            ? `Không tìm thấy kết quả cho "${query.search.trim()}".`
+            : 'Chưa có nhật ký chỉnh sửa hồ sơ.'}
+        </div>
+      ) : (
+        <>
+          <div className="md:hidden divide-y divide-border/30">
+            {entries.map((e) => (
+              <div key={e.id} className="p-4 space-y-2">
+                <span className="text-xs text-muted-foreground">
+                  {format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi })}
+                </span>
+                <p className="text-sm font-medium">{e.patient_name ?? '—'}</p>
+                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-700">
+                  Cập nhật hồ sơ
+                </span>
+                <p className="text-sm text-slate-700">{e.message}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailExamId(e.exam_id);
+                    setDetailPatientName(e.patient_name);
+                    setDetailChangedFields(e.changed_fields);
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  Xem chi tiết
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-card">
+                <tr className="border-b border-border/30">
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nội dung</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {entries.map((e) => (
+                  <tr key={e.id} className="hover:bg-muted/30 transition-colors h-14">
+                    <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                      {format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi })}
+                    </td>
+                    <td className="px-4 lg:px-6 py-4">
+                      <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-700">
+                        Cập nhật hồ sơ
+                      </span>
+                    </td>
+                    <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.patient_name ?? '—'}</td>
+                    <td className="px-4 lg:px-6 py-4 text-sm text-slate-700">{e.message}</td>
+                    <td className="px-4 lg:px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDetailExamId(e.exam_id);
+                          setDetailPatientName(e.patient_name);
+                          setDetailChangedFields(e.changed_fields);
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        Xem chi tiết
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {total > query.pageSize && (
+            <div className="px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/30">
+              <p className="text-xs text-muted-foreground">
+                Hiển thị {from} đến {to} của {total} bản ghi
+              </p>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => onQueryChange({ page: safePage - 1 })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {visiblePages.map((n, idx) => (
+                  n === 'ellipsis' ? (
+                    <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-muted-foreground">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => onQueryChange({ page: n })}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
+                        n === safePage
+                          ? 'bg-primary text-primary-foreground'
+                          : 'border border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  )
+                ))}
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => onQueryChange({ page: safePage + 1 })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <ExamSoapDetailDialog
+        examId={detailExamId}
+        patientName={detailPatientName}
+        changedFields={detailChangedFields}
+        open={!!detailExamId}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setDetailExamId(null);
+            setDetailPatientName(null);
+            setDetailChangedFields([]);
+          }
+        }}
+      />
+    </div>
+  );
+}

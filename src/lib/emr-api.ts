@@ -6,6 +6,10 @@ import { supabase } from '@/lib/supabase';
 import { analyzeTranscript, suggestIcd10 } from '@/lib/stt-nlp-api';
 import { decrypt, encrypt } from '@/lib/crypto';
 import { formatPinInvalidMessage } from '@/lib/pin-attempts';
+import {
+  toExamActivityLogEntry,
+  type ExamActivityLogEntry,
+} from '@/lib/exam-activity-log';
 import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
 import {
   SOAP_ASSESSMENT_REQUIRED_MESSAGE,
@@ -129,6 +133,20 @@ export async function getExaminationByAppointment(
   return await mapExamRow(rows[0]);
 }
 
+export async function getExaminationById(
+  examId: string
+): Promise<MedicalExamination | null> {
+  const { data, error } = await supabase
+    .from('medical_examinations')
+    .select('*, soap_icd_codes(*)')
+    .eq('id', examId)
+    .maybeSingle();
+  if (error) throw new Error(mapEmrError(error.message));
+  if (!data) return null;
+  const [exam] = await mapExamRowsWithIcds([data as Record<string, unknown>]);
+  return exam;
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -208,7 +226,8 @@ export async function saveSoapDraft(
     o_text?: string;
     a_text?: string;
     p_text?: string;
-  }
+  },
+  options?: { manual?: boolean; changedFields?: string[] }
 ): Promise<string> {
   // Encrypt SOAP fields before saving
   const encrypted = await encryptSoapFields(fields);
@@ -219,9 +238,29 @@ export async function saveSoapDraft(
     p_o_text: encrypted.o_text ?? null,
     p_a_text: encrypted.a_text ?? null,
     p_p_text: encrypted.p_text ?? null,
+    p_manual: options?.manual ?? false,
+    p_changed_fields: options?.changedFields ?? [],
   });
   if (error) throw new Error(mapEmrError(error.message));
   return data as string;
+}
+
+export async function listExaminationActivityLog(
+  examId: string
+): Promise<ExamActivityLogEntry[]> {
+  const { data, error } = await supabase.rpc('list_examination_activity_log', {
+    p_exam_id: examId,
+  });
+  if (error) throw new Error(mapEmrError(error.message));
+  return ((data ?? []) as Array<{
+    id: string;
+    exam_id: string;
+    actor_id: string | null;
+    actor_name: string | null;
+    action: 'UPDATED';
+    created_at: string;
+    changed_fields?: unknown;
+  }>).map(toExamActivityLogEntry);
 }
 
 /**

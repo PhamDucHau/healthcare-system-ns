@@ -1,4 +1,8 @@
 import { supabase } from '@/lib/supabase';
+import {
+  toExamActivityLogEntry,
+  type DoctorExamActivityLogEntry,
+} from '@/lib/exam-activity-log';
 import type {
   AppointmentsAuditEntry,
   AppointmentsAuditListParams,
@@ -49,6 +53,43 @@ export async function listDoctorAppointmentsAuditLog(
   return {
     total: Number(payload.total ?? 0),
     rows: (payload.rows ?? []) as AppointmentsAuditEntry[],
+  };
+}
+
+export type DoctorExamActivityLogListParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+};
+
+export async function listDoctorExaminationActivityLog(
+  params: DoctorExamActivityLogListParams = {},
+): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
+  const { data, error } = await supabase.rpc('list_doctor_examination_activity_log', {
+    p_query: params.search?.trim() || null,
+    p_page: params.page ?? 1,
+    p_limit: params.limit ?? 10,
+  });
+  if (error) throw new Error(mapError(error.message));
+  const payload = (data ?? { total: 0, rows: [] }) as RpcListPayload;
+  const rows = (payload.rows ?? []) as Array<{
+    id: string;
+    exam_id: string;
+    actor_id: string | null;
+    actor_name: string | null;
+    action: 'UPDATED';
+    created_at: string;
+    changed_fields?: unknown;
+    patient_name: string | null;
+    appointment_id: string | null;
+  }>;
+  return {
+    total: Number(payload.total ?? 0),
+    rows: rows.map((row) => ({
+      ...toExamActivityLogEntry(row),
+      patient_name: row.patient_name,
+      appointment_id: row.appointment_id,
+    })),
   };
 }
 

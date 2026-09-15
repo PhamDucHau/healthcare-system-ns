@@ -4,12 +4,12 @@
  */
 
 import { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   Activity, AlertTriangle, Check, ChevronDown, ChevronUp,
   ClipboardList, Loader2, Lock, Save, Sparkles, X, Pencil,
-  Mic, StopCircle, Brain, Heart, TrendingUp,
+  Mic, StopCircle, Brain, Heart, TrendingUp, ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -135,7 +135,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                 {editor.saving
                   ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
                   : <Save className="h-4 w-4 mr-1.5" />}
-                Lưu nháp
+                Lưu
               </Button>
               <Button
                 size="sm"
@@ -284,6 +284,28 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                 appointmentId={appointmentId}
                 patientId={editor.exam.patient_id}
               />
+            )}
+          </ExpandableSection>
+
+          <ExpandableSection
+            title="Nhật ký hệ thống"
+            icon={<ScrollText className="h-4 w-4 text-primary" />}
+            expanded={sectionExpanded.history}
+            onToggle={() => setSectionExpanded((p) => ({ ...p, history: !p.history }))}
+          >
+            {editor.activityLogs.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Chưa có nhật ký hoạt động.</p>
+            ) : (
+              <ul className="space-y-2">
+                {editor.activityLogs.map((entry) => (
+                  <li key={entry.id} className="text-sm text-slate-700">
+                    <p>{entry.message}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(new Date(entry.created_at), 'dd/MM/yyyy HH:mm', { locale: vi })}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             )}
           </ExpandableSection>
 

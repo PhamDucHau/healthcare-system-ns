@@ -1,16 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UseSoapNoteEditorReturn } from "@/hooks/useSoapNoteEditor";
 import type { MedicalExamination, SoapFormData } from "@/types/emr";
-import { SOAP_ASSESSMENT_REQUIRED_MESSAGE } from "@/types/emr";
-
-const toastError = vi.fn();
 
 vi.mock("sonner", () => ({
-  toast: {
-    error: (...args: unknown[]) => toastError(...args),
-    success: vi.fn(),
-  },
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
 const editorState = vi.fn();
@@ -35,7 +29,7 @@ function exam(overrides: Partial<MedicalExamination> = {}): MedicalExamination {
     doctor_id: "doc-1",
     s_text: "Đau họng",
     o_text: "Họng đỏ",
-    a_text: "",
+    a_text: "Viêm họng cấp",
     p_text: "Nghỉ ngơi",
     status: "DRAFT",
     is_addendum: false,
@@ -43,32 +37,17 @@ function exam(overrides: Partial<MedicalExamination> = {}): MedicalExamination {
     auto_saved_at: null,
     created_at: "2026-09-16T00:00:00.000Z",
     updated_at: "2026-09-16T00:00:00.000Z",
-    icd_codes: [
-      {
-        id: "icd-1",
-        exam_id: "exam-1",
-        icd_code: "J02.9",
-        icd_name: "Viêm họng cấp",
-        is_ai_suggested: false,
-        ai_confidence: null,
-        ai_reason: null,
-        confirm_status: "CONFIRMED",
-        confirmed_at: "2026-09-16T00:00:00.000Z",
-        display_order: 0,
-        created_at: "2026-09-16T00:00:00.000Z",
-      },
-    ],
+    icd_codes: [],
     ...overrides,
   };
 }
 
-function formData(overrides: Partial<SoapFormData> = {}): SoapFormData {
+function formData(): SoapFormData {
   return {
     s_text: "Đau họng",
     o_text: "Họng đỏ",
-    a_text: "",
+    a_text: "Viêm họng cấp",
     p_text: "Nghỉ ngơi",
-    ...overrides,
   };
 }
 
@@ -134,35 +113,39 @@ function mockEditor(overrides: Partial<UseSoapNoteEditorReturn> = {}): UseSoapNo
   };
 }
 
-describe("SoapNoteEditor sign-off gate (TC-DLS-006)", () => {
+describe("SOAP exam activity log (TC-DLS-403)", () => {
   beforeEach(() => {
-    toastError.mockReset();
     editorState.mockReturnValue(mockEditor());
   });
 
-  it("should not open PIN dialog when Assessment (A) is empty", () => {
+  it("should offer a Lưu button on an unlocked exam", () => {
     render(<SoapNoteEditor appointmentId="appt-1" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Hoàn tất & Ký duyệt/i }));
-
-    expect(toastError).toHaveBeenCalledWith(SOAP_ASSESSMENT_REQUIRED_MESSAGE);
-    expect(screen.queryByText("Xác nhận & Ký duyệt hồ sơ")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Lưu$/i })).toBeEnabled();
   });
 
-  it("should open PIN dialog when Assessment (A) is filled", async () => {
+  it("should show the system log line for a saved update", () => {
     editorState.mockReturnValue(
       mockEditor({
-        formData: formData({ a_text: "Viêm họng cấp" }),
-        exam: exam({ a_text: "Viêm họng cấp" }),
+        activityLogs: [
+          {
+            id: "log-1",
+            exam_id: "exam-1",
+            actor_id: "doc-1",
+            actor_name: "Nguyễn Văn A",
+            action: "UPDATED",
+            created_at: "2026-09-16T10:15:00.000Z",
+            message: "Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ",
+            changed_fields: [],
+          },
+        ],
       })
     );
     render(<SoapNoteEditor appointmentId="appt-1" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Hoàn tất & Ký duyệt/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Nhật ký hệ thống/i }));
 
-    await waitFor(() => {
-      expect(toastError).not.toHaveBeenCalled();
-      expect(screen.getByText("Xác nhận & Ký duyệt hồ sơ")).toBeInTheDocument();
-    });
+    expect(
+      screen.getByText("Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ")
+    ).toBeInTheDocument();
   });
 });
