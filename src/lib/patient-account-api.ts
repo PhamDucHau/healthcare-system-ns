@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { decryptRow, decryptRows, encryptRow } from "@/lib/crypto";
 import {
   mapAccessibilityPreferences,
   mapEmergencyContact,
@@ -9,6 +10,15 @@ import {
   type PatientAccountSettings,
 } from "@/types/patient-account";
 
+async function mapDecryptedEmergencyContact(row: Record<string, unknown>): Promise<EmergencyContact> {
+  try {
+    const decrypted = await decryptRow(row, "patient_emergency_contacts");
+    return mapEmergencyContact(decrypted);
+  } catch {
+    return mapEmergencyContact(row);
+  }
+}
+
 export async function fetchEmergencyContacts(): Promise<EmergencyContact[]> {
   const { data, error } = await supabase
     .from("patient_emergency_contacts")
@@ -17,7 +27,15 @@ export async function fetchEmergencyContacts(): Promise<EmergencyContact[]> {
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => mapEmergencyContact(row as Record<string, unknown>));
+  try {
+    const decrypted = await decryptRows(
+      (data ?? []) as Record<string, unknown>[],
+      "patient_emergency_contacts",
+    );
+    return decrypted.map((row) => mapEmergencyContact(row));
+  } catch {
+    return (data ?? []).map((row) => mapEmergencyContact(row as Record<string, unknown>));
+  }
 }
 
 export type EmergencyContactInput = {
@@ -31,41 +49,51 @@ export async function createEmergencyContact(input: EmergencyContactInput): Prom
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data, error } = await supabase
-    .from("patient_emergency_contacts")
-    .insert({
+  const encrypted = await encryptRow(
+    {
       patient_user_id: user.id,
       full_name: input.full_name.trim(),
       relationship: input.relationship.trim(),
       phone_number: input.phone_number.trim(),
       sort_order: input.sort_order ?? 0,
-    })
+    },
+    "patient_emergency_contacts",
+  );
+
+  const { data, error } = await supabase
+    .from("patient_emergency_contacts")
+    .insert(encrypted)
     .select("*")
     .single();
 
   if (error) throw new Error(error.message);
-  return mapEmergencyContact(data as Record<string, unknown>);
+  return mapDecryptedEmergencyContact(data as Record<string, unknown>);
 }
 
 export async function updateEmergencyContact(
   id: string,
   input: EmergencyContactInput,
 ): Promise<EmergencyContact> {
-  const { data, error } = await supabase
-    .from("patient_emergency_contacts")
-    .update({
+  const encrypted = await encryptRow(
+    {
       full_name: input.full_name.trim(),
       relationship: input.relationship.trim(),
       phone_number: input.phone_number.trim(),
       sort_order: input.sort_order ?? 0,
       updated_at: new Date().toISOString(),
-    })
+    },
+    "patient_emergency_contacts",
+  );
+
+  const { data, error } = await supabase
+    .from("patient_emergency_contacts")
+    .update(encrypted)
     .eq("id", id)
     .select("*")
     .single();
 
   if (error) throw new Error(error.message);
-  return mapEmergencyContact(data as Record<string, unknown>);
+  return mapDecryptedEmergencyContact(data as Record<string, unknown>);
 }
 
 export async function deleteEmergencyContact(id: string): Promise<void> {

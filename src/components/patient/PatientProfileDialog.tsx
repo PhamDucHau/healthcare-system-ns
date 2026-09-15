@@ -26,6 +26,7 @@ import {
   type CccdParsed,
 } from "@/lib/cccd-ocr";
 import { validateCccdRequired } from "@/lib/cccd-required";
+import { encryptRow, sanitizeSensitiveInput } from "@/lib/crypto";
 import { supabase } from "@/lib/supabase";
 import { type PatientPortalDetail } from "@/types/patient-portal";
 import {
@@ -122,21 +123,25 @@ function sanitizeStorageSegment(fileName: string): string {
   return ascii.slice(0, 120) || "file";
 }
 
+function forEdit(value: string | null | undefined): string {
+  return sanitizeSensitiveInput(value);
+}
+
 function profileToEditData(p: PatientPortalDetail): EditData {
   return {
     legalFirstName: p.legal_first_name ?? "",
     legalLastName: p.legal_last_name ?? "",
     dateOfBirth: p.date_of_birth ?? "",
-    phoneNumber: p.phone_number ?? "",
+    phoneNumber: forEdit(p.phone_number),
     email: p.email_address ?? "",
     pronouns: p.preferred_pronouns ?? "",
-    idNumber: p.id_number ?? "",
+    idNumber: forEdit(p.id_number),
     idIssuer: p.id_issuer ?? "",
     idIssuedDate: p.id_issued_date ?? "",
     idExpirationDate: p.id_expiration_date ?? "",
-    residentialAddress: p.residential_address ?? "",
+    residentialAddress: forEdit(p.residential_address),
     insuranceProvider: p.insurance_provider ?? "",
-    memberId: p.member_id ?? "",
+    memberId: forEdit(p.member_id),
     groupNumber: p.group_number ?? "",
   };
 }
@@ -207,10 +212,11 @@ function readOnboardingDraft(): Partial<PatientPortalDetail> | null {
 }
 
 function Field({ label, value }: { label: string; value: string }) {
+  const displayValue = sanitizeSensitiveInput(value) || "—";
   return (
     <div className="rounded-lg border bg-muted/30 px-3 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-medium text-foreground">{value || "—"}</p>
+      <p className="mt-0.5 text-sm font-medium text-foreground">{displayValue}</p>
     </div>
   );
 }
@@ -743,27 +749,38 @@ const PatientProfileDialog = ({ open, onOpenChange }: PatientProfileDialogProps)
       });
     }
 
-    const { error } = await supabase.from("patient").upsert(
-      {
-        user_id: userId,
-        legal_first_name: editData.legalFirstName || null,
-        legal_last_name: editData.legalLastName || null,
-        date_of_birth: editData.dateOfBirth || null,
-        phone_number: editData.phoneNumber || null,
-        email_address: editData.email || null,
-        preferred_pronouns: editData.pronouns || null,
-        id_number: editData.idNumber || null,
-        id_issuer: editData.idIssuer || null,
-        id_issued_date: editData.idIssuedDate || null,
-        id_expiration_date: editData.idExpirationDate || null,
-        residential_address: editData.residentialAddress || null,
-        insurance_provider: editData.insuranceProvider || null,
-        member_id: editData.memberId || null,
-        group_number: editData.groupNumber || null,
-        ...newPaths,
-      },
-      { onConflict: "user_id" },
-    );
+    let payload: Record<string, unknown>;
+    try {
+      payload = await encryptRow(
+        {
+          user_id: userId,
+          legal_first_name: editData.legalFirstName || null,
+          legal_last_name: editData.legalLastName || null,
+          date_of_birth: editData.dateOfBirth || null,
+          phone_number: editData.phoneNumber || null,
+          email_address: editData.email || null,
+          preferred_pronouns: editData.pronouns || null,
+          id_number: editData.idNumber || null,
+          id_issuer: editData.idIssuer || null,
+          id_issued_date: editData.idIssuedDate || null,
+          id_expiration_date: editData.idExpirationDate || null,
+          residential_address: editData.residentialAddress || null,
+          insurance_provider: editData.insuranceProvider || null,
+          member_id: editData.memberId || null,
+          group_number: editData.groupNumber || null,
+          ...newPaths,
+        },
+        "patient",
+      );
+    } catch (e) {
+      setIsSaving(false);
+      toast.error("Lưu thất bại", {
+        description: e instanceof Error ? e.message : "Không mã hóa được dữ liệu nhạy cảm",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("patient").upsert(payload, { onConflict: "user_id" });
 
     setIsSaving(false);
     if (error) {

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { fetchSexualHealth, formatStdTestDisplay, upsertSexualHealth } from "@/lib/patient-sexual-health-api";
+import { sanitizeSensitiveInput } from "@/lib/crypto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,12 +23,12 @@ const AccountSexualHealthPage = () => {
 
   useEffect(() => {
     if (!data) return;
-    setOrientation(data.sexual_orientation ?? "");
-    setSexAtBirth(data.sex_at_birth ?? "");
-    setPrepStatus(data.prep_pep_status ?? "");
+    setOrientation(sanitizeSensitiveInput(data.sexual_orientation));
+    setSexAtBirth(sanitizeSensitiveInput(data.sex_at_birth));
+    setPrepStatus(sanitizeSensitiveInput(data.prep_pep_status));
     setTestDate(data.last_std_test_date ?? "");
-    setTestResult(data.last_std_test_result ?? "");
-    setNotes(data.notes_for_doctor ?? "");
+    setTestResult(sanitizeSensitiveInput(data.last_std_test_result));
+    setNotes(sanitizeSensitiveInput(data.notes_for_doctor));
   }, [data]);
 
   const saveMutation = useMutation({
@@ -46,7 +47,11 @@ const AccountSexualHealthPage = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const hasData = Boolean(data?.sexual_orientation || data?.prep_pep_status || data?.notes_for_doctor);
+  const hasData = Boolean(
+    sanitizeSensitiveInput(data?.sexual_orientation)
+    || sanitizeSensitiveInput(data?.prep_pep_status)
+    || sanitizeSensitiveInput(data?.notes_for_doctor),
+  );
 
   return (
     <section>

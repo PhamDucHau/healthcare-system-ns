@@ -7,6 +7,37 @@ const ALGORITHM = 'AES-GCM';
 const KEY_LENGTH = 256;
 const IV_LENGTH = 12;
 const TAG_LENGTH = 128;
+const DECRYPT_FAILURE_PLACEHOLDER = '[Lỗi giải mã]';
+/** IV (12) + GCM tag (16) = 28 bytes → ~40 base64 chars. */
+const MIN_CIPHERTEXT_BASE64_LENGTH = 40;
+
+/**
+ * AES-GCM blobs stored as base64 (no whitespace). Used to avoid showing
+ * ciphertext in patient UI and to skip decrypting already-plaintext fields.
+ */
+export function looksLikeEncryptedToken(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (trimmed.length < MIN_CIPHERTEXT_BASE64_LENGTH) return false;
+  if (/\s/.test(trimmed)) return false;
+  return /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed);
+}
+
+/** Hide ciphertext / decrypt errors in patient-facing UI. */
+export function sanitizeSensitiveDisplay(value: string | null | undefined): string {
+  if (!value?.trim()) return '—';
+  const trimmed = value.trim();
+  if (trimmed === DECRYPT_FAILURE_PLACEHOLDER || looksLikeEncryptedToken(trimmed)) {
+    return '—';
+  }
+  return value;
+}
+
+/** Empty string instead of ciphertext so form inputs stay editable. */
+export function sanitizeSensitiveInput(value: string | null | undefined): string {
+  const display = sanitizeSensitiveDisplay(value);
+  return display === '—' ? '' : display;
+}
 
 let cryptoKey: CryptoKey | null = null;
 
@@ -56,6 +87,7 @@ async function getCryptoKey(): Promise<CryptoKey> {
  */
 export async function encrypt(plaintext: string): Promise<string> {
   if (!plaintext) return '';
+  if (looksLikeEncryptedToken(plaintext)) return plaintext;
 
   const key = await getCryptoKey();
   const encoder = new TextEncoder();
@@ -81,6 +113,7 @@ export async function encrypt(plaintext: string): Promise<string> {
  */
 export async function decrypt(ciphertext: string): Promise<string> {
   if (!ciphertext) return '';
+  if (!looksLikeEncryptedToken(ciphertext)) return ciphertext;
 
   try {
     const key = await getCryptoKey();
@@ -98,7 +131,7 @@ export async function decrypt(ciphertext: string): Promise<string> {
     return new TextDecoder().decode(decrypted);
   } catch {
     console.error('Decryption failed - data may be corrupted or key mismatch');
-    return '[Lỗi giải mã]';
+    return DECRYPT_FAILURE_PLACEHOLDER;
   }
 }
 

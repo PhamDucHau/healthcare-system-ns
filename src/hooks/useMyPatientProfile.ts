@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { decryptRow } from "@/lib/crypto";
 import { supabase } from "@/lib/supabase";
 import { mapPatientPortalRow, type PatientPortalDetail } from "@/types/patient-portal";
 
@@ -12,7 +13,13 @@ async function fetchMyPatientProfile(userId: string): Promise<PatientPortalDetai
 
   if (error) throw error;
   if (!row) return null;
-  return mapPatientPortalRow(row as Record<string, unknown>);
+
+  try {
+    const decrypted = await decryptRow(row as Record<string, unknown>, "patient");
+    return mapPatientPortalRow(decrypted);
+  } catch {
+    return mapPatientPortalRow(row as Record<string, unknown>);
+  }
 }
 
 export function useMyPatientProfile() {

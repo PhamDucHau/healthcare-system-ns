@@ -2,50 +2,36 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ImageIcon, Loader2, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyPatientProfile } from "@/hooks/useMyPatientProfile";
 import { supabase } from "@/lib/supabase";
-import { mapPatientPortalRow } from "@/types/patient-portal";
 import { ProfileDetailField } from "@/components/account/ProfileDetailField";
 import { Button } from "@/components/ui/button";
+import { sanitizeSensitiveDisplay } from "@/lib/crypto";
 
 const AccountInsurancePage = () => {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  const { data: profile, isLoading: profileLoading } = useMyPatientProfile();
+  const cardPath = profile?.card_front_storage_path ?? null;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["patient", "my-profile-insurance", userId],
+  const { data: cardImageUrl, isLoading: cardLoading } = useQuery({
+    queryKey: ["patient", "my-insurance-card", userId, cardPath],
     queryFn: async () => {
-      const { data: row, error } = await supabase
-        .from("patient")
-        .select("*")
-        .eq("user_id", userId as string)
-        .maybeSingle();
-      if (error) throw error;
-      if (!row) return { profile: null, cardImageUrl: null };
-
-      const profile = mapPatientPortalRow(row as Record<string, unknown>);
-      const cardPath = profile.card_front_storage_path;
-
-      let cardImageUrl: string | null = null;
-      if (cardPath) {
-        const { data: signed } = await supabase.storage
-          .from("insurance-cards")
-          .createSignedUrl(cardPath, 3600);
-        cardImageUrl = signed?.signedUrl ?? null;
-      }
-
-      return { profile, cardImageUrl };
+      const { data: signed } = await supabase.storage
+        .from("insurance-cards")
+        .createSignedUrl(cardPath as string, 3600);
+      return signed?.signedUrl ?? null;
     },
-    enabled: Boolean(userId),
+    enabled: Boolean(userId && cardPath),
   });
 
-  const profile = data?.profile ?? null;
-  const cardImageUrl = data?.cardImageUrl ?? null;
+  const isLoading = profileLoading || (Boolean(cardPath) && cardLoading);
 
   const hasInsurance = Boolean(
     profile
     && (
       profile.insurance_provider?.trim()
-      || profile.member_id?.trim()
+      || sanitizeSensitiveDisplay(profile.member_id) !== "—"
       || profile.card_front_storage_path
     ),
   );

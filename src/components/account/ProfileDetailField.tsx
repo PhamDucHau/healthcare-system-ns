@@ -1,3 +1,6 @@
+import type { LucideIcon } from "lucide-react";
+import { sanitizeSensitiveDisplay } from "@/lib/crypto";
+
 function formatDob(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -14,8 +17,6 @@ function profileInitials(fullName: string | null | undefined): string {
   return `${first}${last}`.toUpperCase();
 }
 
-import type { LucideIcon } from "lucide-react";
-
 type ProfileDetailFieldProps = {
   label: string;
   value: string;
@@ -24,7 +25,8 @@ type ProfileDetailFieldProps = {
 };
 
 export function ProfileDetailField({ label, value, className, icon: Icon }: ProfileDetailFieldProps) {
-  const hasValue = Boolean(value && value !== "—");
+  const displayValue = sanitizeSensitiveDisplay(value);
+  const hasValue = Boolean(displayValue && displayValue !== "—");
   return (
     <div
       className={`group flex items-start gap-3 rounded-xl border border-border/70 bg-card px-4 py-3.5 transition-colors hover:border-primary/40 hover:bg-primary/[0.03] ${className ?? ""}`}
@@ -38,9 +40,9 @@ export function ProfileDetailField({ label, value, className, icon: Icon }: Prof
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
         <p
           className={`mt-1 truncate text-sm font-semibold ${hasValue ? "text-foreground" : "text-muted-foreground/60"}`}
-          title={hasValue ? value : undefined}
+          title={hasValue ? displayValue : undefined}
         >
-          {value || "—"}
+          {displayValue}
         </p>
       </div>
     </div>

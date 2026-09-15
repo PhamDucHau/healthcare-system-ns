@@ -29,6 +29,7 @@ import {
   validateAvatarFile,
 } from "@/lib/patient-avatar-api";
 import { Button } from "@/components/ui/button";
+import { sanitizeSensitiveDisplay } from "@/lib/crypto";
 
 const AccountPersonalPage = () => {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -49,6 +50,9 @@ const AccountPersonalPage = () => {
 
   const recordExists = hasPatientRecord(profile);
   const waitingForProfile = isLoading && profile === undefined;
+  const phoneDisplay = recordExists
+    ? sanitizeSensitiveDisplay(profile.phone_number)
+    : "—";
 
   const handleAvatarPick = () => {
     if (isUploadingAvatar) return;
@@ -158,10 +162,10 @@ const AccountPersonalPage = () => {
                         {profile.email_address}
                       </span>
                     ) : null}
-                    {profile.phone_number ? (
+                    {phoneDisplay !== "—" ? (
                       <span className="inline-flex items-center gap-1.5">
                         <Phone className="h-3.5 w-3.5" />
-                        {profile.phone_number}
+                        {phoneDisplay}
                       </span>
                     ) : null}
                   </div>
@@ -201,7 +205,7 @@ const AccountPersonalPage = () => {
               <ProfileDetailField
                 icon={Phone}
                 label="Số điện thoại"
-                value={profile.phone_number ?? "—"}
+                value={phoneDisplay}
               />
               <ProfileDetailField
                 icon={UserRound}

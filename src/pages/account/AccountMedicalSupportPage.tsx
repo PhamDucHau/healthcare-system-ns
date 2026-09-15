@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { sanitizeSensitiveDisplay, sanitizeSensitiveInput } from "@/lib/crypto";
 
 function ContactDialog({
   open,
@@ -36,16 +37,16 @@ function ContactDialog({
   initial?: EmergencyContact | null;
   onSave: (input: EmergencyContactInput) => Promise<void>;
 }) {
-  const [fullName, setFullName] = useState(initial?.full_name ?? "");
-  const [relationship, setRelationship] = useState(initial?.relationship ?? "");
-  const [phone, setPhone] = useState(initial?.phone_number ?? "");
+  const [fullName, setFullName] = useState(sanitizeSensitiveInput(initial?.full_name));
+  const [relationship, setRelationship] = useState(sanitizeSensitiveInput(initial?.relationship));
+  const [phone, setPhone] = useState(sanitizeSensitiveInput(initial?.phone_number));
   const [saving, setSaving] = useState(false);
 
   const handleOpen = (v: boolean) => {
     if (v) {
-      setFullName(initial?.full_name ?? "");
-      setRelationship(initial?.relationship ?? "");
-      setPhone(initial?.phone_number ?? "");
+      setFullName(sanitizeSensitiveInput(initial?.full_name));
+      setRelationship(sanitizeSensitiveInput(initial?.relationship));
+      setPhone(sanitizeSensitiveInput(initial?.phone_number));
     }
     onOpenChange(v);
   };
@@ -213,9 +214,9 @@ const AccountMedicalSupportPage = () => {
                   <tbody>
                     {contacts.map((c) => (
                       <tr key={c.id} className="border-b last:border-0">
-                        <td className="py-3 font-medium">{c.full_name}</td>
-                        <td className="py-3">{c.relationship}</td>
-                        <td className="py-3">{c.phone_number}</td>
+                        <td className="py-3 font-medium">{sanitizeSensitiveDisplay(c.full_name)}</td>
+                        <td className="py-3">{sanitizeSensitiveDisplay(c.relationship)}</td>
+                        <td className="py-3">{sanitizeSensitiveDisplay(c.phone_number)}</td>
                         <td className="py-3">
                           <button
                             type="button"
