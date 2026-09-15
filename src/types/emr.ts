@@ -88,9 +88,13 @@ export type SignExaminationResult = {
 
 export type SoapValidationErrors = Partial<{
   s_text: string;
+  a_text: string;
   icd_codes: string;
   pin: string;
 }>;
+
+export const SOAP_ASSESSMENT_REQUIRED_MESSAGE =
+  'Vui lòng điền phần Đánh giá (A) trước khi ký xác nhận';
 
 export function validateSoapForSave(data: SoapFormData): SoapValidationErrors {
   const errors: SoapValidationErrors = {};
@@ -105,6 +109,9 @@ export function validateSoapForSign(
   icdCodes: SoapIcdCode[]
 ): SoapValidationErrors {
   const errors = validateSoapForSave(data);
+  if (!data.a_text || data.a_text.trim() === '') {
+    errors.a_text = SOAP_ASSESSMENT_REQUIRED_MESSAGE;
+  }
   const confirmed = icdCodes.filter((c) => c.confirm_status === 'CONFIRMED');
   if (confirmed.length === 0) {
     errors.icd_codes = 'Cần ít nhất 1 chẩn đoán ICD-10 được xác nhận';

@@ -6,12 +6,13 @@ import { supabase } from '@/lib/supabase';
 import { analyzeTranscript, suggestIcd10 } from '@/lib/stt-nlp-api';
 import { decrypt, encrypt } from '@/lib/crypto';
 import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
-import type {
-  MedicalExamination,
-  SoapIcdCode,
-  IcdConfirmStatus,
-  SignExaminationResult,
-  AiIcdSuggestion,
+import {
+  SOAP_ASSESSMENT_REQUIRED_MESSAGE,
+  type MedicalExamination,
+  type SoapIcdCode,
+  type IcdConfirmStatus,
+  type SignExaminationResult,
+  type AiIcdSuggestion,
 } from '@/types/emr';
 
 // Helper to decrypt SOAP fields
@@ -578,6 +579,8 @@ function mapEmrError(message: string): string {
     return 'Bạn phải xác nhận trách nhiệm trước khi ký.';
   if (message.includes('VALIDATION_ERROR: s_text'))
     return 'Phần Subjective (S) là bắt buộc.';
+  if (message.includes('VALIDATION_ERROR: Assessment (A)'))
+    return SOAP_ASSESSMENT_REQUIRED_MESSAGE;
   if (message.includes('VALIDATION_ERROR: PIN must be'))
     return 'Mã PIN phải gồm đúng 6 chữ số.';
   return message;

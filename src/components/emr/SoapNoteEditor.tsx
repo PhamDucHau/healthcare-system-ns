@@ -23,8 +23,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 import { useSoapNoteEditor } from '@/hooks/useSoapNoteEditor';
 import type { SoapIcdCode, AiIcdSuggestion } from '@/types/emr';
+import { validateSoapForSign } from '@/types/emr';
 import IcdSearchPanel from './IcdSearchPanel';
 import DoctorSignOffDialog from './DoctorSignOffDialog';
 import SetupPinDialog from './SetupPinDialog';
@@ -79,6 +81,16 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
   const confirmedIcds = editor.exam?.icd_codes.filter((c) => c.confirm_status === 'CONFIRMED') ?? [];
   const pendingIcds = editor.exam?.icd_codes.filter((c) => c.confirm_status === 'PENDING') ?? [];
 
+  const openSignOff = () => {
+    const errors = validateSoapForSign(editor.formData, editor.exam?.icd_codes ?? []);
+    const firstError = Object.values(errors)[0];
+    if (firstError) {
+      toast.error(firstError);
+      return;
+    }
+    setShowSignOff(true);
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50/40">
       {/* ── Header bar ── */}
@@ -127,7 +139,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
               </Button>
               <Button
                 size="sm"
-                onClick={() => setShowSignOff(true)}
+                onClick={openSignOff}
                 disabled={editor.submitting || editor.isRecording || editor.isTranscribing}
                 className="h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/95 shadow-sm"
               >
@@ -302,6 +314,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
           <SoapSection
             label="A — Assessment"
             description="Chẩn đoán lâm sàng tự do (ICD-10 chọn bên phải)"
+            required
             value={editor.formData.a_text}
             onChange={(v) => editor.updateField('a_text', v)}
             locked={editor.isLocked}
