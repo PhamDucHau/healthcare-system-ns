@@ -126,6 +126,74 @@ export async function getExaminationByAppointment(
   return await mapExamRow(rows[0]);
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function mapExamRowsWithIcds(
+  rows: Record<string, unknown>[],
+): Promise<MedicalExamination[]> {
+  return Promise.all(
+    rows.map((row) => {
+      const embedded = row.soap_icd_codes;
+      const icd_codes = Array.isArray(embedded)
+        ? embedded.map((item) => ({
+            ...(item as Record<string, unknown>),
+            exam_id: row.id,
+          }))
+        : row.icd_codes;
+      return mapExamRow({ ...row, icd_codes });
+    }),
+  );
+}
+
+/**
+ * Locked SOAP notes for a patient (auth user id and/or profile id).
+ */
+export async function listLockedExaminationsForPatient(ids: {
+  patientUserId?: string | null;
+  profileId?: string | null;
+}): Promise<MedicalExamination[]> {
+  const userId = ids.patientUserId && UUID_RE.test(ids.patientUserId) ? ids.patientUserId : null;
+  const profileId = ids.profileId && UUID_RE.test(ids.profileId) ? ids.profileId : null;
+  if (!userId && !profileId) return [];
+
+  const byId = new Map<string, MedicalExamination>();
+
+  if (userId) {
+    const { data, error } = await supabase
+      .from('medical_examinations')
+      .select('*, soap_icd_codes(*)')
+      .eq('patient_id', userId)
+      .eq('status', 'LOCKED');
+    if (error) throw new Error(mapEmrError(error.message));
+    for (const exam of await mapExamRowsWithIcds((data ?? []) as Record<string, unknown>[])) {
+      byId.set(exam.id, exam);
+    }
+  }
+
+  if (profileId) {
+    const { data: appts, error: apptErr } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('profile_id', profileId);
+    if (apptErr) throw new Error(mapEmrError(apptErr.message));
+    const appointmentIds = (appts ?? []).map((row) => String(row.id)).filter((id) => UUID_RE.test(id));
+    if (appointmentIds.length > 0) {
+      const { data, error } = await supabase
+        .from('medical_examinations')
+        .select('*, soap_icd_codes(*)')
+        .in('appointment_id', appointmentIds)
+        .eq('status', 'LOCKED');
+      if (error) throw new Error(mapEmrError(error.message));
+      for (const exam of await mapExamRowsWithIcds((data ?? []) as Record<string, unknown>[])) {
+        byId.set(exam.id, exam);
+      }
+    }
+  }
+
+  return [...byId.values()];
+}
+
 /**
  * Auto-saves or manually saves SOAP draft fields
  * RULE-010c: s_text must not be empty if provided

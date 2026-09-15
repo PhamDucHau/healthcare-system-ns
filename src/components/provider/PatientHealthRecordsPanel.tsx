@@ -1,49 +1,65 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import SoapNoteReadOnly from '@/components/emr/SoapNoteReadOnly';
+import { listLockedExaminationsForPatient } from '@/lib/emr-api';
 import {
+  examsToHealthRecordVersions,
   listHealthRecordVersions,
   versionToExam,
   type HealthRecordVersion,
 } from '@/lib/patient-health-records-storage';
 
 type PatientHealthRecordsPanelProps = {
-  /** Auth user id and/or patient profile id — both keys are checked. */
-  lookupIds: string[];
+  patientUserId: string | null;
+  profileId: string | null;
+  /** Extra localStorage keys (demo / legacy). */
+  fallbackLookupIds?: string[];
 };
 
-export default function PatientHealthRecordsPanel({ lookupIds }: PatientHealthRecordsPanelProps) {
-  const [versions, setVersions] = useState<HealthRecordVersion[]>([]);
+export default function PatientHealthRecordsPanel({
+  patientUserId,
+  profileId,
+  fallbackLookupIds = [],
+}: PatientHealthRecordsPanelProps) {
   const [expandedVersion, setExpandedVersion] = useState<number | null>(null);
 
-  const reload = () => {
+  const { data: exams = [], isLoading } = useQuery({
+    queryKey: ['patient', 'locked-exams', patientUserId, profileId],
+    queryFn: () => listLockedExaminationsForPatient({ patientUserId, profileId }),
+    enabled: Boolean(patientUserId || profileId),
+  });
+
+  const versions = useMemo(() => {
+    const fromDb = examsToHealthRecordVersions(exams);
+    if (fromDb.length > 0) return fromDb;
+
     const seen = new Set<string>();
     const merged: HealthRecordVersion[] = [];
-    for (const id of lookupIds) {
+    for (const id of fallbackLookupIds) {
       if (!id || seen.has(id)) continue;
       seen.add(id);
       for (const v of listHealthRecordVersions(id)) {
-        if (!merged.some((m) => m.exam_id === v.exam_id && m.version === v.version)) {
-          merged.push(v);
-        }
+        if (!merged.some((m) => m.exam_id === v.exam_id)) merged.push(v);
       }
     }
-    merged.sort((a, b) => new Date(b.signed_at).getTime() - new Date(a.signed_at).getTime());
-    setVersions(merged);
-    if (merged.length > 0 && expandedVersion == null) {
-      setExpandedVersion(merged[0].version);
-    }
-  };
+    return merged.sort(
+      (a, b) => new Date(b.signed_at).getTime() - new Date(a.signed_at).getTime(),
+    );
+  }, [exams, fallbackLookupIds]);
 
-  useEffect(() => {
-    reload();
-    const onUpdate = () => reload();
-    window.addEventListener('qcare:health-records-updated', onUpdate);
-    return () => window.removeEventListener('qcare:health-records-updated', onUpdate);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupIds.join('|')]);
+  const expanded = expandedVersion ?? versions[0]?.version ?? null;
+
+  if (isLoading) {
+    return (
+      <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Đang tải hồ sơ đã ký…
+      </p>
+    );
+  }
 
   if (versions.length === 0) {
     return (
@@ -63,17 +79,17 @@ export default function PatientHealthRecordsPanel({ lookupIds }: PatientHealthRe
         {versions.length} phiên bản hồ sơ — mới nhất ở trên
       </p>
       {versions.map((record) => {
-        const isOpen = expandedVersion === record.version;
+        const isOpen = expanded === record.version;
         const icdCount = record.icd_codes.filter((c) => c.confirm_status === 'CONFIRMED').length;
         return (
           <article
-            key={`${record.exam_id}-v${record.version}`}
+            key={record.exam_id}
             className="rounded-xl border bg-background overflow-hidden"
           >
             <button
               type="button"
               onClick={() => setExpandedVersion(isOpen ? null : record.version)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold">
@@ -88,9 +104,9 @@ export default function PatientHealthRecordsPanel({ lookupIds }: PatientHealthRe
                 </p>
               </div>
               {isOpen ? (
-                <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <ChevronUp className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
               )}
             </button>
             {isOpen && (

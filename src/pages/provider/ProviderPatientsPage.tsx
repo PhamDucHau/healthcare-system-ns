@@ -37,6 +37,10 @@ import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatient
 import PatientHealthRecordsPanel from "@/components/provider/PatientHealthRecordsPanel";
 import { fetchPatientHealthChartByUserId } from "@/lib/patient-health-history-api";
 import {
+  listSubmittedPreConsultsForOverview,
+  mergeOverviewHistory,
+} from "@/lib/patient-overview-history";
+import {
   formatAllergyLabel,
   formatConditionLabel,
   formatImmunizationLabel,
@@ -654,6 +658,17 @@ const ProviderPatientsPage = () => {
     enabled: Boolean(realPatientUserId),
   });
 
+  const { data: submittedPreConsults = [] } = useQuery({
+    queryKey: ["patient", "preconsult-overview", realPatientUserId],
+    queryFn: () => listSubmittedPreConsultsForOverview(realPatientUserId!),
+    enabled: Boolean(realPatientUserId),
+  });
+
+  const overviewHistory = useMemo(
+    () => mergeOverviewHistory(healthChart ?? null, submittedPreConsults),
+    [healthChart, submittedPreConsults],
+  );
+
   const { data: vitalHistory = [] } = useQuery({
     queryKey: ["vital_signs_history", "patient", realPatientUserId],
     queryFn: () => listAllVitalSignsForPatient(supabase, realPatientUserId!).then((r) => r.vitals),
@@ -698,23 +713,23 @@ const ProviderPatientsPage = () => {
 
   const diagnosisLabels = useMemo(() => {
     if (isDemoSelection) return DEMO_DIAGNOSES;
-    return (healthChart?.diagnoses ?? []).map(formatConditionLabel);
-  }, [isDemoSelection, healthChart]);
+    return overviewHistory.diagnoses.map(formatConditionLabel);
+  }, [isDemoSelection, overviewHistory]);
 
   const medicationLabels = useMemo(() => {
     if (isDemoSelection) return DEMO_MEDICATIONS;
-    return (healthChart?.medications ?? []).map(formatMedicationLabel);
-  }, [isDemoSelection, healthChart]);
+    return overviewHistory.medications.map(formatMedicationLabel);
+  }, [isDemoSelection, overviewHistory]);
 
   const allergyLabels = useMemo(() => {
     if (isDemoSelection) return DEMO_ALLERGIES;
-    return (healthChart?.allergies ?? []).map(formatAllergyLabel);
-  }, [isDemoSelection, healthChart]);
+    return overviewHistory.allergies.map(formatAllergyLabel);
+  }, [isDemoSelection, overviewHistory]);
 
   const surgeryLabels = useMemo(() => {
     if (isDemoSelection) return [];
-    return (healthChart?.surgeries ?? []).map(formatSurgeryLabel);
-  }, [isDemoSelection, healthChart]);
+    return overviewHistory.surgeries.map(formatSurgeryLabel);
+  }, [isDemoSelection, overviewHistory]);
 
   const immunizationLabels = useMemo(() => {
     if (isDemoSelection) return [];
@@ -1138,7 +1153,13 @@ const ProviderPatientsPage = () => {
                 </>
               ) : activeTab === "records" ? (
                 <PatientHealthRecordsPanel
-                  lookupIds={[
+                  patientUserId={realPatientUserId}
+                  profileId={
+                    patientDetailFromDb?.id && !isDemoPatientId(patientDetailFromDb.id)
+                      ? patientDetailFromDb.id
+                      : null
+                  }
+                  fallbackLookupIds={[
                     realPatientUserId ?? "",
                     activeNoteKey,
                     patientDetail?.id ?? "",
