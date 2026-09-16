@@ -3,9 +3,14 @@ import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Download, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { listDoctorExaminationActivityLog } from '@/lib/delta-log-api';
+import {
+  listDoctorExaminationActivityLog,
+  type DoctorExamActivityLogListParams,
+} from '@/lib/delta-log-api';
 import type { DoctorExamActivityLogEntry, SoapChangedField } from '@/lib/exam-activity-log';
+import type { DeltaLogListResult } from '@/types/delta-log';
 import { exportRowsToCsv } from '@/lib/csv-export';
+import { sanitizeSensitiveDisplay } from '@/lib/crypto';
 import ExamSoapDetailDialog from '@/components/provider/medical-history/ExamSoapDetailDialog';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -25,7 +30,23 @@ type Query = {
   pageSize: number;
 };
 
-export default function DoctorExamActivityLogTab() {
+function displayPatientName(name: string | null | undefined): string {
+  return sanitizeSensitiveDisplay(name);
+}
+
+type ListLogs = (
+  params?: DoctorExamActivityLogListParams,
+) => Promise<DeltaLogListResult<DoctorExamActivityLogEntry>>;
+
+type Props = {
+  listLogs?: ListLogs;
+  showDoctorColumn?: boolean;
+};
+
+export default function DoctorExamActivityLogTab({
+  listLogs = listDoctorExaminationActivityLog,
+  showDoctorColumn = false,
+}: Props) {
   const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [entries, setEntries] = useState<DoctorExamActivityLogEntry[]>([]);
@@ -46,7 +67,7 @@ export default function DoctorExamActivityLogTab() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    listDoctorExaminationActivityLog({
+    listLogs({
       search: debouncedSearch || undefined,
       page: query.page,
       limit: query.pageSize,
@@ -68,7 +89,7 @@ export default function DoctorExamActivityLogTab() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [debouncedSearch, query.page, query.pageSize]);
+  }, [debouncedSearch, listLogs, query.page, query.pageSize]);
 
   const onQueryChange = useCallback((patch: Partial<Query>) => {
     setQuery((current) => ({
@@ -106,7 +127,7 @@ export default function DoctorExamActivityLogTab() {
   async function handleExport() {
     setExporting(true);
     try {
-      const { rows } = await listDoctorExaminationActivityLog({
+      const { rows } = await listLogs({
         search: debouncedSearch || undefined,
         page: 1,
         limit: 1000,
@@ -117,7 +138,7 @@ export default function DoctorExamActivityLogTab() {
         rows.map((e) => ({
           time: format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi }),
           action: 'Cập nhật hồ sơ',
-          patient_name: e.patient_name ?? '—',
+          patient_name: displayPatientName(e.patient_name),
           doctor_name: e.actor_name ?? '—',
           message: e.message,
         })),
@@ -171,16 +192,19 @@ export default function DoctorExamActivityLogTab() {
                 <span className="text-xs text-muted-foreground">
                   {format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi })}
                 </span>
-                <p className="text-sm font-medium">{e.patient_name ?? '—'}</p>
+                <p className="text-sm font-medium">{displayPatientName(e.patient_name)}</p>
                 <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-700">
                   Cập nhật hồ sơ
                 </span>
+                {showDoctorColumn ? (
+                  <p className="text-xs text-muted-foreground">{e.actor_name ?? '—'}</p>
+                ) : null}
                 <p className="text-sm text-slate-700">{e.message}</p>
                 <button
                   type="button"
                   onClick={() => {
                     setDetailExamId(e.exam_id);
-                    setDetailPatientName(e.patient_name);
+                    setDetailPatientName(displayPatientName(e.patient_name));
                     setDetailDoctorName(e.actor_name);
                     setDetailUpdatedAt(e.created_at);
                     setDetailChangedFields(e.changed_fields);
@@ -201,6 +225,9 @@ export default function DoctorExamActivityLogTab() {
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
+                  {showDoctorColumn ? (
+                    <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bác sĩ</th>
+                  ) : null}
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nội dung</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chi tiết</th>
                 </tr>
@@ -216,14 +243,17 @@ export default function DoctorExamActivityLogTab() {
                         Cập nhật hồ sơ
                       </span>
                     </td>
-                    <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.patient_name ?? '—'}</td>
+                    <td className="px-4 lg:px-6 py-4 text-sm font-medium">{displayPatientName(e.patient_name)}</td>
+                    {showDoctorColumn ? (
+                      <td className="px-4 lg:px-6 py-4 text-sm">{e.actor_name ?? '—'}</td>
+                    ) : null}
                     <td className="px-4 lg:px-6 py-4 text-sm text-slate-700">{e.message}</td>
                     <td className="px-4 lg:px-6 py-4">
                       <button
                         type="button"
                         onClick={() => {
                           setDetailExamId(e.exam_id);
-                          setDetailPatientName(e.patient_name);
+                          setDetailPatientName(displayPatientName(e.patient_name));
                           setDetailDoctorName(e.actor_name);
                           setDetailUpdatedAt(e.created_at);
                           setDetailChangedFields(e.changed_fields);

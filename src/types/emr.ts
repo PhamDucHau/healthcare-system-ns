@@ -36,8 +36,9 @@ export type MedicalExamination = {
   a_text: string | null;
   p_text: string | null;
   status: ExamStatus;
-  is_addendum: boolean;
-  parent_exam_id: string | null;
+    is_addendum: boolean;
+    parent_exam_id: string | null;
+    amendment_reason?: string | null;
   auto_saved_at: string | null;
   created_at: string;
   updated_at: string;

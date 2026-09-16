@@ -87,6 +87,9 @@ export type SignatureLogEntry = {
   ip_address: string | null;
   user_agent: string | null;
   signed_at: string;
+  patient_name: string | null;
+  appointment_id: string | null;
+  visit_at: string | null;
 };
 
 export type SignatureLogListParams = {

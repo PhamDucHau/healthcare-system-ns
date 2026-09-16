@@ -5,15 +5,15 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Check, Lock, Loader2, ShieldCheck, Sparkles, FilePlus } from 'lucide-react';
+import { Check, Lock, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { verifyExaminationIntegrity, createExamAddendum, type IntegrityResult } from '@/lib/emr-api';
+import { verifyExaminationIntegrity, type IntegrityResult } from '@/lib/emr-api';
 import ExamComprehensiveLogControl from '@/components/emr/ExamComprehensiveLogControl';
+import ExamAddendumForm from '@/components/emr/ExamAddendumForm';
 import type { MedicalExamination } from '@/types/emr';
 
 type SoapNoteReadOnlyProps = {
@@ -28,9 +28,6 @@ export default function SoapNoteReadOnly({
   const confirmedIcds = exam.icd_codes.filter((c) => c.confirm_status === 'CONFIRMED');
   const [integrity, setIntegrity] = useState<IntegrityResult | null>(null);
   const [verifying, setVerifying] = useState(false);
-  const [showAddendum, setShowAddendum] = useState(false);
-  const [addendumText, setAddendumText] = useState('');
-  const [creatingAddendum, setCreatingAddendum] = useState(false);
 
   const handleVerify = async () => {
     setVerifying(true);
@@ -41,19 +38,6 @@ export default function SoapNoteReadOnly({
       setIntegrity({ valid: false, message: (e as Error).message });
     } finally {
       setVerifying(false);
-    }
-  };
-
-  const handleCreateAddendum = async () => {
-    if (!addendumText.trim()) return;
-    setCreatingAddendum(true);
-    try {
-      await createExamAddendum(exam.id, { s_text: addendumText.trim() });
-      setShowAddendum(false);
-      setAddendumText('');
-      onAddendumCreated?.();
-    } finally {
-      setCreatingAddendum(false);
     }
   };
 
@@ -79,11 +63,6 @@ export default function SoapNoteReadOnly({
             {verifying ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
             Xác minh tính toàn vẹn
           </Button>
-          {!exam.is_addendum && (
-            <Button variant="outline" size="sm" onClick={() => setShowAddendum(!showAddendum)}>
-              <FilePlus className="h-3 w-3 mr-1" /> Tạo phụ lục
-            </Button>
-          )}
         </div>
       </div>
 
@@ -93,21 +72,8 @@ export default function SoapNoteReadOnly({
         </Alert>
       )}
 
-      {showAddendum && (
-        <div className="space-y-2 border rounded-xl p-3 bg-muted/30">
-          <p className="text-xs font-semibold">Phụ lục hiệu chỉnh (Addendum)</p>
-          <Textarea
-            value={addendumText}
-            onChange={(e) => setAddendumText(e.target.value)}
-            placeholder="Nội dung bổ sung / hiệu chỉnh..."
-            rows={3}
-            className="text-sm"
-          />
-          <Button size="sm" disabled={creatingAddendum || !addendumText.trim()} onClick={() => void handleCreateAddendum()}>
-            {creatingAddendum && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-            Lưu phụ lục
-          </Button>
-        </div>
+      {!exam.is_addendum && (
+        <ExamAddendumForm examId={exam.id} onCreated={onAddendumCreated} />
       )}
 
       {confirmedIcds.length > 0 && (

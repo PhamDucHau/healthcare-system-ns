@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import {
-  createOrGetExamination,
+  resolveExaminationId,
   getExaminationByAppointment,
   saveSoapDraft,
   listExaminationActivityLog,
@@ -348,8 +348,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
           setHasPinSet(await checkDoctorPinSet());
         }
 
-        // Create or get exam
-        const examId = await createOrGetExamination(appointmentId);
+        const examId = await resolveExaminationId(appointmentId);
         examIdRef.current = examId;
 
         // Load full exam data

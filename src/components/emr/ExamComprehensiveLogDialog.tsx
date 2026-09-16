@@ -71,6 +71,11 @@ export default function ExamComprehensiveLogDialog({ open, onOpenChange, events 
                   </Badge>
                 </div>
                 <p className="text-sm text-slate-800">{event.message}</p>
+                {event.action === 'ADDENDUM_CREATED' && event.amendment_reason?.trim() ? (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Lý do: <span className="text-foreground">{event.amendment_reason}</span>
+                  </p>
+                ) : null}
                 {event.soap && (event.action === 'UPDATED' || event.action === 'SIGNED') && event.aiSoap ? (
                   <div className="mt-2">
                     <SoapAiDoctorCompare

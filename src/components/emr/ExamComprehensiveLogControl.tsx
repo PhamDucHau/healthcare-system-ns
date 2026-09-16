@@ -59,6 +59,7 @@ export default function ExamComprehensiveLogControl({ exam, logs, doctorName }: 
       id: row.id,
       created_at: row.created_at,
       soap: snapshotFromExamFields(row),
+      amendment_reason: row.amendment_reason ?? null,
     })),
   }), [exam, logs, fetchedLogs, addenda, doctorName]);
 

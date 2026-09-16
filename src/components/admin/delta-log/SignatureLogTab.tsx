@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { listSignatureLogs } from '@/lib/delta-log-api';
 import type { SignatureLogEntry, SignatureTargetType } from '@/types/delta-log';
 import { exportRowsToCsv } from '@/lib/csv-export';
+import { sanitizeSensitiveDisplay } from '@/lib/crypto';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import SignatureDetailDialog from './SignatureDetailDialog';
 
@@ -31,8 +32,19 @@ const TARGET_COLORS: Record<string, string> = {
 const EXPORT_COLUMNS = [
   { key: 'time', label: 'Thời gian ký' },
   { key: 'target_type', label: 'Loại tài liệu' },
+  { key: 'patient_name', label: 'Bệnh nhân' },
+  { key: 'visit_at', label: 'Ngày khám' },
   { key: 'signed_by', label: 'Người ký' },
 ];
+
+function displayPatientName(name: string | null | undefined): string {
+  return sanitizeSensitiveDisplay(name);
+}
+
+function formatVisitAt(visitAt: string | null | undefined): string | null {
+  if (!visitAt) return null;
+  return format(parseISO(visitAt), 'dd/MM/yy HH:mm', { locale: vi });
+}
 
 type Query = {
   search: string;
@@ -132,6 +144,8 @@ export default function SignatureLogTab() {
       const data = rows.map((e) => ({
         time: format(parseISO(e.signed_at), 'dd/MM/yy HH:mm', { locale: vi }),
         target_type: TARGET_LABELS[e.target_type] ?? e.target_type,
+        patient_name: displayPatientName(e.patient_name),
+        visit_at: formatVisitAt(e.visit_at) ?? '—',
         signed_by: e.signed_by_name ?? '—',
       }));
       exportRowsToCsv('chu-ky-so-audit.csv', EXPORT_COLUMNS, data);
@@ -151,7 +165,7 @@ export default function SignatureLogTab() {
             type="search"
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
-            placeholder="Tìm kiếm chữ ký số..."
+            placeholder="Tìm người ký hoặc bệnh nhân..."
             className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -217,8 +231,15 @@ export default function SignatureLogTab() {
         <>
           {/* Mobile card view */}
           <div className="md:hidden divide-y divide-border/30">
-            {entries.map((e) => (
-              <div key={e.id} className="p-4 space-y-2">
+            {entries.map((e) => {
+              const visitLabel = formatVisitAt(e.visit_at);
+              return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => setDetailEntry(e)}
+                className="w-full text-left p-4 space-y-2 hover:bg-muted/30 transition-colors"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
                     {format(parseISO(e.signed_at), 'dd/MM/yy HH:mm', { locale: vi })}
@@ -227,9 +248,14 @@ export default function SignatureLogTab() {
                     {TARGET_LABELS[e.target_type] ?? e.target_type}
                   </span>
                 </div>
-                <p className="text-sm font-medium">{e.signed_by_name ?? '—'}</p>
-              </div>
-            ))}
+                <p className="text-sm font-medium">{displayPatientName(e.patient_name)}</p>
+                {visitLabel && (
+                  <p className="text-xs text-muted-foreground">{visitLabel}</p>
+                )}
+                <p className="text-sm text-muted-foreground">{e.signed_by_name ?? '—'}</p>
+              </button>
+              );
+            })}
           </div>
 
           {/* Desktop table view */}
@@ -239,12 +265,19 @@ export default function SignatureLogTab() {
                 <tr className="border-b border-border/30">
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian ký</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Loại tài liệu</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người ký</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
-                {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-muted/30 transition-colors h-14">
+                {entries.map((e) => {
+                  const visitLabel = formatVisitAt(e.visit_at);
+                  return (
+                  <tr
+                    key={e.id}
+                    className="hover:bg-muted/30 transition-colors h-14 cursor-pointer"
+                    onClick={() => setDetailEntry(e)}
+                  >
                     <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
                       {format(parseISO(e.signed_at), 'dd/MM/yy HH:mm', { locale: vi })}
                     </td>
@@ -253,9 +286,16 @@ export default function SignatureLogTab() {
                         {TARGET_LABELS[e.target_type] ?? e.target_type}
                       </span>
                     </td>
+                    <td className="px-4 lg:px-6 py-4">
+                      <p className="text-sm font-medium">{displayPatientName(e.patient_name)}</p>
+                      {visitLabel && (
+                        <p className="text-xs text-muted-foreground">{visitLabel}</p>
+                      )}
+                    </td>
                     <td className="px-4 lg:px-6 py-4 text-sm">{e.signed_by_name ?? '—'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

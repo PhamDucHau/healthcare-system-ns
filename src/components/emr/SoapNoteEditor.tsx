@@ -35,6 +35,7 @@ import PreConsultationReadOnly from './PreConsultationReadOnly';
 import QuestionnaireAssignPanel from './QuestionnaireAssignPanel';
 import VoiceRecordingHistory from './VoiceRecordingHistory';
 import ExamComprehensiveLogControl from './ExamComprehensiveLogControl';
+import ExamAddendumForm from './ExamAddendumForm';
 
 type PatientInfo = {
   name: string;
@@ -161,6 +162,9 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
       <div className="flex flex-1 overflow-hidden">
         {/* Left: SOAP editor */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {editor.isLocked && editor.exam && !editor.exam.is_addendum && (
+            <ExamAddendumForm examId={editor.exam.id} />
+          )}
           {/* Patient Risk Score Card (FR-025) */}
           {editor.riskAssessment && (
             <Card className="border-primary/10 overflow-hidden shadow-sm">

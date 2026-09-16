@@ -59,6 +59,7 @@ describe("SOAP read-only comprehensive log (TC-DLS-022)", () => {
         status: "DRAFT",
         is_addendum: true,
         parent_exam_id: "exam-1",
+        amendment_reason: "abc",
         auto_saved_at: null,
         created_at: "2026-09-16T10:30:00.000Z",
         updated_at: "2026-09-16T10:30:00.000Z",
@@ -76,7 +77,9 @@ describe("SOAP read-only comprehensive log (TC-DLS-022)", () => {
       expect(listAddenda).toHaveBeenCalledWith("exam-1");
     });
 
-    expect(await screen.findByText("Bổ sung: sốt tái phát tối")).toBeInTheDocument();
+    expect(screen.getAllByText("Bổ sung: sốt tái phát tối").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("abc").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Lý do:/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("AI đau họng").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nháp AI").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Bác sĩ sửa").length).toBeGreaterThan(0);

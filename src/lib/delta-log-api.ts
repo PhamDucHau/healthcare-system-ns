@@ -62,28 +62,23 @@ export type DoctorExamActivityLogListParams = {
   limit?: number;
 };
 
-export async function listDoctorExaminationActivityLog(
-  params: DoctorExamActivityLogListParams = {},
-): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
-  const { data, error } = await supabase.rpc('list_doctor_examination_activity_log', {
-    p_query: params.search?.trim() || null,
-    p_page: params.page ?? 1,
-    p_limit: params.limit ?? 10,
-  });
-  if (error) throw new Error(mapError(error.message));
-  const payload = (data ?? { total: 0, rows: [] }) as RpcListPayload;
-  const rows = (payload.rows ?? []) as Array<{
-    id: string;
-    exam_id: string;
-    actor_id: string | null;
-    actor_name: string | null;
-    action: string;
-    created_at: string;
-    changed_fields?: unknown;
-    related_exam_id?: string | null;
-    patient_name: string | null;
-    appointment_id: string | null;
-  }>;
+type ExamActivityLogRpcRow = {
+  id: string;
+  exam_id: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  action: string;
+  created_at: string;
+  changed_fields?: unknown;
+  related_exam_id?: string | null;
+  patient_name: string | null;
+  appointment_id: string | null;
+};
+
+function mapExamActivityLogPayload(
+  payload: RpcListPayload,
+): DeltaLogListResult<DoctorExamActivityLogEntry> {
+  const rows = (payload.rows ?? []) as ExamActivityLogRpcRow[];
   return {
     total: Number(payload.total ?? 0),
     rows: rows.map((row) => ({
@@ -92,6 +87,31 @@ export async function listDoctorExaminationActivityLog(
       appointment_id: row.appointment_id,
     })),
   };
+}
+
+async function listExaminationActivityLogRpc(
+  rpcName: 'list_doctor_examination_activity_log' | 'list_admin_examination_activity_log',
+  params: DoctorExamActivityLogListParams = {},
+): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
+  const { data, error } = await supabase.rpc(rpcName, {
+    p_query: params.search?.trim() || null,
+    p_page: params.page ?? 1,
+    p_limit: params.limit ?? 10,
+  });
+  if (error) throw new Error(mapError(error.message));
+  return mapExamActivityLogPayload((data ?? { total: 0, rows: [] }) as RpcListPayload);
+}
+
+export async function listDoctorExaminationActivityLog(
+  params: DoctorExamActivityLogListParams = {},
+): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
+  return listExaminationActivityLogRpc('list_doctor_examination_activity_log', params);
+}
+
+export async function listAdminExaminationActivityLog(
+  params: DoctorExamActivityLogListParams = {},
+): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
+  return listExaminationActivityLogRpc('list_admin_examination_activity_log', params);
 }
 
 // ─── System Audit Log ────────────────────────────────────────────────────────

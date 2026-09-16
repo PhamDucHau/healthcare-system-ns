@@ -121,6 +121,7 @@ async function mapExamRow(row: Record<string, unknown>): Promise<MedicalExaminat
     status: decrypted.status as MedicalExamination['status'],
     is_addendum: Boolean(decrypted.is_addendum),
     parent_exam_id: decrypted.parent_exam_id != null ? String(decrypted.parent_exam_id) : null,
+    amendment_reason: decrypted.amendment_reason != null ? String(decrypted.amendment_reason) : null,
     auto_saved_at: decrypted.auto_saved_at != null ? String(decrypted.auto_saved_at) : null,
     created_at: String(decrypted.created_at),
     updated_at: String(decrypted.updated_at),
@@ -141,6 +142,13 @@ export async function createOrGetExamination(appointmentId: string): Promise<str
   });
   if (error) throw new Error(mapEmrError(error.message));
   return data as string;
+}
+
+/** Load an existing SOAP first so completed/signed exams skip create_or_get. */
+export async function resolveExaminationId(appointmentId: string): Promise<string> {
+  const existing = await getExaminationByAppointment(appointmentId);
+  if (existing) return existing.id;
+  return createOrGetExamination(appointmentId);
 }
 
 /**
@@ -676,8 +684,12 @@ function mapEmrError(message: string): string {
     return 'Phần Subjective (S) là bắt buộc.';
   if (message.includes('VALIDATION_ERROR: Assessment (A)'))
     return SOAP_ASSESSMENT_REQUIRED_MESSAGE;
-  if (message.includes('VALIDATION_ERROR: PIN must be'))
-    return 'Mã PIN phải gồm đúng 6 chữ số.';
+  if (message.includes('REASON_REQUIRED'))
+    return 'Vui lòng nhập lý do xác nhận trước khi tạo phiếu bổ sung.';
+  if (message.includes('medical_examinations_appointment_id_key'))
+    return 'Không tạo được phiếu bổ sung cho lịch hẹn này.';
+  if (message.includes('digest('))
+    return 'Không tạo được phiếu bổ sung (lỗi mã hóa chữ ký).';
   return message;
 }
 
@@ -702,7 +714,7 @@ export async function verifyExaminationIntegrity(examId: string): Promise<Integr
 
 export async function createExamAddendum(
   parentExamId: string,
-  fields: { s_text?: string; o_text?: string; a_text?: string; p_text?: string }
+  fields: { s_text?: string; o_text?: string; a_text?: string; p_text?: string; reason: string }
 ): Promise<string> {
   const { data, error } = await supabase.rpc('create_exam_addendum', {
     p_parent_exam_id: parentExamId,
@@ -710,6 +722,7 @@ export async function createExamAddendum(
     p_o_text: fields.o_text ?? null,
     p_a_text: fields.a_text ?? null,
     p_p_text: fields.p_text ?? null,
+    p_reason: fields.reason,
   });
   if (error) throw new Error(mapEmrError(error.message));
   return data as string;

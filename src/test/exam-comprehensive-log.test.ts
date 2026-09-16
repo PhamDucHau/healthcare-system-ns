@@ -82,6 +82,7 @@ describe("buildComprehensiveExamTimeline (TC-DLS-022)", () => {
         created_at: "2026-09-16T10:30:00.000Z",
         soap: addendumSoap,
         actor_name: "Nguyễn Văn A",
+        amendment_reason: "Sai sót ghi nhận triệu chứng",
       }],
     });
 
@@ -97,6 +98,7 @@ describe("buildComprehensiveExamTimeline (TC-DLS-022)", () => {
     expect(events[1].changed_fields).toEqual(["s_text"]);
     expect(events[2].soap).toEqual(doctorSoap);
     expect(events[3].soap).toEqual(addendumSoap);
+    expect(events[3].amendment_reason).toBe("Sai sót ghi nhận triệu chứng");
   });
 
   it("should synthesize AI, sign, and addendum when log rows are missing", () => {
@@ -114,6 +116,7 @@ describe("buildComprehensiveExamTimeline (TC-DLS-022)", () => {
         created_at: "2026-09-16T10:30:00.000Z",
         soap: addendumSoap,
         actor_name: "Nguyễn Văn A",
+        amendment_reason: "Thiếu sốt",
       }],
     });
 
@@ -125,6 +128,7 @@ describe("buildComprehensiveExamTimeline (TC-DLS-022)", () => {
     expect(events[0].soap?.s_text).toBe("AI đau họng");
     expect(events[1].soap?.s_text).toBe("Đau họng 3 ngày");
     expect(events[2].soap?.s_text).toBe("Bổ sung: sốt tái phát tối");
+    expect(events[2].amendment_reason).toBe("Thiếu sốt");
     expect(events[0].created_at).toBe("2026-09-16T09:00:00.000Z");
     expect(events[1].created_at).toBe("2026-09-16T10:20:00.000Z");
   });

@@ -47,6 +47,7 @@ export type DoctorExamActivityLogEntry = ExamActivityLogEntry & {
 export type ComprehensiveTimelineEvent = ExamActivityLogEntry & {
   soap: SoapNoteSnapshot | null;
   aiSoap?: SoapNoteSnapshot | null;
+  amendment_reason?: string | null;
 };
 
 export type ExamAddendumSource = {
@@ -54,6 +55,7 @@ export type ExamAddendumSource = {
   created_at: string;
   soap: SoapNoteSnapshot;
   actor_name?: string | null;
+  amendment_reason?: string | null;
 };
 
 export type ComprehensiveExamTimelineInput = {
@@ -172,8 +174,14 @@ function attachSoap(
   entry: ExamActivityLogEntry,
   soap: SoapNoteSnapshot | null,
   aiSoap?: SoapNoteSnapshot | null,
+  amendmentReason?: string | null,
 ): ComprehensiveTimelineEvent {
-  return { ...entry, soap, aiSoap: aiSoap ?? null };
+  return {
+    ...entry,
+    soap,
+    aiSoap: aiSoap ?? null,
+    amendment_reason: amendmentReason ?? null,
+  };
 }
 
 export function buildComprehensiveExamTimeline(
@@ -189,7 +197,7 @@ export function buildComprehensiveExamTimeline(
         row.id === entry.related_exam_id
         || (!entry.related_exam_id && row.id === entry.exam_id),
       ) ?? input.addenda.find((row) => row.created_at === entry.created_at);
-      return attachSoap(entry, addendum?.soap ?? null);
+      return attachSoap(entry, addendum?.soap ?? null, null, addendum?.amendment_reason);
     }
     if (entry.action === 'SIGNED' || entry.action === 'UPDATED') {
       return attachSoap(entry, input.doctorSoap, input.aiBaseline);
@@ -244,6 +252,8 @@ export function buildComprehensiveExamTimeline(
         relatedExamId: addendum.id,
       }),
       addendum.soap,
+      null,
+      addendum.amendment_reason,
     ));
   }
 

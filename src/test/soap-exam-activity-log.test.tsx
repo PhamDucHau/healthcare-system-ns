@@ -18,6 +18,7 @@ vi.mock("@/components/emr/PreConsultationReadOnly", () => ({ default: () => null
 vi.mock("@/components/emr/QuestionnaireAssignPanel", () => ({ default: () => null }));
 vi.mock("@/components/emr/VoiceRecordingHistory", () => ({ default: () => null }));
 vi.mock("@/components/emr/IcdSearchPanel", () => ({ default: () => null }));
+vi.mock("@/components/emr/ExamAddendumForm", () => ({ default: () => null }));
 
 vi.mock("@/lib/emr-api", () => ({
   listExamAddenda: vi.fn().mockResolvedValue([]),

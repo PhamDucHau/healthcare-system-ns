@@ -6,8 +6,13 @@ import { toast } from 'sonner';
 import { listAppointmentsAuditLog } from '@/lib/delta-log-api';
 import type { AppointmentsAuditEntry, AppointmentAction } from '@/types/delta-log';
 import { exportRowsToCsv } from '@/lib/csv-export';
+import { sanitizeSensitiveDisplay } from '@/lib/crypto';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AppointmentDetailDialog from './AppointmentDetailDialog';
+
+function displayPatientName(name: string | null | undefined): string {
+  return sanitizeSensitiveDisplay(name);
+}
 
 const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 10;
@@ -60,6 +65,8 @@ const STATUS_COLORS: Record<string, string> = {
 const EXPORT_COLUMNS = [
   { key: 'time', label: 'Thời gian' },
   { key: 'action', label: 'Hành động' },
+  { key: 'patient_name', label: 'Bệnh nhân' },
+  { key: 'specialty', label: 'Chuyên khoa' },
   { key: 'performed_by', label: 'Người thực hiện' },
   { key: 'old_status', label: 'Trạng thái cũ' },
   { key: 'new_status', label: 'Trạng thái mới' },
@@ -164,6 +171,8 @@ export default function AppointmentsAuditTab() {
       const data = rows.map((e) => ({
         time: format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi }),
         action: ACTION_LABELS[e.action] ?? e.action,
+        patient_name: displayPatientName(e.patient_name),
+        specialty: e.specialty_name ?? '—',
         performed_by: e.performed_by_name ?? '—',
         old_status: e.old_status ? STATUS_LABELS[e.old_status] ?? e.old_status : '—',
         new_status: e.new_status ? STATUS_LABELS[e.new_status] ?? e.new_status : '—',
@@ -186,7 +195,7 @@ export default function AppointmentsAuditTab() {
             type="search"
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
-            placeholder="Tìm kiếm lịch hẹn..."
+            placeholder="Tìm kiếm bệnh nhân..."
             className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -264,8 +273,10 @@ export default function AppointmentsAuditTab() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{e.performed_by_name ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">{e.specialty_name ?? '—'}</p>
+                    <p className="text-sm font-medium truncate">{displayPatientName(e.patient_name)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {[e.specialty_name, e.performed_by_name].filter(Boolean).join(' · ') || '—'}
+                    </p>
                   </div>
                   {e.new_status && (
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium shrink-0 ${STATUS_COLORS[e.new_status] ?? 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
@@ -292,6 +303,7 @@ export default function AppointmentsAuditTab() {
                 <tr className="border-b border-border/30">
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Chuyên khoa</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người thực hiện</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trạng thái</th>
@@ -310,6 +322,7 @@ export default function AppointmentsAuditTab() {
                         {ACTION_LABELS[e.action] ?? e.action}
                       </span>
                     </td>
+                    <td className="px-4 lg:px-6 py-4 text-sm font-medium">{displayPatientName(e.patient_name)}</td>
                     <td className="px-4 lg:px-6 py-4 text-sm hidden lg:table-cell">{e.specialty_name ?? '—'}</td>
                     <td className="px-4 lg:px-6 py-4 text-sm">{e.performed_by_name ?? '—'}</td>
                     <td className="px-4 lg:px-6 py-4">

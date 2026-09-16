@@ -5,9 +5,12 @@ import AppointmentsAuditTab from '@/components/admin/delta-log/AppointmentsAudit
 import SystemAuditTab from '@/components/admin/delta-log/SystemAuditTab';
 import MasterDataAuditTab from '@/components/admin/delta-log/MasterDataAuditTab';
 import SignatureLogTab from '@/components/admin/delta-log/SignatureLogTab';
+import DoctorExamActivityLogTab from '@/components/provider/medical-history/DoctorExamActivityLogTab';
+import { listAdminExaminationActivityLog } from '@/lib/delta-log-api';
 
 const TABS = [
   { value: 'appointments', label: 'Lịch sử khám bệnh' },
+  { value: 'exam-activity', label: 'Nhật ký hồ sơ' },
   { value: 'system', label: 'Hệ thống' },
   { value: 'master-data', label: 'Danh mục' },
   { value: 'signatures', label: 'Chữ ký số' },
@@ -55,6 +58,12 @@ export default function DeltaLogPage() {
 
         <TabsContent value="appointments" className="mt-0">
           <AppointmentsAuditTab />
+        </TabsContent>
+        <TabsContent value="exam-activity" className="mt-0">
+          <DoctorExamActivityLogTab
+            listLogs={listAdminExaminationActivityLog}
+            showDoctorColumn
+          />
         </TabsContent>
         <TabsContent value="system" className="mt-0">
           <SystemAuditTab />

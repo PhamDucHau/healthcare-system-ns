@@ -219,6 +219,10 @@ export default function ProviderAppointmentsPage() {
   };
 
   const handleExamination = async (row: AdminAppointment) => {
+    if (row.status === "COMPLETED") {
+      navigate(`/provider-portal/examination/${row.id}`);
+      return;
+    }
     if (!warnIfNotReady(row)) return;
     if (row.status === "CONFIRMED") {
       const ok = await handleCheckin(row);
@@ -226,6 +230,14 @@ export default function ProviderAppointmentsPage() {
       return;
     }
     navigate(`/provider-portal/examination/${row.id}`);
+  };
+
+  const handleRowClick = (row: AdminAppointment) => {
+    if (row.status === "COMPLETED") {
+      void handleExamination(row);
+      return;
+    }
+    setVitalSignsAppt(row);
   };
 
   const handleVitalSigns = (row: AdminAppointment) => {
@@ -380,7 +392,7 @@ export default function ProviderAppointmentsPage() {
                   <div
                     key={row.id}
                     className="rounded-xl border bg-card p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => setVitalSignsAppt(row)}
+                    onClick={() => handleRowClick(row)}
                   >
                     {/* Header: Time + Status + Actions */}
                     <div className="flex items-center justify-between mb-3">
@@ -395,15 +407,20 @@ export default function ProviderAppointmentsPage() {
                           {ADMIN_STATUS_LABEL[row.status]}
                         </span>
                       </div>
-                      {row.status !== "COMPLETED" && (
-                        <div onClick={(e) => e.stopPropagation()}>
+                      <div onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Thao tác">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {row.status === "COMPLETED" && (
+                                <DropdownMenuItem onClick={() => void handleExamination(row)}>
+                                  <Stethoscope className="mr-2 h-4 w-4 text-primary" />
+                                  Xem lại hồ sơ SOAP
+                                </DropdownMenuItem>
+                              )}
                               {row.status === "CONFIRMED" && (<>
                                 <DropdownMenuItem
                                   disabled={checkingInId === row.id}
@@ -465,7 +482,6 @@ export default function ProviderAppointmentsPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      )}
                     </div>
 
                     {/* Patient Info */}
@@ -547,7 +563,7 @@ export default function ProviderAppointmentsPage() {
                       <TableRow
                         key={row.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setVitalSignsAppt(row)}
+                        onClick={() => handleRowClick(row)}
                       >
                         <TableCell className="font-mono text-sm font-semibold">
                           {row.start_time
@@ -608,14 +624,19 @@ export default function ProviderAppointmentsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          {row.status !== "COMPLETED" && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Thao tác">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {row.status === "COMPLETED" && (
+                                <DropdownMenuItem onClick={() => void handleExamination(row)}>
+                                  <Stethoscope className="mr-2 h-4 w-4 text-primary" />
+                                  Xem lại hồ sơ SOAP
+                                </DropdownMenuItem>
+                              )}
                               {row.status === "CONFIRMED" && (<>
                                 <DropdownMenuItem
                                   disabled={checkingInId === row.id}
@@ -676,7 +697,6 @@ export default function ProviderAppointmentsPage() {
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
-                          )}
                         </TableCell>
                       </TableRow>
                     );
