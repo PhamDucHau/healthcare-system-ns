@@ -24,6 +24,7 @@ type Props = {
   doctorName?: string | null;
   updatedAt?: string | null;
   changedFields?: SoapChangedField[];
+  emptyMessage?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -34,6 +35,7 @@ export default function ExamSoapDetailDialog({
   doctorName,
   updatedAt,
   changedFields = [],
+  emptyMessage = 'Không tìm thấy hồ sơ SOAP.',
   open,
   onOpenChange,
 }: Props) {
@@ -110,7 +112,7 @@ export default function ExamSoapDetailDialog({
           </div>
         ) : !exam ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
-            Không tìm thấy hồ sơ SOAP.
+            {emptyMessage}
           </p>
         ) : (
           <div className="space-y-4">

@@ -1,4 +1,4 @@
-import { User, Menu, Home, Calendar } from "lucide-react";
+import { User, Menu } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -9,12 +9,7 @@ import { useMyPatientProfile } from "@/hooks/useMyPatientProfile";
 import { createAvatarSignedUrl } from "@/lib/patient-avatar-api";
 import { portalLogout } from "@/lib/portal-auth-api";
 import { loginPathForRole } from "@/lib/portal-auth";
-
-const menuItems = [
-  { icon: Home, label: "Trang chủ", path: "/home" },
-  { icon: User, label: "Tài khoản", path: "/account" },
-  { icon: Calendar, label: "Lịch hẹn", path: "/appointments" },
-];
+import { isPatientMenuActive, PATIENT_MENU_ITEMS } from "@/config/patient-menu";
 
 function UserAvatarBubble({
   avatarUrl,
@@ -97,10 +92,8 @@ const TopNav = () => {
               </button>
 
               <nav className="flex flex-col gap-1">
-                {menuItems.map(({ icon: Icon, label, path }) => {
-                  const active = path === "/account"
-                    ? location.pathname === path || location.pathname.startsWith("/account/")
-                    : location.pathname === path;
+                {PATIENT_MENU_ITEMS.map(({ icon: Icon, label, path }) => {
+                  const active = isPatientMenuActive(location.pathname, path);
                   return (
                     <Link
                       key={label}

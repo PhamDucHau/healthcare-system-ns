@@ -16,6 +16,7 @@ import AccountSexualHealthPage from "./pages/account/AccountSexualHealthPage.tsx
 import AccountSettingsPage from "./pages/account/AccountSettingsPage.tsx";
 import Labs from "./pages/Labs.tsx";
 import Appointments from "./pages/Appointments.tsx";
+import PatientExamHistoryPage from "./pages/PatientExamHistoryPage.tsx";
 import BookAppointment from "./pages/BookAppointment.tsx";
 import PreConsultation from "./pages/PreConsultation.tsx";
 import Support from "./pages/Support.tsx";
@@ -123,6 +124,14 @@ const App = () => (
               element={
                 <PatientRoute>
                   <Appointments />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/exam-history"
+              element={
+                <PatientRoute>
+                  <PatientExamHistoryPage />
                 </PatientRoute>
               }
             />

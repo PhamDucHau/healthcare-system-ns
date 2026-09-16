@@ -4,7 +4,7 @@ import { vi } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { listDoctorAppointmentsAuditLog } from '@/lib/delta-log-api';
-import type { AppointmentsAuditEntry, AppointmentAction } from '@/types/delta-log';
+import type { AppointmentsAuditEntry, AppointmentAction, AppointmentsAuditListParams, DeltaLogListResult } from '@/types/delta-log';
 import { exportRowsToCsv } from '@/lib/csv-export';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AppointmentDetailDialog from '@/components/admin/delta-log/AppointmentDetailDialog';
@@ -57,10 +57,12 @@ const STATUS_COLORS: Record<string, string> = {
   NO_SHOW: 'bg-red-50 text-red-700 border border-red-200',
 };
 
-const EXPORT_COLUMNS = [
+const BASE_EXPORT_COLUMNS = [
   { key: 'time', label: 'Thời gian' },
   { key: 'action', label: 'Hành động' },
-  { key: 'patient_name', label: 'Bệnh nhân' },
+];
+
+const TAIL_EXPORT_COLUMNS = [
   { key: 'specialty', label: 'Chuyên khoa' },
   { key: 'performed_by', label: 'Người thực hiện' },
   { key: 'status', label: 'Trạng thái' },
@@ -73,7 +75,23 @@ type Query = {
   pageSize: number;
 };
 
-export default function DoctorMedicalHistoryTab() {
+type ListLogs = (
+  params?: AppointmentsAuditListParams,
+) => Promise<DeltaLogListResult<AppointmentsAuditEntry>>;
+
+type Props = {
+  listLogs?: ListLogs;
+  showPatientColumn?: boolean;
+  showDoctorColumn?: boolean;
+  searchPlaceholder?: string;
+};
+
+export default function DoctorMedicalHistoryTab({
+  listLogs = listDoctorAppointmentsAuditLog,
+  showPatientColumn = true,
+  showDoctorColumn = false,
+  searchPlaceholder = 'Tìm kiếm bệnh nhân...',
+}: Props) {
   const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
   const [filterAction, setFilterAction] = useState<AppointmentAction | ''>('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -92,7 +110,7 @@ export default function DoctorMedicalHistoryTab() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    listDoctorAppointmentsAuditLog({
+    listLogs({
       search: debouncedSearch || undefined,
       page: query.page,
       limit: query.pageSize,
@@ -115,7 +133,7 @@ export default function DoctorMedicalHistoryTab() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [debouncedSearch, query.page, query.pageSize, filterAction]);
+  }, [debouncedSearch, listLogs, query.page, query.pageSize, filterAction]);
 
   const onQueryChange = useCallback((patch: Partial<Query>) => {
     setQuery((current) => ({
@@ -156,22 +174,29 @@ export default function DoctorMedicalHistoryTab() {
   async function handleExport() {
     setExporting(true);
     try {
-      const { rows } = await listDoctorAppointmentsAuditLog({
+      const { rows } = await listLogs({
         search: debouncedSearch || undefined,
         page: 1,
         limit: 1000,
         action: filterAction || undefined,
       });
+      const exportColumns = [
+        ...BASE_EXPORT_COLUMNS,
+        ...(showPatientColumn ? [{ key: 'patient_name', label: 'Bệnh nhân' }] : []),
+        ...(showDoctorColumn ? [{ key: 'doctor_name', label: 'Bác sĩ' }] : []),
+        ...TAIL_EXPORT_COLUMNS,
+      ];
       const data = rows.map((e) => ({
         time: format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi }),
         action: ACTION_LABELS[e.action] ?? e.action,
         patient_name: e.patient_name ?? '—',
+        doctor_name: e.doctor_name ?? '—',
         specialty: e.specialty_name ?? '—',
         performed_by: e.performed_by_name ?? '—',
         status: e.new_status ? STATUS_LABELS[e.new_status] ?? e.new_status : '—',
         notes: e.notes ?? '—',
       }));
-      exportRowsToCsv('lich-su-kham-benh.csv', EXPORT_COLUMNS, data);
+      exportRowsToCsv('lich-su-kham-benh.csv', exportColumns, data);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -188,7 +213,7 @@ export default function DoctorMedicalHistoryTab() {
             type="search"
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
-            placeholder="Tìm kiếm bệnh nhân..."
+            placeholder={searchPlaceholder}
             className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -266,7 +291,9 @@ export default function DoctorMedicalHistoryTab() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{e.patient_name ?? '—'}</p>
+                    <p className="text-sm font-medium truncate">
+                      {showDoctorColumn ? (e.doctor_name ?? '—') : (e.patient_name ?? '—')}
+                    </p>
                     <p className="text-xs text-muted-foreground">{e.specialty_name ?? '—'}</p>
                   </div>
                   {e.new_status && (
@@ -294,7 +321,12 @@ export default function DoctorMedicalHistoryTab() {
                 <tr className="border-b border-border/30">
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
+                  {showPatientColumn ? (
+                    <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
+                  ) : null}
+                  {showDoctorColumn ? (
+                    <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bác sĩ</th>
+                  ) : null}
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Chuyên khoa</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trạng thái</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden xl:table-cell">Ghi chú</th>
@@ -312,7 +344,12 @@ export default function DoctorMedicalHistoryTab() {
                         {ACTION_LABELS[e.action] ?? e.action}
                       </span>
                     </td>
-                    <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.patient_name ?? '—'}</td>
+                    {showPatientColumn ? (
+                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.patient_name ?? '—'}</td>
+                    ) : null}
+                    {showDoctorColumn ? (
+                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.doctor_name ?? '—'}</td>
+                    ) : null}
                     <td className="px-4 lg:px-6 py-4 text-sm hidden lg:table-cell">{e.specialty_name ?? '—'}</td>
                     <td className="px-4 lg:px-6 py-4">
                       {e.new_status ? (

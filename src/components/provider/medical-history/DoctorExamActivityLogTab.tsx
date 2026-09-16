@@ -16,14 +16,6 @@ import ExamSoapDetailDialog from '@/components/provider/medical-history/ExamSoap
 const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 10;
 
-const EXPORT_COLUMNS = [
-  { key: 'time', label: 'Thời gian' },
-  { key: 'action', label: 'Hành động' },
-  { key: 'patient_name', label: 'Bệnh nhân' },
-  { key: 'doctor_name', label: 'Bác sĩ' },
-  { key: 'message', label: 'Nội dung' },
-];
-
 type Query = {
   search: string;
   page: number;
@@ -41,11 +33,17 @@ type ListLogs = (
 type Props = {
   listLogs?: ListLogs;
   showDoctorColumn?: boolean;
+  showPatientColumn?: boolean;
+  searchPlaceholder?: string;
+  soapEmptyMessage?: string;
 };
 
 export default function DoctorExamActivityLogTab({
   listLogs = listDoctorExaminationActivityLog,
   showDoctorColumn = false,
+  showPatientColumn = true,
+  searchPlaceholder = 'Tìm bệnh nhân hoặc bác sĩ...',
+  soapEmptyMessage,
 }: Props) {
   const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -132,9 +130,16 @@ export default function DoctorExamActivityLogTab({
         page: 1,
         limit: 1000,
       });
+      const exportColumns = [
+        { key: 'time', label: 'Thời gian' },
+        { key: 'action', label: 'Hành động' },
+        ...(showPatientColumn ? [{ key: 'patient_name', label: 'Bệnh nhân' }] : []),
+        { key: 'doctor_name', label: 'Bác sĩ' },
+        { key: 'message', label: 'Nội dung' },
+      ];
       exportRowsToCsv(
         'nhat-ky-he-thong.csv',
-        EXPORT_COLUMNS,
+        exportColumns,
         rows.map((e) => ({
           time: format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi }),
           action: 'Cập nhật hồ sơ',
@@ -161,7 +166,7 @@ export default function DoctorExamActivityLogTab({
             type="search"
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
-            placeholder="Tìm bệnh nhân hoặc bác sĩ..."
+            placeholder={searchPlaceholder}
             className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -192,7 +197,9 @@ export default function DoctorExamActivityLogTab({
                 <span className="text-xs text-muted-foreground">
                   {format(parseISO(e.created_at), 'dd/MM/yy HH:mm', { locale: vi })}
                 </span>
-                <p className="text-sm font-medium">{displayPatientName(e.patient_name)}</p>
+                {showPatientColumn ? (
+                  <p className="text-sm font-medium">{displayPatientName(e.patient_name)}</p>
+                ) : null}
                 <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-700">
                   Cập nhật hồ sơ
                 </span>
@@ -224,7 +231,9 @@ export default function DoctorExamActivityLogTab({
                 <tr className="border-b border-border/30">
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
+                  {showPatientColumn ? (
+                    <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
+                  ) : null}
                   {showDoctorColumn ? (
                     <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bác sĩ</th>
                   ) : null}
@@ -243,7 +252,9 @@ export default function DoctorExamActivityLogTab({
                         Cập nhật hồ sơ
                       </span>
                     </td>
-                    <td className="px-4 lg:px-6 py-4 text-sm font-medium">{displayPatientName(e.patient_name)}</td>
+                    {showPatientColumn ? (
+                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">{displayPatientName(e.patient_name)}</td>
+                    ) : null}
                     {showDoctorColumn ? (
                       <td className="px-4 lg:px-6 py-4 text-sm">{e.actor_name ?? '—'}</td>
                     ) : null}
@@ -320,10 +331,11 @@ export default function DoctorExamActivityLogTab({
 
       <ExamSoapDetailDialog
         examId={detailExamId}
-        patientName={detailPatientName}
+        patientName={showPatientColumn ? detailPatientName : null}
         doctorName={detailDoctorName}
         updatedAt={detailUpdatedAt}
         changedFields={detailChangedFields}
+        emptyMessage={soapEmptyMessage}
         open={!!detailExamId}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {

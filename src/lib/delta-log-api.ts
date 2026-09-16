@@ -89,8 +89,28 @@ function mapExamActivityLogPayload(
   };
 }
 
+export async function listPatientAppointmentsAuditLog(
+  params: AppointmentsAuditListParams = {},
+): Promise<DeltaLogListResult<AppointmentsAuditEntry>> {
+  const { data, error } = await supabase.rpc('list_patient_appointments_audit_log', {
+    p_query: params.search?.trim() || null,
+    p_page: params.page ?? 1,
+    p_limit: params.limit ?? 10,
+    p_action: params.action?.trim() || null,
+  });
+  if (error) throw new Error(mapError(error.message));
+  const payload = (data ?? { total: 0, rows: [] }) as RpcListPayload;
+  return {
+    total: Number(payload.total ?? 0),
+    rows: (payload.rows ?? []) as AppointmentsAuditEntry[],
+  };
+}
+
 async function listExaminationActivityLogRpc(
-  rpcName: 'list_doctor_examination_activity_log' | 'list_admin_examination_activity_log',
+  rpcName:
+    | 'list_doctor_examination_activity_log'
+    | 'list_admin_examination_activity_log'
+    | 'list_patient_examination_activity_log',
   params: DoctorExamActivityLogListParams = {},
 ): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
   const { data, error } = await supabase.rpc(rpcName, {
@@ -112,6 +132,12 @@ export async function listAdminExaminationActivityLog(
   params: DoctorExamActivityLogListParams = {},
 ): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
   return listExaminationActivityLogRpc('list_admin_examination_activity_log', params);
+}
+
+export async function listPatientExaminationActivityLog(
+  params: DoctorExamActivityLogListParams = {},
+): Promise<DeltaLogListResult<DoctorExamActivityLogEntry>> {
+  return listExaminationActivityLogRpc('list_patient_examination_activity_log', params);
 }
 
 // ─── System Audit Log ────────────────────────────────────────────────────────

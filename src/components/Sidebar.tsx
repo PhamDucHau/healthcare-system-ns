@@ -1,11 +1,5 @@
-import { Home, User, Calendar } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-
-const menuItems = [
-  { icon: Home, label: "Trang chủ", path: "/home" },
-  { icon: User, label: "Tài khoản", path: "/account" },
-  { icon: Calendar, label: "Lịch hẹn", path: "/appointments" },
-];
+import { isPatientMenuActive, PATIENT_MENU_ITEMS } from "@/config/patient-menu";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -13,10 +7,8 @@ const Sidebar = () => {
   return (
     <aside className="hidden lg:flex w-60 flex-col border-r bg-card p-4 gap-2">
       <nav className="flex flex-col gap-1">
-        {menuItems.map(({ icon: Icon, label, path }) => {
-          const active = path === "/account"
-            ? location.pathname === path || location.pathname.startsWith("/account/")
-            : location.pathname === path;
+        {PATIENT_MENU_ITEMS.map(({ icon: Icon, label, path }) => {
+          const active = isPatientMenuActive(location.pathname, path);
           return (
             <Link
               key={label}
