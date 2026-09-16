@@ -4,6 +4,20 @@ export type SoapChangedField = 's_text' | 'o_text' | 'a_text' | 'p_text';
 
 const SOAP_FIELDS: SoapChangedField[] = ['s_text', 'o_text', 'a_text', 'p_text'];
 
+export const SOAP_CHANGED_FIELD_CHIPS: Record<SoapChangedField, string> = {
+  s_text: 'S',
+  o_text: 'O',
+  a_text: 'A',
+  p_text: 'P',
+};
+
+export const EXAM_ACTIVITY_ACTION_LABEL: Record<ExamActivityAction, string> = {
+  AI_GENERATED: 'Tạo nháp AI',
+  UPDATED: 'Cập nhật hồ sơ',
+  SIGNED: 'Ký xác nhận',
+  ADDENDUM_CREATED: 'Phiếu bổ sung',
+};
+
 const ACTIONS: ExamActivityAction[] = ['UPDATED', 'AI_GENERATED', 'SIGNED', 'ADDENDUM_CREATED'];
 
 export type SoapNoteSnapshot = {

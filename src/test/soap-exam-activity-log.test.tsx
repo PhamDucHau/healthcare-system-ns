@@ -128,31 +128,9 @@ describe("SOAP exam activity log (TC-DLS-403)", () => {
     expect(screen.getByRole("button", { name: /^Lưu$/i })).toBeEnabled();
   });
 
-  it("should show the system log line for a saved update", () => {
-    editorState.mockReturnValue(
-      mockEditor({
-        activityLogs: [
-          {
-            id: "log-1",
-            exam_id: "exam-1",
-            actor_id: "doc-1",
-            actor_name: "Nguyễn Văn A",
-            action: "UPDATED",
-            created_at: "2026-09-16T10:15:00.000Z",
-            message: "Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ",
-            changed_fields: [],
-            related_exam_id: null,
-          },
-        ],
-      })
-    );
+  it("should not show Nhật ký hệ thống on the exam SOAP page", () => {
     render(<SoapNoteEditor appointmentId="appt-1" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Nhật ký hệ thống/i }));
-
-    expect(
-      screen.getByText("Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ")
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Nhật ký hệ thống/i })).not.toBeInTheDocument();
   });
 });
 
@@ -214,6 +192,6 @@ describe("SOAP comprehensive activity log (TC-DLS-022)", () => {
 
     expect((await screen.findAllByText("AI đau họng")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Đau họng 3 ngày").length).toBeGreaterThan(0);
-    expect(screen.getByText("Bác sĩ Nguyễn Văn A đã tạo nháp SOAP bằng AI")).toBeInTheDocument();
+    expect(screen.getAllByText("Bác sĩ Nguyễn Văn A đã tạo nháp SOAP bằng AI").length).toBeGreaterThan(0);
   });
 });

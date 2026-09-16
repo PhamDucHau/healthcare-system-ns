@@ -94,13 +94,18 @@ export type SignExaminationResult = {
 
 export type SoapValidationErrors = Partial<{
   s_text: string;
+  o_text: string;
   a_text: string;
+  p_text: string;
   icd_codes: string;
   pin: string;
 }>;
 
-export const SOAP_ASSESSMENT_REQUIRED_MESSAGE =
-  'Vui lòng điền phần Đánh giá (A) trước khi ký xác nhận';
+export const SOAP_SUBJECTIVE_REQUIRED_MESSAGE = 'Phần Subjective (S) là bắt buộc';
+export const SOAP_OBJECTIVE_REQUIRED_MESSAGE = 'Phần Objective (O) là bắt buộc';
+export const SOAP_ASSESSMENT_REQUIRED_MESSAGE = 'Phần Assessment (A) là bắt buộc';
+export const SOAP_PLAN_REQUIRED_MESSAGE = 'Phần Plan (P) là bắt buộc';
+export const SOAP_ICD_REQUIRED_MESSAGE = 'Cần ít nhất 1 chẩn đoán ICD-10 được xác nhận';
 
 export const PIN_SIGN_LOCK_MESSAGE = 'Vui lòng thử lại sau 10 phút';
 
@@ -118,10 +123,30 @@ export function isPinSignLockMessage(message: string): boolean {
   );
 }
 
-export function validateSoapForSave(data: SoapFormData): SoapValidationErrors {
+function isBlank(value: string | undefined): boolean {
+  return !value || value.trim() === '';
+}
+
+export function validateSoapForSave(
+  data: SoapFormData,
+  icdCodes: SoapIcdCode[]
+): SoapValidationErrors {
   const errors: SoapValidationErrors = {};
-  if (!data.s_text || data.s_text.trim() === '') {
-    errors.s_text = 'Phần Subjective (S) là bắt buộc';
+  if (isBlank(data.s_text)) {
+    errors.s_text = SOAP_SUBJECTIVE_REQUIRED_MESSAGE;
+  }
+  if (isBlank(data.o_text)) {
+    errors.o_text = SOAP_OBJECTIVE_REQUIRED_MESSAGE;
+  }
+  if (isBlank(data.a_text)) {
+    errors.a_text = SOAP_ASSESSMENT_REQUIRED_MESSAGE;
+  }
+  if (isBlank(data.p_text)) {
+    errors.p_text = SOAP_PLAN_REQUIRED_MESSAGE;
+  }
+  const confirmed = icdCodes.filter((c) => c.confirm_status === 'CONFIRMED');
+  if (confirmed.length === 0) {
+    errors.icd_codes = SOAP_ICD_REQUIRED_MESSAGE;
   }
   return errors;
 }
@@ -130,15 +155,7 @@ export function validateSoapForSign(
   data: SoapFormData,
   icdCodes: SoapIcdCode[]
 ): SoapValidationErrors {
-  const errors = validateSoapForSave(data);
-  if (!data.a_text || data.a_text.trim() === '') {
-    errors.a_text = SOAP_ASSESSMENT_REQUIRED_MESSAGE;
-  }
-  const confirmed = icdCodes.filter((c) => c.confirm_status === 'CONFIRMED');
-  if (confirmed.length === 0) {
-    errors.icd_codes = 'Cần ít nhất 1 chẩn đoán ICD-10 được xác nhận';
-  }
-  return errors;
+  return validateSoapForSave(data, icdCodes);
 }
 
 // ─── Status Labels ────────────────────────────────────────────────────────────

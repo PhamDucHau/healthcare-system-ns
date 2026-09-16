@@ -69,6 +69,7 @@ import type {
 import {
   DEFAULT_SOAP_FORM,
   isPinSignLockMessage,
+  validateSoapForSave,
   validateSoapForSign,
 } from '@/types/emr';
 
@@ -254,7 +255,9 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   // ─── Helper: perform auto-save ────────────────────────────────────────────
 
   const performAutoSave = useCallback(async () => {
-    if (!examIdRef.current || !formData.s_text.trim()) return;
+    if (!examIdRef.current) return;
+    const errors = validateSoapForSave(formData, exam?.icd_codes ?? []);
+    if (Object.keys(errors).length > 0) return;
     try {
       await saveSoapDraft(examIdRef.current, formData);
       lastSavedFormRef.current = { ...formData };
@@ -262,7 +265,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     } catch {
       // Silent fail for auto-save
     }
-  }, [formData]);
+  }, [exam?.icd_codes, formData]);
 
   // ─── Helper: trigger AI suggestions ──────────────────────────────────────
 
@@ -464,8 +467,10 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
 
   const saveDraft = useCallback(async () => {
     if (!examIdRef.current) return;
-    if (!formData.s_text.trim()) {
-      toast.error('Phần Subjective (S) là bắt buộc');
+    const errors = validateSoapForSave(formData, exam?.icd_codes ?? []);
+    const firstError = Object.values(errors)[0];
+    if (firstError) {
+      toast.error(firstError);
       return;
     }
     setSaving(true);
@@ -483,7 +488,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     } finally {
       setSaving(false);
     }
-  }, [formData, reloadActivityLogs]);
+  }, [exam?.icd_codes, formData, reloadActivityLogs]);
 
   // ─── Public: add ICD code ─────────────────────────────────────────────────
 

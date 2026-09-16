@@ -4,12 +4,12 @@
  */
 
 import { useState } from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   Activity, AlertTriangle, Check, ChevronDown, ChevronUp,
   ClipboardList, Loader2, Lock, Save, Sparkles, X, Pencil,
-  Mic, StopCircle, Brain, Heart, TrendingUp, ScrollText,
+  Mic, StopCircle, Brain, Heart, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -58,7 +58,6 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
   const [sectionExpanded, setSectionExpanded] = useState({
     vitals: true,
     preConsult: false,
-    history: false,
     questionnaires: false,
   });
 
@@ -292,28 +291,6 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
             )}
           </ExpandableSection>
 
-          <ExpandableSection
-            title="Nhật ký hệ thống"
-            icon={<ScrollText className="h-4 w-4 text-primary" />}
-            expanded={sectionExpanded.history}
-            onToggle={() => setSectionExpanded((p) => ({ ...p, history: !p.history }))}
-          >
-            {editor.activityLogs.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Chưa có nhật ký hoạt động.</p>
-            ) : (
-              <ul className="space-y-2">
-                {editor.activityLogs.map((entry) => (
-                  <li key={entry.id} className="text-sm text-slate-700">
-                    <p>{entry.message}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {format(new Date(entry.created_at), 'dd/MM/yyyy HH:mm', { locale: vi })}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ExpandableSection>
-
           <Separator className="my-6 bg-slate-200" />
 
           {/* SOAP sections */}
@@ -331,6 +308,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
           <SoapSection
             label="O — Objective"
             description="Kết quả khám thực thể, sinh hiệu"
+            required
             value={editor.formData.o_text}
             onChange={(v) => editor.updateField('o_text', v)}
             locked={editor.isLocked}
@@ -368,6 +346,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
           <SoapSection
             label="P — Plan"
             description="Kế hoạch điều trị: hướng xử trí, kê đơn thuốc, chế độ sinh hoạt, tái khám"
+            required
             value={editor.formData.p_text}
             onChange={(v) => editor.updateField('p_text', v)}
             locked={editor.isLocked}
@@ -781,7 +760,7 @@ function SoapSection({
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2">
           <span className="text-sm font-extrabold text-primary uppercase tracking-wide">{label}</span>
-          {required && <span className="text-xs text-red-500">*</span>}
+          {required && <span className="text-lg font-bold leading-none text-red-500">*</span>}
           <span className="text-xs text-muted-foreground hidden md:inline">{description}</span>
         </div>
         {isAiSuggested && !locked && (
