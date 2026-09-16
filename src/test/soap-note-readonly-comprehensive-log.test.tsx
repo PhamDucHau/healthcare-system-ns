@@ -77,7 +77,9 @@ describe("SOAP read-only comprehensive log (TC-DLS-022)", () => {
     });
 
     expect(await screen.findByText("Bổ sung: sốt tái phát tối")).toBeInTheDocument();
-    expect(screen.getByText("AI đau họng")).toBeInTheDocument();
+    expect(screen.getAllByText("AI đau họng").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Nháp AI").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bác sĩ sửa").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Đau họng 3 ngày").length).toBeGreaterThan(0);
   });
 });

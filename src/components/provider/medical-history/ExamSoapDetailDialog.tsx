@@ -8,15 +8,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import type { SoapChangedField } from '@/lib/exam-activity-log';
-import { getExaminationById } from '@/lib/emr-api';
+import { snapshotFromExamFields } from '@/lib/exam-activity-log';
+import { getExaminationById, listExaminationActivityLog } from '@/lib/emr-api';
 import { EXAM_STATUS_LABELS } from '@/types/emr';
 import type { MedicalExamination } from '@/types/emr';
+import SoapAiDoctorCompare, {
+  doctorColumnLabel,
+  formatSoapUpdatedAt,
+} from '@/components/emr/SoapAiDoctorCompare';
 
 type Props = {
   examId: string | null;
   patientName?: string | null;
+  doctorName?: string | null;
+  updatedAt?: string | null;
   changedFields?: SoapChangedField[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,28 +31,43 @@ type Props = {
 export default function ExamSoapDetailDialog({
   examId,
   patientName,
+  doctorName,
+  updatedAt,
   changedFields = [],
   open,
   onOpenChange,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [exam, setExam] = useState<MedicalExamination | null>(null);
+  const [aiGeneratedAt, setAiGeneratedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !examId) {
       setExam(null);
+      setAiGeneratedAt(null);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
 
-    getExaminationById(examId)
-      .then((row) => {
-        if (!cancelled) setExam(row);
+    Promise.all([
+      getExaminationById(examId),
+      listExaminationActivityLog(examId).catch(() => []),
+    ])
+      .then(([row, logs]) => {
+        if (cancelled) return;
+        setExam(row);
+        const aiLog = logs
+          .filter((entry) => entry.action === 'AI_GENERATED')
+          .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
+        setAiGeneratedAt(aiLog?.created_at ?? null);
       })
       .catch(() => {
-        if (!cancelled) setExam(null);
+        if (!cancelled) {
+          setExam(null);
+          setAiGeneratedAt(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -58,16 +79,28 @@ export default function ExamSoapDetailDialog({
   }, [open, examId]);
 
   const confirmedIcds = exam?.icd_codes.filter((c) => c.confirm_status === 'CONFIRMED') ?? [];
+  const resolvedAiGeneratedAt = aiGeneratedAt
+    ?? (exam?.ai_baseline ? exam.created_at : null);
+  const updatedAtLabel = formatSoapUpdatedAt(updatedAt);
+  const updatedByLabel = doctorName?.trim() ? doctorColumnLabel(doctorName) : null;
+  const updateMeta =
+    updatedByLabel && updatedAtLabel
+      ? `Cập nhật bởi ${updatedByLabel} lúc ${updatedAtLabel}`
+      : updatedByLabel
+        ? `Cập nhật bởi ${updatedByLabel}`
+        : updatedAtLabel
+          ? `Cập nhật lúc ${updatedAtLabel}`
+          : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Chi tiết hồ sơ SOAP{patientName ? ` — ${patientName}` : ''}
           </DialogTitle>
           <DialogDescription>
-            Nội dung SOAP (S/O/A/P) của hồ sơ khám bệnh.
+            So sánh nháp AI với nội dung bác sĩ đã chỉnh sửa (S/O/A/P).
           </DialogDescription>
         </DialogHeader>
 
@@ -81,11 +114,14 @@ export default function ExamSoapDetailDialog({
           </p>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <Badge variant="outline">
                 {EXAM_STATUS_LABELS[exam.status] ?? exam.status}
               </Badge>
+              {updateMeta && (
+                <span className="text-xs text-muted-foreground">{updateMeta}</span>
+              )}
             </div>
 
             {confirmedIcds.length > 0 && (
@@ -102,76 +138,17 @@ export default function ExamSoapDetailDialog({
               </div>
             )}
 
-            <SoapBlock
-              field="s_text"
-              label="S — Subjective"
-              description="Lời khai bệnh nhân"
-              content={exam.s_text}
-              changed={changedFields.includes('s_text')}
-            />
-            <SoapBlock
-              field="o_text"
-              label="O — Objective"
-              description="Kết quả khám thực thể"
-              content={exam.o_text}
-              changed={changedFields.includes('o_text')}
-            />
-            <SoapBlock
-              field="a_text"
-              label="A — Assessment"
-              description="Chẩn đoán lâm sàng"
-              content={exam.a_text}
-              changed={changedFields.includes('a_text')}
-            />
-            <SoapBlock
-              field="p_text"
-              label="P — Plan"
-              description="Kế hoạch điều trị"
-              content={exam.p_text}
-              changed={changedFields.includes('p_text')}
+            <SoapAiDoctorCompare
+              doctorSoap={snapshotFromExamFields(exam)}
+              aiSoap={exam.ai_baseline ?? null}
+              changedFields={changedFields}
+              doctorName={doctorName}
+              updatedAt={updatedAt}
+              aiGeneratedAt={resolvedAiGeneratedAt}
             />
           </div>
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function SoapBlock({
-  field,
-  label,
-  description,
-  content,
-  changed,
-}: {
-  field: SoapChangedField;
-  label: string;
-  description: string;
-  content: string | null;
-  changed: boolean;
-}) {
-  return (
-    <div
-      data-testid={`soap-block-${field}`}
-      data-changed={changed ? 'true' : 'false'}
-      className="space-y-1"
-    >
-      <div className="flex items-baseline gap-2">
-        <span className="text-xs font-bold text-primary">{label}</span>
-        <span className="text-xs text-muted-foreground">{description}</span>
-        {changed && (
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5">
-            Đã sửa
-          </span>
-        )}
-      </div>
-      <Card className={changed ? 'border-amber-400 bg-amber-50/80 shadow-sm' : 'border-border/50'}>
-        <CardContent className="py-2.5 px-3">
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">
-            {content?.trim() ? content : '—'}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
   );
 }

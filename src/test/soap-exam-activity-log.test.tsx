@@ -212,7 +212,7 @@ describe("SOAP comprehensive activity log (TC-DLS-022)", () => {
     render(<SoapNoteEditor appointmentId="appt-1" />);
     fireEvent.click(screen.getByRole("button", { name: /Nhật ký toàn diện/i }));
 
-    expect(await screen.findByText("AI đau họng")).toBeInTheDocument();
+    expect((await screen.findAllByText("AI đau họng")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Đau họng 3 ngày").length).toBeGreaterThan(0);
     expect(screen.getByText("Bác sĩ Nguyễn Văn A đã tạo nháp SOAP bằng AI")).toBeInTheDocument();
   });

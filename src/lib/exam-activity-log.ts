@@ -32,6 +32,7 @@ export type DoctorExamActivityLogEntry = ExamActivityLogEntry & {
 
 export type ComprehensiveTimelineEvent = ExamActivityLogEntry & {
   soap: SoapNoteSnapshot | null;
+  aiSoap?: SoapNoteSnapshot | null;
 };
 
 export type ExamAddendumSource = {
@@ -156,8 +157,9 @@ function syntheticEntry(params: {
 function attachSoap(
   entry: ExamActivityLogEntry,
   soap: SoapNoteSnapshot | null,
+  aiSoap?: SoapNoteSnapshot | null,
 ): ComprehensiveTimelineEvent {
-  return { ...entry, soap };
+  return { ...entry, soap, aiSoap: aiSoap ?? null };
 }
 
 export function buildComprehensiveExamTimeline(
@@ -176,7 +178,7 @@ export function buildComprehensiveExamTimeline(
       return attachSoap(entry, addendum?.soap ?? null);
     }
     if (entry.action === 'SIGNED' || entry.action === 'UPDATED') {
-      return attachSoap(entry, input.doctorSoap);
+      return attachSoap(entry, input.doctorSoap, input.aiBaseline);
     }
     return attachSoap(entry, null);
   });
@@ -208,6 +210,7 @@ export function buildComprehensiveExamTimeline(
         actorName,
       }),
       input.doctorSoap,
+      input.aiBaseline,
     ));
   }
 

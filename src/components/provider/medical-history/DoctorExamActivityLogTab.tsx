@@ -34,6 +34,8 @@ export default function DoctorExamActivityLogTab() {
   const [exporting, setExporting] = useState(false);
   const [detailExamId, setDetailExamId] = useState<string | null>(null);
   const [detailPatientName, setDetailPatientName] = useState<string | null>(null);
+  const [detailDoctorName, setDetailDoctorName] = useState<string | null>(null);
+  const [detailUpdatedAt, setDetailUpdatedAt] = useState<string | null>(null);
   const [detailChangedFields, setDetailChangedFields] = useState<SoapChangedField[]>([]);
 
   useEffect(() => {
@@ -179,6 +181,8 @@ export default function DoctorExamActivityLogTab() {
                   onClick={() => {
                     setDetailExamId(e.exam_id);
                     setDetailPatientName(e.patient_name);
+                    setDetailDoctorName(e.actor_name);
+                    setDetailUpdatedAt(e.created_at);
                     setDetailChangedFields(e.changed_fields);
                   }}
                   className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
@@ -220,6 +224,8 @@ export default function DoctorExamActivityLogTab() {
                         onClick={() => {
                           setDetailExamId(e.exam_id);
                           setDetailPatientName(e.patient_name);
+                          setDetailDoctorName(e.actor_name);
+                          setDetailUpdatedAt(e.created_at);
                           setDetailChangedFields(e.changed_fields);
                         }}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
@@ -285,12 +291,16 @@ export default function DoctorExamActivityLogTab() {
       <ExamSoapDetailDialog
         examId={detailExamId}
         patientName={detailPatientName}
+        doctorName={detailDoctorName}
+        updatedAt={detailUpdatedAt}
         changedFields={detailChangedFields}
         open={!!detailExamId}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             setDetailExamId(null);
             setDetailPatientName(null);
+            setDetailDoctorName(null);
+            setDetailUpdatedAt(null);
             setDetailChangedFields([]);
           }
         }}

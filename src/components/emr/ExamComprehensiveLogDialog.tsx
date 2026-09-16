@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import type { ComprehensiveTimelineEvent, ExamActivityAction, SoapChangedField } from '@/lib/exam-activity-log';
+import SoapAiDoctorCompare from '@/components/emr/SoapAiDoctorCompare';
 
 const ACTION_LABEL: Record<ExamActivityAction, string> = {
   AI_GENERATED: 'Tạo nháp AI',
@@ -39,9 +40,11 @@ type Props = {
 };
 
 export default function ExamComprehensiveLogDialog({ open, onOpenChange, events }: Props) {
+  const aiGeneratedAt = events.find((event) => event.action === 'AI_GENERATED')?.created_at ?? null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nhật ký hoạt động toàn diện</DialogTitle>
           <DialogDescription>
@@ -68,7 +71,18 @@ export default function ExamComprehensiveLogDialog({ open, onOpenChange, events 
                   </Badge>
                 </div>
                 <p className="text-sm text-slate-800">{event.message}</p>
-                {event.soap && (
+                {event.soap && (event.action === 'UPDATED' || event.action === 'SIGNED') && event.aiSoap ? (
+                  <div className="mt-2">
+                    <SoapAiDoctorCompare
+                      doctorSoap={event.soap}
+                      aiSoap={event.aiSoap}
+                      changedFields={event.changed_fields}
+                      doctorName={event.actor_name}
+                      updatedAt={event.created_at}
+                      aiGeneratedAt={aiGeneratedAt}
+                    />
+                  </div>
+                ) : event.soap ? (
                   <div className="mt-2 space-y-2">
                     <SoapLine
                       field="s_text"
@@ -95,7 +109,7 @@ export default function ExamComprehensiveLogDialog({ open, onOpenChange, events 
                       changed={event.changed_fields.includes('p_text')}
                     />
                   </div>
-                )}
+                ) : null}
               </li>
             ))}
           </ol>

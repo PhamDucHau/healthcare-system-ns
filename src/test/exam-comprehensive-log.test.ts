@@ -93,6 +93,7 @@ describe("buildComprehensiveExamTimeline (TC-DLS-022)", () => {
     ]);
     expect(events[0].soap).toEqual(aiSoap);
     expect(events[1].soap).toEqual(doctorSoap);
+    expect(events[1].aiSoap).toEqual(aiSoap);
     expect(events[1].changed_fields).toEqual(["s_text"]);
     expect(events[2].soap).toEqual(doctorSoap);
     expect(events[3].soap).toEqual(addendumSoap);
