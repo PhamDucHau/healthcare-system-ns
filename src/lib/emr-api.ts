@@ -8,7 +8,9 @@ import { decrypt, encrypt } from '@/lib/crypto';
 import { formatPinInvalidMessage } from '@/lib/pin-attempts';
 import {
   toExamActivityLogEntry,
+  type ExamActivityAction,
   type ExamActivityLogEntry,
+  type SoapNoteSnapshot,
 } from '@/lib/exam-activity-log';
 import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
 import {
@@ -46,6 +48,28 @@ async function encryptSoapFields(fields: {
   if (fields.a_text) encrypted.a_text = await encrypt(fields.a_text);
   if (fields.p_text) encrypted.p_text = await encrypt(fields.p_text);
   return encrypted;
+}
+
+async function decryptSoapSnapshot(raw: unknown): Promise<SoapNoteSnapshot | null> {
+  if (raw == null) return null;
+  let parsed: Record<string, unknown> | null = null;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  } else if (typeof raw === 'object') {
+    parsed = raw as Record<string, unknown>;
+  }
+  if (!parsed) return null;
+  const decrypted = await decryptSoapFields(parsed);
+  return {
+    s_text: decrypted.s_text != null ? String(decrypted.s_text) : null,
+    o_text: decrypted.o_text != null ? String(decrypted.o_text) : null,
+    a_text: decrypted.a_text != null ? String(decrypted.a_text) : null,
+    p_text: decrypted.p_text != null ? String(decrypted.p_text) : null,
+  };
 }
 
 // ─── Row Mappers ──────────────────────────────────────────────────────────────
@@ -100,6 +124,7 @@ async function mapExamRow(row: Record<string, unknown>): Promise<MedicalExaminat
     auto_saved_at: decrypted.auto_saved_at != null ? String(decrypted.auto_saved_at) : null,
     created_at: String(decrypted.created_at),
     updated_at: String(decrypted.updated_at),
+    ai_baseline: await decryptSoapSnapshot(decrypted.ai_baseline ?? row.ai_baseline),
     icd_codes: icdCodes,
   };
 }
@@ -257,10 +282,20 @@ export async function listExaminationActivityLog(
     exam_id: string;
     actor_id: string | null;
     actor_name: string | null;
-    action: 'UPDATED';
+    action: ExamActivityAction;
     created_at: string;
     changed_fields?: unknown;
+    related_exam_id?: string | null;
   }>).map(toExamActivityLogEntry);
+}
+
+export async function listExamAddenda(parentExamId: string): Promise<MedicalExamination[]> {
+  const { data, error } = await supabase.rpc('list_exam_addenda', {
+    p_parent_exam_id: parentExamId,
+  });
+  if (error) throw new Error(mapEmrError(error.message));
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return Promise.all(rows.map((row) => mapExamRow(row)));
 }
 
 /**
@@ -684,9 +719,10 @@ export async function saveSoapAiBaseline(
   examId: string,
   baseline: { s_text: string; o_text: string; a_text: string; p_text: string }
 ): Promise<void> {
+  const encrypted = await encryptSoapFields(baseline);
   const { error } = await supabase.rpc('save_soap_ai_baseline', {
     p_exam_id: examId,
-    p_baseline: baseline,
+    p_baseline: encrypted,
   });
   if (error) throw new Error(error.message);
 }

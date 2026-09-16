@@ -34,6 +34,7 @@ import VitalSignsReadOnly from './VitalSignsReadOnly';
 import PreConsultationReadOnly from './PreConsultationReadOnly';
 import QuestionnaireAssignPanel from './QuestionnaireAssignPanel';
 import VoiceRecordingHistory from './VoiceRecordingHistory';
+import ExamComprehensiveLogControl from './ExamComprehensiveLogControl';
 
 type PatientInfo = {
   name: string;
@@ -117,6 +118,10 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Tự lưu {formatDistanceToNow(editor.autoSavedAt, { locale: vi, addSuffix: true })}
             </span>
+          )}
+
+          {editor.exam && (
+            <ExamComprehensiveLogControl exam={editor.exam} logs={editor.activityLogs} />
           )}
 
           {editor.isLocked ? (

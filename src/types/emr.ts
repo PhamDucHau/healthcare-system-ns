@@ -41,6 +41,12 @@ export type MedicalExamination = {
   auto_saved_at: string | null;
   created_at: string;
   updated_at: string;
+  ai_baseline?: {
+    s_text: string | null;
+    o_text: string | null;
+    a_text: string | null;
+    p_text: string | null;
+  } | null;
   // Joined
   icd_codes: SoapIcdCode[];
 };

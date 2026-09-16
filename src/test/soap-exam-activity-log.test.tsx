@@ -19,6 +19,11 @@ vi.mock("@/components/emr/QuestionnaireAssignPanel", () => ({ default: () => nul
 vi.mock("@/components/emr/VoiceRecordingHistory", () => ({ default: () => null }));
 vi.mock("@/components/emr/IcdSearchPanel", () => ({ default: () => null }));
 
+vi.mock("@/lib/emr-api", () => ({
+  listExamAddenda: vi.fn().mockResolvedValue([]),
+  listExaminationActivityLog: vi.fn().mockResolvedValue([]),
+}));
+
 import SoapNoteEditor from "@/components/emr/SoapNoteEditor";
 
 function exam(overrides: Partial<MedicalExamination> = {}): MedicalExamination {
@@ -136,6 +141,7 @@ describe("SOAP exam activity log (TC-DLS-403)", () => {
             created_at: "2026-09-16T10:15:00.000Z",
             message: "Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ",
             changed_fields: [],
+            related_exam_id: null,
           },
         ],
       })
@@ -147,5 +153,67 @@ describe("SOAP exam activity log (TC-DLS-403)", () => {
     expect(
       screen.getByText("Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ")
     ).toBeInTheDocument();
+  });
+});
+
+describe("SOAP comprehensive activity log (TC-DLS-022)", () => {
+  beforeEach(() => {
+    editorState.mockReturnValue(mockEditor());
+  });
+
+  it("should show AI draft then doctor SOAP in Nhật ký toàn diện", async () => {
+    editorState.mockReturnValue(
+      mockEditor({
+        exam: exam({
+          s_text: "Đau họng 3 ngày",
+          o_text: "Họng đỏ",
+          a_text: "Viêm họng cấp",
+          p_text: "Nghỉ ngơi, uống nhiều nước",
+          ai_baseline: {
+            s_text: "AI đau họng",
+            o_text: "AI họng đỏ",
+            a_text: "AI viêm họng",
+            p_text: "AI nghỉ ngơi",
+          },
+        }),
+        formData: {
+          s_text: "Đau họng 3 ngày",
+          o_text: "Họng đỏ",
+          a_text: "Viêm họng cấp",
+          p_text: "Nghỉ ngơi, uống nhiều nước",
+        },
+        activityLogs: [
+          {
+            id: "ai-1",
+            exam_id: "exam-1",
+            actor_id: "doc-1",
+            actor_name: "Nguyễn Văn A",
+            action: "AI_GENERATED",
+            created_at: "2026-09-16T10:00:00.000Z",
+            message: "Bác sĩ Nguyễn Văn A đã tạo nháp SOAP bằng AI",
+            changed_fields: [],
+            related_exam_id: null,
+          },
+          {
+            id: "log-1",
+            exam_id: "exam-1",
+            actor_id: "doc-1",
+            actor_name: "Nguyễn Văn A",
+            action: "UPDATED",
+            created_at: "2026-09-16T10:15:00.000Z",
+            message: "Bác sĩ Nguyễn Văn A đã cập nhật nội dung hồ sơ",
+            changed_fields: ["s_text"],
+            related_exam_id: null,
+          },
+        ],
+      })
+    );
+
+    render(<SoapNoteEditor appointmentId="appt-1" />);
+    fireEvent.click(screen.getByRole("button", { name: /Nhật ký toàn diện/i }));
+
+    expect(await screen.findByText("AI đau họng")).toBeInTheDocument();
+    expect(screen.getAllByText("Đau họng 3 ngày").length).toBeGreaterThan(0);
+    expect(screen.getByText("Bác sĩ Nguyễn Văn A đã tạo nháp SOAP bằng AI")).toBeInTheDocument();
   });
 });

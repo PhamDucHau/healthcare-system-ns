@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { verifyExaminationIntegrity, createExamAddendum, type IntegrityResult } from '@/lib/emr-api';
+import ExamComprehensiveLogControl from '@/components/emr/ExamComprehensiveLogControl';
 import type { MedicalExamination } from '@/types/emr';
 
 type SoapNoteReadOnlyProps = {
@@ -73,6 +74,7 @@ export default function SoapNoteReadOnly({
               {format(parseISO(exam.updated_at), "dd/MM/yyyy 'lúc' HH:mm", { locale: vi })}
             </span>
           )}
+          <ExamComprehensiveLogControl exam={exam} />
           <Button variant="outline" size="sm" onClick={() => void handleVerify()} disabled={verifying}>
             {verifying ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
             Xác minh tính toàn vẹn

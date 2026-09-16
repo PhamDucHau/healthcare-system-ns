@@ -77,9 +77,10 @@ export async function listDoctorExaminationActivityLog(
     exam_id: string;
     actor_id: string | null;
     actor_name: string | null;
-    action: 'UPDATED';
+    action: string;
     created_at: string;
     changed_fields?: unknown;
+    related_exam_id?: string | null;
     patient_name: string | null;
     appointment_id: string | null;
   }>;

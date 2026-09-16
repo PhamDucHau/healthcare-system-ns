@@ -44,6 +44,7 @@ describe("Doctor medical history system log tab (TC-DLS-403)", () => {
           appointment_id: "appt-1",
           message: "Bác sĩ Lê Thị Hồng Xoan đã cập nhật nội dung hồ sơ",
           changed_fields: ["s_text", "a_text"],
+          related_exam_id: null,
         },
       ],
     });
