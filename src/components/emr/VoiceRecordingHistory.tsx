@@ -2,14 +2,16 @@
  * Button + dialog listing saved consultation recordings.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Headphones, Loader2, Play, Pause } from 'lucide-react';
+import { Headphones, Loader2, Play, Pause, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -24,17 +26,37 @@ type VoiceRecordingHistoryProps = {
   recordings: RecordingPlaybackItem[];
   loading?: boolean;
   resolveAudioUrl: (storagePath: string) => Promise<string | null>;
+  onRegenerate?: (recordings: RecordingPlaybackItem[]) => void;
+  regenerating?: boolean;
+  busy?: boolean;
 };
 
 export default function VoiceRecordingHistory({
-  recordings, loading, resolveAudioUrl,
+  recordings, loading, resolveAudioUrl, onRegenerate, regenerating, busy,
 }: VoiceRecordingHistoryProps) {
   const [open, setOpen] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => recordings.map((rec) => rec.id));
+
+  useEffect(() => {
+    setSelectedIds(recordings.map((rec) => rec.id));
+  }, [recordings]);
 
   const count = recordings.length;
+  const selectedRecordings = recordings.filter((rec) => selectedIds.includes(rec.id));
+  const canRegenerate = Boolean(onRegenerate)
+    && selectedRecordings.length > 0
+    && !busy
+    && !regenerating;
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      if (checked) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter((item) => item !== id);
+    });
+  };
 
   const handlePlay = useCallback(async (rec: RecordingPlaybackItem) => {
     if (playingId === rec.id) {
@@ -89,6 +111,9 @@ export default function VoiceRecordingHistory({
             <Headphones className="h-5 w-5 text-primary" />
             Bản ghi phiên khám ({count})
           </DialogTitle>
+          <DialogDescription className="text-xs">
+            Tích chọn file ghi âm rồi bấm Gen lại transcript.
+          </DialogDescription>
         </DialogHeader>
 
         {count === 0 ? (
@@ -105,6 +130,8 @@ export default function VoiceRecordingHistory({
                 ? `${Math.floor(rec.duration_seconds / 60)}:${String(rec.duration_seconds % 60).padStart(2, '0')}`
                 : null;
               const src = rec.audioUrl ?? audioUrls[rec.id];
+              const checked = selectedIds.includes(rec.id);
+              const rowLabel = `Bản ghi #${label}`;
 
               return (
                 <div
@@ -112,9 +139,17 @@ export default function VoiceRecordingHistory({
                   className="rounded-lg border bg-card px-3 py-2.5 space-y-2"
                 >
                   <div className="flex items-start gap-2">
+                    {onRegenerate && (
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) => toggleSelected(rec.id, !!value)}
+                        className="mt-1"
+                        aria-label={rowLabel}
+                      />
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">
-                        Bản ghi #{label}
+                        {rowLabel}
                         {duration && (
                           <span className="text-muted-foreground font-normal ml-1.5">· {duration}</span>
                         )}
@@ -155,6 +190,25 @@ export default function VoiceRecordingHistory({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {onRegenerate && count > 0 && (
+          <div className="flex justify-end pt-1">
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 px-3 gap-1.5"
+              disabled={!canRegenerate}
+              onClick={() => onRegenerate(selectedRecordings)}
+            >
+              {regenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Gen lại transcript
+            </Button>
           </div>
         )}
       </DialogContent>

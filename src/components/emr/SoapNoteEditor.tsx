@@ -500,6 +500,9 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                     recordings={editor.consultationRecordings}
                     loading={editor.recordingsLoading}
                     resolveAudioUrl={editor.resolveRecordingAudioUrl}
+                    onRegenerate={(recs) => void editor.regenerateTranscriptFromRecordings(recs)}
+                    regenerating={Boolean(editor.regeneratingRecordingId)}
+                    busy={editor.isTranscribing || editor.isGeneratingSoap}
                   />
                 )}
 

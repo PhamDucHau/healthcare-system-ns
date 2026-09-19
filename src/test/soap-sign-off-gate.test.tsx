@@ -114,6 +114,8 @@ function mockEditor(overrides: Partial<UseSoapNoteEditorReturn> = {}): UseSoapNo
     consultationRecordings: [],
     recordingsLoading: false,
     resolveRecordingAudioUrl: vi.fn(),
+    regeneratingRecordingId: null,
+    regenerateTranscriptFromRecordings: vi.fn(),
     isGeneratingSoap: false,
     soapJobStatus: "idle",
     generateSoap: vi.fn(),

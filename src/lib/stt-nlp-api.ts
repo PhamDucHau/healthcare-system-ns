@@ -248,6 +248,89 @@ export async function suggestIcd10(params: {
   });
 }
 
+export type SttRegenApis = {
+  transcribe: boolean;
+  diarize: boolean;
+  session: boolean;
+};
+
+export type RegenerateTranscriptResult = {
+  turns: TranscriptTurn[];
+  plainTranscript: string;
+  sessionWarning?: string;
+};
+
+function turnsFromPlainTranscript(plain: string): TranscriptTurn[] {
+  const text = plain.trim();
+  return text ? [{ speaker: 'doctor', text }] : [];
+}
+
+export async function regenerateTranscriptFromAudio(params: {
+  audioBlob?: Blob | null;
+  existingTranscript?: string;
+  existingTurns?: TranscriptTurn[];
+  apis: SttRegenApis;
+  session?: { appointmentId: string; doctorId: string };
+}): Promise<RegenerateTranscriptResult> {
+  const { apis } = params;
+  if (!apis.transcribe && !apis.diarize) {
+    throw new Error('Chọn ít nhất Transcribe hoặc Diarize để gen lại transcript.');
+  }
+
+  let sessionWarning: string | undefined;
+  if (apis.session && params.session) {
+    try {
+      await createSttSession({
+        appointmentId: params.session.appointmentId,
+        doctorId: params.session.doctorId,
+        consentConfirmed: true,
+      });
+    } catch (err) {
+      sessionWarning = (err as Error).message || 'Không tạo được phiên STT. Tiếp tục gen transcript.';
+    }
+  }
+
+  let turns: TranscriptTurn[] = [];
+  let plainTranscript = '';
+
+  if (apis.transcribe) {
+    if (!params.audioBlob || params.audioBlob.size === 0) {
+      throw new Error('Không có file ghi âm để transcribe.');
+    }
+    const transcribed = await transcribeAudio(params.audioBlob, {
+      diarize: apis.diarize,
+      mode: 'auto',
+    });
+    plainTranscript = transcribed.transcript?.trim() ?? '';
+    if (transcribed.turns?.length) {
+      turns = mapApiTurnsToTranscript(transcribed.turns);
+    } else if (apis.diarize && plainTranscript) {
+      turns = await diarizeTranscript(plainTranscript);
+    } else {
+      turns = turnsFromPlainTranscript(plainTranscript);
+    }
+  } else if (apis.diarize) {
+    const source =
+      params.existingTranscript?.trim()
+      || transcriptToPlainText(params.existingTurns ?? []);
+    if (!source) {
+      throw new Error('Không có transcript để diarize. Hãy bật Transcribe hoặc chọn bản ghi đã có chữ.');
+    }
+    turns = await diarizeTranscript(source);
+    plainTranscript = source;
+  }
+
+  if (turns.length === 0) {
+    throw new Error('Không nhận diện được nội dung hội thoại từ bản ghi.');
+  }
+
+  return {
+    turns,
+    plainTranscript: plainTranscript || transcriptToPlainText(turns),
+    sessionWarning,
+  };
+}
+
 export async function buildTranscriptFromAudio(audioBlob: Blob): Promise<{
   turns: TranscriptTurn[];
   plainTranscript: string;

@@ -179,6 +179,27 @@ export async function updateTranscriptEdited(
   if (error) throw new Error(error.message);
 }
 
+export async function persistRegeneratedTranscript(params: {
+  appointmentId: string;
+  fullTranscript: VoiceSession['transcript_raw'];
+  recordingId: string;
+  newTurns: VoiceSession['transcript_raw'];
+}): Promise<void> {
+  const { error: sessionError } = await supabase
+    .from('voice_sessions')
+    .update({ transcript_raw: params.fullTranscript })
+    .eq('appointment_id', params.appointmentId);
+
+  if (sessionError) throw new Error(sessionError.message);
+
+  const { error: recordingError } = await supabase
+    .from('consultation_recordings')
+    .update({ transcript_snapshot: params.newTurns })
+    .eq('id', params.recordingId);
+
+  if (recordingError) throw new Error(recordingError.message);
+}
+
 export async function getVoiceSession(appointmentId: string): Promise<VoiceSession | null> {
   const { data, error } = await supabase
     .from('voice_sessions')

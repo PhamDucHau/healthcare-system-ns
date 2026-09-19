@@ -34,6 +34,7 @@ import {
   listConsultationRecordings,
   type ConsultationRecording,
   updateTranscriptEdited,
+  persistRegeneratedTranscript,
   generateSoapFromAi,
   getRiskAssessment,
   recalculateRiskScore,
@@ -46,6 +47,7 @@ import {
   buildLiveTranscriptFromSnapshot,
   checkSttApiHealth,
   createSttSession,
+  regenerateTranscriptFromAudio,
   transcriptToPlainText,
   type NlpAnalyzeResult,
 } from '@/lib/stt-nlp-api';
@@ -123,6 +125,10 @@ export type UseSoapNoteEditorReturn = {
   consultationRecordings: Array<ConsultationRecording & { audioUrl?: string | null }>;
   recordingsLoading: boolean;
   resolveRecordingAudioUrl: (storagePath: string) => Promise<string | null>;
+  regeneratingRecordingId: string | null;
+  regenerateTranscriptFromRecordings: (
+    recordings: Array<ConsultationRecording & { audioUrl?: string | null }>
+  ) => Promise<void>;
 
   // AI SOAP Note generation (FR-024)
   isGeneratingSoap: boolean;
@@ -189,6 +195,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     Array<ConsultationRecording & { audioUrl?: string | null }>
   >([]);
   const [recordingsLoading, setRecordingsLoading] = useState(false);
+  const [regeneratingRecordingId, setRegeneratingRecordingId] = useState<string | null>(null);
 
   // AI SOAP generator states
   const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
@@ -243,6 +250,66 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
   const resolveRecordingAudioUrl = useCallback(async (storagePath: string) => {
     return getConsultationAudioUrl(storagePath);
   }, []);
+
+  const regenerateTranscriptFromRecordings = useCallback(async (
+    recs: Array<ConsultationRecording & { audioUrl?: string | null }>
+  ) => {
+    if (recs.length === 0) return;
+    if (!window.confirm(
+      `Gen lại ${recs.length} file ghi âm đã chọn. Transcript mới sẽ được nối vào hội thoại phiên khám hiện tại. Tiếp tục?`
+    )) {
+      return;
+    }
+
+    const apis = { transcribe: true, diarize: true, session: false };
+    setRegeneratingRecordingId(recs[0].id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      let currentTranscript = transcript;
+      let totalTurns = 0;
+
+      for (const rec of recs) {
+        setRegeneratingRecordingId(rec.id);
+        const url = rec.audioUrl ?? await getConsultationAudioUrl(rec.audio_storage_path);
+        if (!url) throw new Error(`Không tải được file ghi âm ${rec.id}.`);
+        const audioRes = await fetch(url);
+        if (!audioRes.ok) throw new Error('Không tải được file ghi âm.');
+        const audioBlob = await audioRes.blob();
+
+        const existingTurns = rec.transcript_snapshot?.length ? rec.transcript_snapshot : currentTranscript;
+        const result = await regenerateTranscriptFromAudio({
+          audioBlob,
+          existingTranscript: transcriptToPlainText(existingTurns),
+          existingTurns,
+          apis,
+          session: user ? { appointmentId, doctorId: user.id } : undefined,
+        });
+
+        if (result.sessionWarning) {
+          toast.warning(result.sessionWarning);
+        }
+
+        currentTranscript = [...currentTranscript, ...result.turns];
+        totalTurns += result.turns.length;
+        await persistRegeneratedTranscript({
+          appointmentId,
+          fullTranscript: currentTranscript,
+          recordingId: rec.id,
+          newTurns: result.turns,
+        });
+        setConsultationRecordings((prev) =>
+          prev.map((row) => (row.id === rec.id ? { ...row, transcript_snapshot: result.turns } : row))
+        );
+      }
+
+      setTranscript(currentTranscript);
+      toast.success(`Đã nối ${totalTurns} lượt hội thoại từ ${recs.length} bản ghi.`);
+    } catch (e) {
+      toast.error((e as Error).message || 'Không gen lại được transcript.');
+    } finally {
+      setRegeneratingRecordingId(null);
+    }
+  }, [appointmentId, transcript]);
 
   // Refs for EMR auto-save and debounce
   const examIdRef = useRef<string | null>(null);
@@ -1118,6 +1185,8 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     consultationRecordings,
     recordingsLoading,
     resolveRecordingAudioUrl,
+    regeneratingRecordingId,
+    regenerateTranscriptFromRecordings,
 
     // SOAP auto-generation
     isGeneratingSoap,
