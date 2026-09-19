@@ -92,6 +92,7 @@ function mockEditor(overrides: Partial<UseSoapNoteEditorReturn> = {}): UseSoapNo
     updateTranscriptLine: vi.fn(),
     saveTranscriptEdit: vi.fn(),
     addManualTranscriptLine: vi.fn(),
+    removeTranscriptLine: vi.fn(),
     aiCircuitOpen: false,
     aiCircuitCooldownMs: 0,
     consultationRecordings: [],
@@ -185,5 +186,63 @@ describe("SoapNoteEditor manual transcript form", () => {
 
     expect(screen.queryByText("Nhập transcript thủ công")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Thêm dòng hội thoại/i })).not.toBeInTheDocument();
+  });
+
+  it("should show a delete button on each transcript line including empty text", () => {
+    const removeTranscriptLine = vi.fn();
+    editorState.mockReturnValue(
+      mockEditor({
+        transcript: [
+          { speaker: "patient", text: "" },
+          { speaker: "patient", text: "Tôi đau họng" },
+        ],
+        isRecording: false,
+        removeTranscriptLine,
+      })
+    );
+
+    render(<SoapNoteEditor appointmentId="appt-1" />);
+
+    const deleteButtons = screen.getAllByRole("button", { name: "Xóa dòng hội thoại" });
+    expect(deleteButtons).toHaveLength(2);
+
+    fireEvent.click(deleteButtons[0]);
+    expect(removeTranscriptLine).toHaveBeenCalledWith(0);
+  });
+
+  it("should hide transcript line delete buttons while recording", () => {
+    editorState.mockReturnValue(
+      mockEditor({
+        transcript: [
+          { speaker: "patient", text: "" },
+          { speaker: "patient", text: "Tôi đau họng" },
+        ],
+        isRecording: true,
+        recordingConsent: true,
+      })
+    );
+
+    render(<SoapNoteEditor appointmentId="appt-1" />);
+
+    expect(screen.queryByRole("button", { name: "Xóa dòng hội thoại" })).not.toBeInTheDocument();
+  });
+
+  it("should pass on-screen transcript when confirming SOAP generation", async () => {
+    const generateSoap = vi.fn();
+    const lines = [{ speaker: "patient" as const, text: "Hello, tôi bị đau đầu" }];
+    editorState.mockReturnValue(
+      mockEditor({
+        transcript: lines,
+        isRecording: false,
+        generateSoap,
+      })
+    );
+
+    render(<SoapNoteEditor appointmentId="appt-1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Tạo lại SOAP bằng AI LLM/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Xác nhận ghi đè/i }));
+
+    expect(generateSoap).toHaveBeenCalledWith(lines);
   });
 });

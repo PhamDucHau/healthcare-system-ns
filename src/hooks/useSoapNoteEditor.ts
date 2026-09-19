@@ -35,6 +35,8 @@ import {
   type ConsultationRecording,
   updateTranscriptEdited,
   persistRegeneratedTranscript,
+  persistTranscriptLines,
+  resolveTranscriptTurns,
   generateSoapFromAi,
   getRiskAssessment,
   recalculateRiskScore,
@@ -120,6 +122,7 @@ export type UseSoapNoteEditorReturn = {
   updateTranscriptLine: (index: number, text: string) => void;
   saveTranscriptEdit: () => Promise<void>;
   addManualTranscriptLine: (speaker: 'doctor' | 'patient', text: string) => void;
+  removeTranscriptLine: (index: number) => Promise<void>;
   aiCircuitOpen: boolean;
   aiCircuitCooldownMs: number;
   consultationRecordings: Array<ConsultationRecording & { audioUrl?: string | null }>;
@@ -255,11 +258,6 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     recs: Array<ConsultationRecording & { audioUrl?: string | null }>
   ) => {
     if (recs.length === 0) return;
-    if (!window.confirm(
-      `Gen lại ${recs.length} file ghi âm đã chọn. Transcript mới sẽ được nối vào hội thoại phiên khám hiện tại. Tiếp tục?`
-    )) {
-      return;
-    }
 
     const apis = { transcribe: true, diarize: true, session: false };
     setRegeneratingRecordingId(recs[0].id);
@@ -444,9 +442,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
         const voiceSession = await getVoiceSession(appointmentId).catch(() => null);
         if (voiceSession) {
           setTranscript(
-            voiceSession.transcript_edited?.length
-              ? voiceSession.transcript_edited
-              : voiceSession.transcript_raw
+            resolveTranscriptTurns(voiceSession.transcript_edited, voiceSession.transcript_raw)
           );
         }
         await loadConsultationRecordings();
@@ -961,6 +957,21 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     setSttFallbackMode(true);
   }, []);
 
+  const removeTranscriptLine = useCallback(async (index: number) => {
+    if (isRecording) return;
+
+    const previous = transcript;
+    const next = previous.filter((_, i) => i !== index);
+    setTranscript(next);
+    try {
+      await persistTranscriptLines(appointmentId, next);
+      toast.success('Đã xóa dòng hội thoại.');
+    } catch (e) {
+      setTranscript(previous);
+      toast.error((e as Error).message);
+    }
+  }, [appointmentId, isRecording, transcript]);
+
   const saveTranscriptEdit = useCallback(async () => {
     try {
       await updateTranscriptEdited(appointmentId, transcript);
@@ -986,7 +997,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     setIsGeneratingSoap(true);
     setSoapJobStatus('generating');
     try {
-      const generated = await generateSoapFromAi(appointmentId, transcriptOverride);
+      const generated = await generateSoapFromAi(appointmentId, transcriptOverride ?? transcript);
       recordAiSuccess();
 
       if (generated.analysis) {
@@ -1180,6 +1191,7 @@ export function useSoapNoteEditor(appointmentId: string): UseSoapNoteEditorRetur
     updateTranscriptLine,
     saveTranscriptEdit,
     addManualTranscriptLine,
+    removeTranscriptLine,
     aiCircuitOpen,
     aiCircuitCooldownMs: getAiCircuitCooldownRemaining(),
     consultationRecordings,

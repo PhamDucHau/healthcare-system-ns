@@ -44,7 +44,10 @@ describe('persistRegeneratedTranscript', () => {
     });
 
     expect(fromMock).toHaveBeenCalledWith('voice_sessions');
-    expect(sessionUpdate).toHaveBeenCalledWith({ transcript_raw: fullTranscript });
+    expect(sessionUpdate).toHaveBeenCalledWith({
+      transcript_raw: fullTranscript,
+      transcript_edited: fullTranscript,
+    });
     expect(sessionEq).toHaveBeenCalledWith('appointment_id', 'appt-1');
 
     expect(fromMock).toHaveBeenCalledWith('consultation_recordings');

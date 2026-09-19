@@ -93,6 +93,7 @@ function mockEditor(overrides: Partial<UseSoapNoteEditorReturn> = {}): UseSoapNo
     updateTranscriptLine: vi.fn(),
     saveTranscriptEdit: vi.fn(),
     addManualTranscriptLine: vi.fn(),
+    removeTranscriptLine: vi.fn(),
     aiCircuitOpen: false,
     aiCircuitCooldownMs: 0,
     consultationRecordings: [],

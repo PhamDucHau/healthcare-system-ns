@@ -16,6 +16,25 @@ export type VoiceSession = {
   created_at: string;
 };
 
+export function resolveTranscriptTurns(
+  edited: VoiceSession['transcript_edited'],
+  raw: VoiceSession['transcript_raw'] | null | undefined
+): VoiceSession['transcript_raw'] {
+  return Array.isArray(edited) ? edited : (raw ?? []);
+}
+
+export async function persistTranscriptLines(
+  appointmentId: string,
+  lines: VoiceSession['transcript_raw']
+): Promise<void> {
+  const { error } = await supabase
+    .from('voice_sessions')
+    .update({ transcript_edited: lines, transcript_raw: lines })
+    .eq('appointment_id', appointmentId);
+
+  if (error) throw new Error(error.message);
+}
+
 export type ConsultationRecording = {
   id: string;
   appointment_id: string;
@@ -187,7 +206,7 @@ export async function persistRegeneratedTranscript(params: {
 }): Promise<void> {
   const { error: sessionError } = await supabase
     .from('voice_sessions')
-    .update({ transcript_raw: params.fullTranscript })
+    .update({ transcript_raw: params.fullTranscript, transcript_edited: params.fullTranscript })
     .eq('appointment_id', params.appointmentId);
 
   if (sessionError) throw new Error(sessionError.message);
@@ -228,9 +247,7 @@ export async function generateSoapFromAi(
     ? { transcript_raw: transcriptOverride, transcript_edited: null }
     : await getVoiceSession(appointmentId).catch(() => null);
 
-  const turns = voice?.transcript_edited?.length
-    ? voice.transcript_edited
-    : voice?.transcript_raw ?? [];
+  const turns = resolveTranscriptTurns(voice?.transcript_edited ?? null, voice?.transcript_raw);
 
   const transcriptText = turns.length ? transcriptToPlainText(turns) : '';
 

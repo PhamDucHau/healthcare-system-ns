@@ -9,7 +9,7 @@ import { vi } from 'date-fns/locale';
 import {
   Activity, AlertTriangle, Check, ChevronDown, ChevronUp,
   ClipboardList, Loader2, Lock, Save, Sparkles, X, Pencil,
-  Mic, StopCircle, Brain, Heart, TrendingUp,
+  Mic, StopCircle, Brain, Heart, TrendingUp, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -542,10 +542,24 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                         </p>
                       )}
                       {editor.transcript.map((line, idx) => (
-                        <div key={idx} className="space-y-1">
-                          <span className={`text-[10px] font-bold ${line.speaker === 'doctor' ? 'text-primary' : 'text-slate-600'}`}>
-                            {line.speaker === 'doctor' ? '🩺 BÁC SĨ' : '🧑 BỆNH NHÂN'}
-                          </span>
+                        <div key={idx} className="group/line space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[10px] font-bold ${line.speaker === 'doctor' ? 'text-primary' : 'text-slate-600'}`}>
+                              {line.speaker === 'doctor' ? '🩺 BÁC SĨ' : '🧑 BỆNH NHÂN'}
+                            </span>
+                            {!editor.isRecording && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Xóa dòng hội thoại"
+                                className="h-7 w-7 shrink-0 text-muted-foreground opacity-70 transition-colors group-hover/line:opacity-100 hover:!bg-primary hover:!text-white"
+                                onClick={() => void editor.removeTranscriptLine(idx)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                           {editor.isEditingTranscript ? (
                             <Textarea
                               value={line.text}
@@ -704,7 +718,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void editor.generateSoap()}>
+            <AlertDialogAction onClick={() => void editor.generateSoap(editor.transcript)}>
               Xác nhận ghi đè
             </AlertDialogAction>
           </AlertDialogFooter>
