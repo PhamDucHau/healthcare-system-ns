@@ -600,7 +600,7 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                   </div>
                 )}
 
-                {(editor.sttFallbackMode || editor.transcript.length === 0) && !editor.isRecording && (
+                {!editor.isRecording && (
                   <div className="space-y-2 border-t pt-3">
                     <p className="text-xs font-semibold text-muted-foreground">Nhập transcript thủ công</p>
                     <select
@@ -620,10 +620,10 @@ export default function SoapNoteEditor({ appointmentId, patient }: SoapNoteEdito
                     />
                     <Button
                       size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      disabled={!manualLine.trim()}
+                      variant="outline"
+                      className="w-full h-10 rounded-xl font-bold border-primary/20 text-primary shadow-sm transition-colors hover:!bg-primary hover:!text-white hover:!border-primary"
                       onClick={() => {
+                        if (!manualLine.trim()) return;
                         editor.addManualTranscriptLine(manualSpeaker, manualLine);
                         setManualLine('');
                       }}
