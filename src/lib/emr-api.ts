@@ -439,7 +439,7 @@ export type Icd10SearchResult = {
 };
 
 /**
- * Search ICD-10 via Module 5/6 /icd10/suggest API (primary), DB fallback when offline.
+ * Search ICD-10 via Module 5/6 /icd10/rag API (primary), DB fallback when offline.
  */
 export async function searchIcd10(query: string): Promise<Icd10SearchResult[]> {
   if (!query || query.trim().length < 2) return [];
@@ -487,7 +487,7 @@ async function searchIcd10Local(query: string): Promise<Icd10SearchResult[]> {
 }
 
 /**
- * AI ICD-10 suggestions via Module 5/6 backend (/icd10/suggest)
+ * AI ICD-10 suggestions via Module 5/6 backend (/icd10/rag)
  */
 export async function getAiIcdSuggestions(
   sText: string,

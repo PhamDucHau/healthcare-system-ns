@@ -236,7 +236,7 @@ export async function suggestIcd10(params: {
   symptomsDenied?: string[];
   recentTranscript?: string;
 }): Promise<{ icd10: Icd10Suggestion[]; summary?: string }> {
-  return sttFetch('/icd10/suggest', {
+  return sttFetch('/icd10/rag', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
