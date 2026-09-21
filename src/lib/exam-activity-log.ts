@@ -273,3 +273,67 @@ export function snapshotFromExamFields(fields: {
     p_text: fields.p_text ?? null,
   };
 }
+
+export type VersionedActivityEntry = {
+  id: string;
+  version: number;
+  action: ExamActivityAction;
+  actor_name: string | null;
+  created_at: string;
+  changed_fields: SoapChangedField[];
+  soap_snapshot: SoapNoteSnapshot | null;
+  is_current: boolean;
+};
+
+export function computeVersionNumbers<T extends { created_at: string; action: ExamActivityAction }>(
+  events: T[]
+): (T & { version: number; is_current: boolean })[] {
+  const sorted = [...events].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return sorted.map((event, index) => ({
+    ...event,
+    version: index + 1,
+    is_current: index === sorted.length - 1,
+  }));
+}
+
+export function countChangedFields(changedFields: SoapChangedField[]): number {
+  return changedFields.length;
+}
+
+export function countUnchangedFields(changedFields: SoapChangedField[]): number {
+  return SOAP_FIELDS.length - changedFields.length;
+}
+
+export const VERSION_ACTION_LABELS: Record<ExamActivityAction, string> = {
+  AI_GENERATED: 'Tạo mới',
+  UPDATED: 'Chỉnh sửa',
+  SIGNED: 'Ký xác nhận',
+  ADDENDUM_CREATED: 'Phiếu bổ sung',
+};
+
+/** Build newest-first version rows from activity logs (no snapshots). */
+export function activityLogsToVersionHistory(
+  logs: Array<{
+    id: string;
+    action: ExamActivityAction;
+    actor_name: string | null;
+    created_at: string;
+    changed_fields: SoapChangedField[];
+  }>
+): VersionedActivityEntry[] {
+  if (logs.length === 0) return [];
+
+  const numbered = computeVersionNumbers(logs);
+  return numbered
+    .map((entry) => ({
+      id: entry.id,
+      version: entry.version,
+      action: entry.action,
+      actor_name: entry.actor_name,
+      created_at: entry.created_at,
+      changed_fields: entry.changed_fields,
+      soap_snapshot: null,
+      is_current: entry.is_current,
+    }))
+    .sort((a, b) => b.version - a.version);
+}

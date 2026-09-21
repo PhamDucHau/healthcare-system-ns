@@ -30,11 +30,11 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE_WALKIN: 'bg-green-100 text-green-700',
-  CHECKIN: 'bg-blue-100 text-blue-700',
-  CANCEL: 'bg-red-100 text-red-700',
-  RESCHEDULE: 'bg-yellow-100 text-yellow-700',
-  BULK_CANCEL: 'bg-red-100 text-red-700',
+  CREATE_WALKIN: 'bg-green-50 text-green-700 border border-green-200',
+  CHECKIN: 'bg-blue-50 text-blue-700 border border-blue-200',
+  CANCEL: 'bg-red-50 text-red-700 border border-red-200',
+  RESCHEDULE: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+  BULK_CANCEL: 'bg-red-50 text-red-700 border border-red-200',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -214,7 +214,7 @@ export default function DoctorMedicalHistoryTab({
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
             placeholder={searchPlaceholder}
-            className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full bg-background border border-border/50 rounded-lg py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
@@ -223,8 +223,8 @@ export default function DoctorMedicalHistoryTab({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className={`p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors ${
-                    filterAction ? 'border-primary text-primary bg-accent/20' : ''
+                  className={`p-2 rounded-lg border border-border/50 text-muted-foreground hover:bg-muted transition-colors ${
+                    filterAction ? 'border-primary/50 text-primary bg-accent/20' : ''
                   }`}
                   title="Lọc theo hành động"
                 >
@@ -256,7 +256,7 @@ export default function DoctorMedicalHistoryTab({
               type="button"
               onClick={handleExport}
               disabled={total === 0 || exporting}
-              className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+              className="p-2 rounded-lg border border-border/50 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
               title="Xuất CSV"
             >
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -305,7 +305,7 @@ export default function DoctorMedicalHistoryTab({
                 <button
                   type="button"
                   onClick={() => setDetailId(e.appointment_id)}
-                  className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
                 >
                   Xem chi tiết
                   <ChevronRight className="h-3 w-3" />
@@ -365,7 +365,7 @@ export default function DoctorMedicalHistoryTab({
                       <button
                         type="button"
                         onClick={() => setDetailId(e.appointment_id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
                       >
                         Xem chi tiết
                         <ChevronRight className="h-3 w-3" />
@@ -387,7 +387,7 @@ export default function DoctorMedicalHistoryTab({
                   type="button"
                   disabled={safePage <= 1}
                   onClick={() => onQueryChange({ page: safePage - 1 })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border/50 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -404,7 +404,7 @@ export default function DoctorMedicalHistoryTab({
                       className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
                         n === safePage
                           ? 'bg-primary text-primary-foreground'
-                          : 'border border-border text-muted-foreground hover:bg-muted'
+                          : 'border border-border/50 text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       {n}
@@ -415,7 +415,7 @@ export default function DoctorMedicalHistoryTab({
                   type="button"
                   disabled={safePage >= totalPages}
                   onClick={() => onQueryChange({ page: safePage + 1 })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border/50 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>

@@ -11,6 +11,7 @@ import {
   type ExamActivityAction,
   type ExamActivityLogEntry,
   type SoapNoteSnapshot,
+  type SoapChangedField,
 } from '@/lib/exam-activity-log';
 import type { AiAccuracyDoctorRow, AiAccuracySoapRow } from '@/lib/ai-accuracy-stats';
 import {
@@ -295,6 +296,53 @@ export async function listExaminationActivityLog(
     changed_fields?: unknown;
     related_exam_id?: string | null;
   }>).map(toExamActivityLogEntry);
+}
+
+export type ExamVersionHistoryEntry = {
+  id: string;
+  version: number;
+  action: ExamActivityAction;
+  actor_name: string | null;
+  created_at: string;
+  changed_fields: SoapChangedField[];
+  soap_snapshot: SoapNoteSnapshot | null;
+  is_current: boolean;
+};
+
+export async function getExaminationVersionHistory(
+  examId: string
+): Promise<ExamVersionHistoryEntry[]> {
+  const { data, error } = await supabase.rpc('get_examination_version_history', {
+    p_exam_id: examId,
+  });
+  if (error) throw new Error(mapEmrError(error.message));
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    version: number;
+    action: string;
+    actor_name: string | null;
+    created_at: string;
+    changed_fields: string[] | null;
+    soap_snapshot: unknown;
+    is_current: boolean;
+  }>;
+
+  const results: ExamVersionHistoryEntry[] = [];
+  for (const row of rows) {
+    const soapSnapshot = await decryptSoapSnapshot(row.soap_snapshot);
+    results.push({
+      id: row.id,
+      version: row.version,
+      action: row.action as ExamActivityAction,
+      actor_name: row.actor_name,
+      created_at: row.created_at,
+      changed_fields: (row.changed_fields ?? []) as SoapChangedField[],
+      soap_snapshot: soapSnapshot,
+      is_current: row.is_current,
+    });
+  }
+  return results;
 }
 
 export async function listExamAddenda(parentExamId: string): Promise<MedicalExamination[]> {
