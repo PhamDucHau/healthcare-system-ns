@@ -776,6 +776,53 @@ export async function createExamAddendum(
   return data as string;
 }
 
+/**
+ * Sign (lock) an addendum with doctor PIN verification (TC-DLS-016).
+ */
+export async function signAddendum(params: {
+  addendumId: string;
+  pinPlain: string;
+  responsibilityAck: boolean;
+}): Promise<SignExaminationResult> {
+  const { data, error } = await supabase.rpc('sign_exam_addendum', {
+    p_addendum_id: params.addendumId,
+    p_pin_plain: params.pinPlain?.trim() || null,
+    p_responsibility_ack: params.responsibilityAck,
+    p_ip_address: null,
+    p_user_agent: navigator.userAgent,
+  });
+
+  if (error) throw new Error(mapEmrError(error.message));
+
+  const rows = data as {
+    addendum_id: string | null;
+    sig_id: string | null;
+    data_hash: string | null;
+    error_code?: string | null;
+    attempts_remaining?: number | null;
+  }[] | null;
+
+  if (!rows || rows.length === 0) throw new Error('Không nhận được kết quả ký');
+
+  const row = rows[0];
+  if (row.error_code) {
+    if (row.error_code === 'PIN_INVALID' && row.attempts_remaining != null) {
+      throw new Error(formatPinInvalidMessage(Number(row.attempts_remaining)));
+    }
+    throw new Error(mapEmrError(row.error_code));
+  }
+
+  if (!row.addendum_id || !row.sig_id || !row.data_hash) {
+    throw new Error('Không nhận được kết quả ký');
+  }
+
+  return {
+    exam_id: String(row.addendum_id),
+    sig_id: String(row.sig_id),
+    data_hash: String(row.data_hash),
+  };
+}
+
 export async function saveSoapAiBaseline(
   examId: string,
   baseline: { s_text: string; o_text: string; a_text: string; p_text: string }

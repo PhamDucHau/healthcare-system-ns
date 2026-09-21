@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { FilePlus, Loader2 } from 'lucide-react';
+import { FilePlus, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { createExamAddendum, listExamAddenda } from '@/lib/emr-api';
+import { createExamAddendum, listExamAddenda, signAddendum } from '@/lib/emr-api';
 import { EXAM_STATUS_LABELS } from '@/types/emr';
 import type { MedicalExamination } from '@/types/emr';
+import AddendumSignOffDialog from './AddendumSignOffDialog';
 
 type ExamAddendumFormProps = {
   examId: string;
@@ -21,6 +22,7 @@ export default function ExamAddendumForm({ examId, onCreated }: ExamAddendumForm
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [addenda, setAddenda] = useState<MedicalExamination[]>([]);
+  const [signDialogOpen, setSignDialogOpen] = useState(false);
 
   const loadAddenda = useCallback(async () => {
     try {
@@ -36,22 +38,36 @@ export default function ExamAddendumForm({ examId, onCreated }: ExamAddendumForm
 
   const canSave = reason.trim().length > 0 && content.trim().length > 0;
 
-  const handleSave = async () => {
+  const handleSaveClick = () => {
     if (!canSave) return;
+    setSignDialogOpen(true);
+  };
+
+  const handleSign = async (pin: string, ack: boolean): Promise<string | null> => {
     setSaving(true);
     try {
-      await createExamAddendum(examId, {
+      const addendumId = await createExamAddendum(examId, {
         s_text: content.trim(),
         reason: reason.trim(),
       });
+
+      await signAddendum({
+        addendumId,
+        pinPlain: pin,
+        responsibilityAck: ack,
+      });
+
+      toast.success('Đã lưu và ký xác nhận phiếu bổ sung.');
+      setSignDialogOpen(false);
       setOpen(false);
       setReason('');
       setContent('');
-      toast.success('Đã tạo phiếu bổ sung.');
       await loadAddenda();
       onCreated?.();
+      return null;
     } catch (e) {
-      toast.error((e as Error).message || 'Không tạo được phiếu bổ sung.');
+      const message = (e as Error).message || 'Không lưu được phiếu bổ sung.';
+      return message;
     } finally {
       setSaving(false);
     }
@@ -79,7 +95,7 @@ export default function ExamAddendumForm({ examId, onCreated }: ExamAddendumForm
             rows={3}
             className="text-sm"
           />
-          <Button size="sm" disabled={saving || !canSave} onClick={() => void handleSave()}>
+          <Button size="sm" disabled={saving || !canSave} onClick={handleSaveClick}>
             {saving && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
             Lưu phiếu bổ sung
           </Button>
@@ -98,9 +114,16 @@ export default function ExamAddendumForm({ examId, onCreated }: ExamAddendumForm
                   Phiếu {index + 1}
                 </p>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px]">
-                    {EXAM_STATUS_LABELS[row.status] ?? row.status}
-                  </Badge>
+                  {row.status === 'LOCKED' ? (
+                    <Badge variant="default" className="text-[10px] bg-green-600 hover:bg-green-600 gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      ĐÃ KÝ XÁC NHẬN
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">
+                      {EXAM_STATUS_LABELS[row.status] ?? row.status}
+                    </Badge>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {format(parseISO(row.created_at), "dd/MM/yyyy HH:mm", { locale: vi })}
                   </span>
@@ -114,10 +137,17 @@ export default function ExamAddendumForm({ examId, onCreated }: ExamAddendumForm
               {row.s_text && (
                 <p className="text-sm whitespace-pre-wrap">{row.s_text}</p>
               )}
-            </div>
+                          </div>
           ))}
         </div>
       )}
+
+      <AddendumSignOffDialog
+        open={signDialogOpen}
+        onClose={() => setSignDialogOpen(false)}
+        onSign={handleSign}
+        pendingContent={{ reason, content }}
+      />
     </div>
   );
 }
