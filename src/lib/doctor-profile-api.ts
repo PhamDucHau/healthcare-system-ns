@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { setDoctorPin } from '@/lib/emr-api';
+import { decrypt } from '@/lib/crypto';
 
 export type DoctorProfile = {
   user_id: string;
@@ -20,7 +21,11 @@ export type DoctorProfile = {
 export async function getMyDoctorProfile(): Promise<DoctorProfile> {
   const { data, error } = await supabase.rpc('get_my_doctor_profile');
   if (error) throw new Error(error.message);
-  return data as DoctorProfile;
+  const profile = data as DoctorProfile;
+  if (profile.phone) {
+    profile.phone = await decrypt(profile.phone);
+  }
+  return profile;
 }
 
 export async function updateMyDoctorPin(newPin: string): Promise<void> {

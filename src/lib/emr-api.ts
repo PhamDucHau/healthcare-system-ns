@@ -307,6 +307,9 @@ export type ExamVersionHistoryEntry = {
   changed_fields: SoapChangedField[];
   soap_snapshot: SoapNoteSnapshot | null;
   is_current: boolean;
+  related_exam_id: string | null;
+  addendum_reason: string | null;
+  addendum_soap_snapshot: SoapNoteSnapshot | null;
 };
 
 export async function getExaminationVersionHistory(
@@ -326,11 +329,17 @@ export async function getExaminationVersionHistory(
     changed_fields: string[] | null;
     soap_snapshot: unknown;
     is_current: boolean;
+    related_exam_id: string | null;
+    addendum_reason: string | null;
+    addendum_soap_snapshot: unknown;
   }>;
 
   const results: ExamVersionHistoryEntry[] = [];
   for (const row of rows) {
     const soapSnapshot = await decryptSoapSnapshot(row.soap_snapshot);
+    const addendumSoapSnapshot = row.addendum_soap_snapshot
+      ? await decryptSoapSnapshot(row.addendum_soap_snapshot)
+      : null;
     results.push({
       id: row.id,
       version: row.version,
@@ -340,6 +349,9 @@ export async function getExaminationVersionHistory(
       changed_fields: (row.changed_fields ?? []) as SoapChangedField[],
       soap_snapshot: soapSnapshot,
       is_current: row.is_current,
+      related_exam_id: row.related_exam_id ?? null,
+      addendum_reason: row.addendum_reason ?? null,
+      addendum_soap_snapshot: addendumSoapSnapshot,
     });
   }
   return results;

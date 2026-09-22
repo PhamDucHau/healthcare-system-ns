@@ -86,6 +86,9 @@ export default function SoapVersionDiff({
       ? `Bác sĩ ${currentVersion.actor_name}`
       : 'Bác sĩ';
 
+  const isAddendum = currentVersion.action === 'ADDENDUM_CREATED';
+  const hasAddendumDetails = isAddendum && (currentVersion.addendum_reason || currentVersion.addendum_soap_snapshot);
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -94,6 +97,45 @@ export default function SoapVersionDiff({
           Chi tiết Phiên bản {currentVersion.version}
         </h3>
       </div>
+
+      {/* Addendum Details Section */}
+      {hasAddendumDetails && (
+        <div className="bg-violet-50 border-2 border-violet-200 rounded-xl p-5 space-y-4">
+          <h4 className="text-sm font-bold text-violet-800 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Thông tin phiếu bổ sung
+          </h4>
+
+          {currentVersion.addendum_reason && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-violet-700">Lý do tạo phiếu bổ sung:</p>
+              <p className="text-sm text-violet-900 bg-white rounded-lg p-3 border border-violet-200">
+                {currentVersion.addendum_reason}
+              </p>
+            </div>
+          )}
+
+          {currentVersion.addendum_soap_snapshot && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-violet-700">Nội dung phiếu bổ sung:</p>
+              <div className="bg-white rounded-lg border border-violet-200 divide-y divide-violet-100">
+                {SOAP_SECTIONS.map((section) => {
+                  const value = currentVersion.addendum_soap_snapshot?.[section.field];
+                  if (!value?.trim()) return null;
+                  return (
+                    <div key={section.field} className="p-3">
+                      <p className="text-xs font-semibold text-violet-700 mb-1">{section.label}</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{value}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {hasNoSnapshots ? (
         <div className="bg-white rounded-xl p-8 text-center border border-border shadow-sm">

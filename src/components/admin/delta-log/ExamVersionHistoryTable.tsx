@@ -116,12 +116,19 @@ export default function ExamVersionHistoryTable({
                     </span>
                   </TableCell>
                   <TableCell className={CELL}>
-                    <Badge
-                      variant="outline"
-                      className={`inline-flex h-7 items-center px-2.5 text-xs font-medium rounded-md ${ACTION_CLASS[version.action]}`}
-                    >
-                      {VERSION_ACTION_LABELS[version.action]}
-                    </Badge>
+                    <div className="space-y-1">
+                      <Badge
+                        variant="outline"
+                        className={`inline-flex h-7 items-center px-2.5 text-xs font-medium rounded-md ${ACTION_CLASS[version.action]}`}
+                      >
+                        {VERSION_ACTION_LABELS[version.action]}
+                      </Badge>
+                      {version.action === 'ADDENDUM_CREATED' && version.addendum_reason && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[180px]" title={version.addendum_reason}>
+                          ↳ {version.addendum_reason}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className={`${CELL} text-sm text-muted-foreground`}>
                     {version.action === 'AI_GENERATED' || version.action === 'SIGNED'

@@ -177,7 +177,7 @@ export default function AppointmentDetailDialog({ appointmentId, open, onOpenCha
         const sp = appt.specialties as { name: string } | null;
         const sl = appt.appointment_slots as { slot_date: string; start_time: string; end_time: string; doctor_id: string | null; user_profiles: { full_name: string } | null } | null;
 
-        const patientName = pt ? [pt.legal_first_name, pt.legal_last_name].filter(Boolean).join(' ') : null;
+        const patientName = pt ? [pt.legal_last_name, pt.legal_first_name].filter(Boolean).join(' ') : null;
         const scheduledTime = sl?.slot_date && sl?.start_time
           ? `${sl.slot_date}T${sl.start_time}`
           : appt.created_at;
