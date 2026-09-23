@@ -91,25 +91,21 @@ export default function ExamComprehensiveLogDialog({ open, onOpenChange, events 
                   <div className="mt-2 space-y-2">
                     <SoapLine
                       field="s_text"
-                      label="S"
                       content={event.soap.s_text}
                       changed={event.changed_fields.includes('s_text')}
                     />
                     <SoapLine
                       field="o_text"
-                      label="O"
                       content={event.soap.o_text}
                       changed={event.changed_fields.includes('o_text')}
                     />
                     <SoapLine
                       field="a_text"
-                      label="A"
                       content={event.soap.a_text}
                       changed={event.changed_fields.includes('a_text')}
                     />
                     <SoapLine
                       field="p_text"
-                      label="P"
                       content={event.soap.p_text}
                       changed={event.changed_fields.includes('p_text')}
                     />
@@ -126,12 +122,11 @@ export default function ExamComprehensiveLogDialog({ open, onOpenChange, events 
 
 function SoapLine({
   field,
-  label,
   content,
   changed,
 }: {
   field: SoapChangedField;
-  label: string;
+  label?: string;
   content: string | null;
   changed: boolean;
 }) {
@@ -142,9 +137,6 @@ function SoapLine({
       data-changed={changed ? 'true' : 'false'}
       className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2"
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">
-        {label}{changed ? ' · Đã sửa' : ''}
-      </p>
       <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
     </div>
   );
