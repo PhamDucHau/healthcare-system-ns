@@ -208,6 +208,31 @@ export function maskSensitiveData(
   }
 }
 
+/**
+ * Mask email for display: t•••••••3@gmail.com
+ */
+export function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return '—';
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) {
+    return `${local[0] || ''}${'•'.repeat(6)}@${domain}`;
+  }
+  return `${local[0]}${'•'.repeat(Math.min(local.length - 2, 7))}${local.slice(-1)}@${domain}`;
+}
+
+/**
+ * Mask date of birth for display: ••/••/1994
+ */
+export function maskDob(dob: string): string {
+  if (!dob) return '—';
+  // Handle various date formats
+  const match = dob.match(/(\d{4})/);
+  if (match) {
+    return `••/••/${match[1]}`;
+  }
+  return '••/••/••••';
+}
+
 // Sensitive field definitions for the healthcare system (ISO 27799 & HL7 FHIR)
 export const SENSITIVE_FIELDS = {
   // Patient identifiers (PII)

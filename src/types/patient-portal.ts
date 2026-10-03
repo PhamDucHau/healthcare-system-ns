@@ -32,6 +32,10 @@ export type PatientPortalDetail = {
   id_document_back_storage_path: string | null;
   card_front_storage_path: string | null;
   avatar_storage_path: string | null;
+  delivery_address: string | null;
+  delivery_recipient_name: string | null;
+  delivery_recipient_phone: string | null;
+  delivery_notes: string | null;
   submitted_at: string | null;
   updated_at: string | null;
   consent_accepted: boolean;
@@ -159,6 +163,10 @@ export function mapPatientPortalRow(row: Record<string, unknown>): PatientPortal
     id_document_back_storage_path: row.id_document_back_storage_path != null ? String(row.id_document_back_storage_path) : null,
     card_front_storage_path: row.card_front_storage_path != null ? String(row.card_front_storage_path) : null,
     avatar_storage_path: row.avatar_storage_path != null ? String(row.avatar_storage_path) : null,
+    delivery_address: row.delivery_address != null ? String(row.delivery_address) : null,
+    delivery_recipient_name: row.delivery_recipient_name != null ? String(row.delivery_recipient_name) : null,
+    delivery_recipient_phone: row.delivery_recipient_phone != null ? String(row.delivery_recipient_phone) : null,
+    delivery_notes: row.delivery_notes != null ? String(row.delivery_notes) : null,
     submitted_at: row.submitted_at != null ? String(row.submitted_at) : null,
     updated_at: row.updated_at != null ? String(row.updated_at) : null,
     consent_accepted: Boolean(row.consent_accepted),
