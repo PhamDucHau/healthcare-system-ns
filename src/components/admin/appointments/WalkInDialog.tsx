@@ -189,7 +189,7 @@ export default function WalkInDialog({
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{p.patient_name || "—"}</p>
                           <p className="text-xs text-muted-foreground">
-                            {[p.phone_number, p.id_number].filter(Boolean).join(" · ") || "Không có thông tin liên hệ"}
+                            {p.phone_number || "Không có thông tin liên hệ"}
                           </p>
                         </div>
                       </button>
@@ -220,7 +220,7 @@ export default function WalkInDialog({
                 <div>
                   <p className="text-sm font-medium text-green-900">{selectedPatient.patient_name}</p>
                   <p className="text-xs text-green-700">
-                    {[selectedPatient.phone_number, selectedPatient.id_number].filter(Boolean).join(" · ") || "Hồ sơ mới"}
+                    {selectedPatient.phone_number || "Hồ sơ mới"}
                   </p>
                 </div>
                 <Button

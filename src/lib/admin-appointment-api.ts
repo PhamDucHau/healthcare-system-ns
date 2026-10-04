@@ -249,15 +249,20 @@ export async function fetchAllPatients(): Promise<PatientSearchResult[]> {
 
   if (error) throw new Error(mapAdminError(error.message));
 
-  return (data ?? []).map((r) => ({
-    profile_id:    r.id,
-    patient_id:    r.user_id,
-    patient_name:  [r.legal_last_name, r.legal_first_name].filter(Boolean).join(" "),
-    phone_number:  r.phone_number  ?? null,
-    id_number:     r.id_number     ?? null,
-    date_of_birth: r.date_of_birth ?? null,
-    submitted_at:  r.submitted_at  ?? null,
-  })) as PatientSearchResult[];
+  // Decrypt sensitive fields (phone_number, id_number) before returning
+  const decrypted = await Promise.all(
+    (data ?? []).map(async (r) => ({
+      profile_id:    r.id,
+      patient_id:    r.user_id,
+      patient_name:  [r.legal_last_name, r.legal_first_name].filter(Boolean).join(" "),
+      phone_number:  r.phone_number ? await decrypt(r.phone_number) : null,
+      id_number:     r.id_number    ? await decrypt(r.id_number)    : null,
+      date_of_birth: r.date_of_birth ?? null,
+      submitted_at:  r.submitted_at  ?? null,
+    }))
+  );
+
+  return decrypted as PatientSearchResult[];
 }
 
 // ─── Search patients (client-side filter on top of fetchAllPatients) ──────────
