@@ -1,21 +1,78 @@
-import { User, Calendar, ClipboardCheck, Heart, Activity, Moon, Brain } from "lucide-react";
-import { Link } from "react-router-dom";
+import {
+  Calendar,
+  CalendarPlus,
+  ClipboardList,
+  FlaskConical,
+  Heart,
+  Hospital,
+  MessageCircle,
+  Pill,
+  User,
+} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyPatientProfile } from "@/hooks/useMyPatientProfile";
-
-const dashboardItems = [
-  { icon: User, title: "Tài khoản", subtitle: "Hồ sơ & Bảo mật", path: "/account", iconBg: "bg-accent", iconColor: "text-primary" },
-  { icon: Calendar, title: "Lịch hẹn", subtitle: "Xem lịch khám", path: "/appointments", iconBg: "bg-accent", iconColor: "text-primary" },
-  { icon: ClipboardCheck, title: "Đánh giá", subtitle: "Kiểm tra sức khỏe", path: "/", iconBg: "bg-muted", iconColor: "text-muted-foreground" },
-];
-
-const wellnessStats = [
-  { label: "Hoạt động", value: "12.4k", sub: "Bước hôm nay", icon: Activity },
-  { label: "Giấc ngủ", value: "7g 42p", sub: "Phục hồi sâu", icon: Moon },
-  { label: "Tập trung", value: "Tốt", sub: "Chỉ số sinh hiệu", icon: Brain },
-];
-
 import { greetingForHour } from "@/lib/greeting";
+
+type QuickActionCard = {
+  icon: React.ElementType;
+  title: string;
+  subtitle: string;
+  path: string;
+  bgColor: string;
+  iconBgColor: string;
+};
+
+const QUICK_ACTIONS: QuickActionCard[] = [
+  {
+    icon: User,
+    title: "Tài khoản",
+    subtitle: "Hồ sơ cá nhân & CCCD",
+    path: "/account/personal",
+    bgColor: "bg-slate-100",
+    iconBgColor: "bg-blue-900",
+  },
+  {
+    icon: Calendar,
+    title: "Lịch hẹn",
+    subtitle: "Lịch khám tại phòng khám",
+    path: "/appointments",
+    bgColor: "bg-purple-100",
+    iconBgColor: "bg-purple-700",
+  },
+  {
+    icon: ClipboardList,
+    title: "Khai báo y tế",
+    subtitle: "Phiếu y tế ban đầu",
+    path: "/health-declaration",
+    bgColor: "bg-slate-50",
+    iconBgColor: "bg-emerald-600",
+  },
+  {
+    icon: FlaskConical,
+    title: "Xét nghiệm",
+    subtitle: "Tra cứu kết quả & tải PDF",
+    path: "/labs",
+    bgColor: "bg-sky-100",
+    iconBgColor: "bg-sky-600",
+  },
+  {
+    icon: Pill,
+    title: "Đơn thuốc",
+    subtitle: "Theo dõi & yêu cầu tái cấp",
+    path: "/prescriptions",
+    bgColor: "bg-pink-100",
+    iconBgColor: "bg-pink-700",
+  },
+  {
+    icon: MessageCircle,
+    title: "Tin nhắn",
+    subtitle: "Tư vấn bảo mật với Bác sĩ",
+    path: "/messages",
+    bgColor: "bg-amber-100",
+    iconBgColor: "bg-amber-600",
+  },
+];
 
 function displayNameFromSources(
   profileName: string | null | undefined,
@@ -35,6 +92,7 @@ function displayNameFromSources(
 }
 
 const HomeContent = () => {
+  const navigate = useNavigate();
   const { session } = useAuth();
   const { data: profile } = useMyPatientProfile();
 
@@ -45,83 +103,155 @@ const HomeContent = () => {
       : null,
     session?.user?.email,
   );
+
+  const initials = patientName
+    .split(" ")
+    .map((w: string) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   const greeting = greetingForHour(new Date().getHours());
 
   return (
-    <main className="flex-1 overflow-y-auto p-4 md:p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Hero */}
-        <div className="rounded-2xl bg-gradient-to-r from-accent to-accent/40 p-6 md:p-10 mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
-            {greeting}, <span className="text-primary">{patientName}!</span>
-          </h1>
-          <p className="text-muted-foreground text-sm md:text-base max-w-xl">
-            Hồ sơ sức khỏe của bạn đã được cập nhật. Khám phá các tính năng cá nhân hóa hoặc đặt lịch tư vấn với đội ngũ chăm sóc của chúng tôi.
-          </p>
-        </div>
-
-        {/* Health Dashboard */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold text-foreground">Bảng theo dõi sức khỏe</h2>
-            <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-              Tất cả hệ thống hoạt động
-              <span className="h-2 w-2 rounded-full bg-success" />
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {dashboardItems.map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={idx}
-                  to={item.path}
-                  className="rounded-xl border bg-card p-5 hover:shadow-md transition-shadow"
-                >
-                  <div className={`h-10 w-10 rounded-xl ${item.iconBg} flex items-center justify-center mb-3`}>
-                    <Icon className={`h-5 w-5 ${item.iconColor}`} />
-                  </div>
-                  <p className="text-sm font-bold text-foreground">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Journey Progress */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+    <main className="flex-1 overflow-y-auto p-8 lg:p-9 bg-[#F8FAFC]">
+      <div className="max-w-[1240px] mx-auto">
+        {/* Greeting */}
+        <div className="flex items-center justify-between mb-7">
           <div>
-            <h2 className="text-lg font-bold text-foreground mb-1">Tiến trình của bạn</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Chúng tôi theo dõi mục tiêu sức khỏe hàng ngày và các nhiệm vụ lâm sàng để giúp bạn luôn trên đà phục hồi tốt nhất.
+            <h1 className="text-[28px] font-bold text-slate-800 tracking-tight">
+              {greeting}, {patientName}! 👋
+            </h1>
+            <p className="text-slate-500 text-base mt-0.5">
+              Chào mừng bạn trở lại với Cổng thông tin chăm sóc sức khỏe phòng khám RCARE.
             </p>
           </div>
-          <div className="rounded-xl border bg-card p-6 text-center flex flex-col items-center justify-center">
-            <div className="h-14 w-14 rounded-full bg-accent flex items-center justify-center mb-3">
-              <Heart className="h-7 w-7 text-primary" />
-            </div>
-            <p className="text-sm font-bold text-foreground mb-1">Bạn đã hoàn thành tất cả!</p>
-            <p className="text-xs text-muted-foreground mb-4">Hiện tại không có nhiệm vụ nào</p>
-            <button className="rounded-lg border px-5 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors">
-              Xem lịch sử
-            </button>
+          <div className="w-[50px] h-[50px] rounded-full bg-sky-600 flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-[17px] font-bold">{initials}</span>
           </div>
         </div>
 
-        {/* Wellness Stats Banner */}
-        <div className="rounded-2xl bg-gradient-to-br from-foreground/80 to-foreground overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 to-foreground/40" />
-          <div className="relative p-6 md:p-8">
-            <div className="grid grid-cols-3 gap-4">
-              {wellnessStats.map((stat, idx) => (
-                <div key={idx} className="rounded-xl bg-card/10 backdrop-blur-sm p-4 border border-card/10">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-card/70 mb-1">{stat.label}</p>
-                  <p className="text-xl md:text-2xl font-bold text-card">{stat.value}</p>
-                  <p className="text-xs text-card/60">{stat.sub}</p>
+        {/* Quick Action Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.path}
+                to={action.path}
+                className={`${action.bgColor} rounded-[18px] p-6 flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg border border-transparent select-none`}
+              >
+                <div
+                  className={`w-14 h-14 rounded-full ${action.iconBgColor} flex items-center justify-center mb-3.5 shadow-md transition-transform hover:scale-[1.08]`}
+                >
+                  <Icon className="h-6 w-6 text-white" />
                 </div>
-              ))}
+                <div className="text-[17px] font-bold text-slate-800 mb-1">{action.title}</div>
+                <div className="text-sm text-slate-500">{action.subtitle}</div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Split Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-7">
+          {/* Left: Hero All Done Card */}
+          <div className="bg-white border border-slate-200 rounded-[18px] p-9 text-center flex flex-col items-center justify-center shadow-sm">
+            {/* Heart Bubble Graphic */}
+            <div className="relative w-[100px] h-[100px] flex items-center justify-center mb-5">
+              <div className="absolute w-[82px] h-[82px] bg-pink-100 rounded-full top-0 left-2.5" />
+              <div className="absolute w-12 h-12 bg-sky-100 rounded-full -bottom-1 -left-2" />
+              <Heart className="relative z-10 h-[38px] w-[38px] text-slate-800" />
+            </div>
+
+            <h2 className="text-[22px] font-bold text-slate-800 mb-1.5">
+              Mọi thứ đã hoàn tất!
+            </h2>
+            <p className="text-base text-slate-500 mb-6 max-w-[440px]">
+              Hiện tại bạn không có nhiệm vụ khẩn cấp nào. Hãy đặt lịch khám định kỳ trực tiếp tại phòng khám khi cần.
+            </p>
+
+            <div className="flex gap-3 flex-wrap justify-center">
+              <button
+                onClick={() => navigate("/appointments/book")}
+                className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-full text-base font-semibold transition-all hover:-translate-y-0.5"
+              >
+                <CalendarPlus className="h-4 w-4" />
+                Đặt lịch hẹn khám
+              </button>
+              <button
+                onClick={() => navigate("/health-declaration")}
+                className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3 rounded-full text-base font-semibold transition-colors"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Khai báo y tế
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column Widgets */}
+          <div className="flex flex-col gap-5">
+            {/* Vitals Widget */}
+            <div className="bg-white border border-slate-200 rounded-[18px] p-[22px] shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-base font-bold text-slate-800">Chỉ số sinh hiệu gần nhất</h3>
+                <Link
+                  to="/account/vitals"
+                  className="text-sm text-sky-600 font-semibold hover:underline"
+                >
+                  Xem tất cả
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-200 rounded-[10px] p-3">
+                  <div className="text-[13px] text-slate-500 font-semibold">Huyết áp</div>
+                  <div className="text-lg font-extrabold text-slate-800">
+                    118/78 <span className="text-xs text-slate-500 font-normal">mmHg</span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-[10px] p-3">
+                  <div className="text-[13px] text-slate-500 font-semibold">Nhịp tim</div>
+                  <div className="text-lg font-extrabold text-slate-800">
+                    72 <span className="text-xs text-slate-500 font-normal">bpm</span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-[10px] p-3">
+                  <div className="text-[13px] text-slate-500 font-semibold">Cân nặng</div>
+                  <div className="text-lg font-extrabold text-slate-800">
+                    68.5 <span className="text-xs text-slate-500 font-normal">kg</span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-[10px] p-3">
+                  <div className="text-[13px] text-slate-500 font-semibold">Chỉ số BMI</div>
+                  <div className="text-lg font-extrabold text-emerald-600">
+                    23.15 <span className="text-xs">(Chuẩn)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Upcoming Appointment Widget */}
+            <div className="bg-white border border-slate-200 border-l-[5px] border-l-teal-600 rounded-[18px] p-[22px] shadow-sm">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-teal-600 uppercase mb-1.5">
+                <Hospital className="h-3.5 w-3.5" />
+                KHÁM TRỰC TIẾP TẠI PHÒNG KHÁM
+              </div>
+              <h3 className="text-[16.5px] font-bold text-slate-800 mb-1">
+                Tái khám PrEP 3 tháng & Xét nghiệm máu
+              </h3>
+              <p className="text-sm text-slate-500 mb-3">
+                BS. CKII Nguyễn Hữu Tâm · Phòng khám RCARE Quận 3
+              </p>
+              <div className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                <span className="text-teal-600">🕐</span>
+                14:30 - Thứ Năm, 15/09/2026
+              </div>
+              <button
+                onClick={() => navigate("/appointments")}
+                className="w-full py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full text-sm font-semibold transition-colors"
+              >
+                Xem chi tiết lịch hẹn
+              </button>
             </div>
           </div>
         </div>

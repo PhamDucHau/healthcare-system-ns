@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, Stethoscope, User, CalendarCheck, ClipboardList } from 'lucide-react';
 import TopNav from '@/components/TopNav';
 import Sidebar from '@/components/Sidebar';
 import BookingStep1 from '@/components/patient/booking/BookingStep1';
@@ -14,13 +14,30 @@ import {
   fetchPatientProfile,
 } from '@/lib/appointment-api';
 
+type Doctor = {
+  id: string;
+  name: string;
+  title: string;
+  specialties: string;
+  location: string;
+  nextAvailable: string;
+  avatarColor: string;
+  initials: string;
+};
+
 type BookingState = {
   specialty: Specialty | null;
   date: Date | null;
   slot: AppointmentSlot | null;
+  doctor: Doctor | null;
 };
 
-const STEPS = ['Chuyên khoa', 'Ngày & Giờ', 'Xác nhận'];
+const STEPS = [
+  { num: 1, label: 'Nhu cầu\nkhám', icon: Stethoscope },
+  { num: 2, label: 'Bác sĩ &\nthời gian', icon: User },
+  { num: 3, label: 'Xác nhận\nđặt lịch', icon: CalendarCheck },
+  { num: 4, label: 'Khai báo\ny tế (Bắt buộc)', icon: ClipboardList },
+];
 
 const BookAppointment = () => {
   const navigate = useNavigate();
@@ -30,6 +47,7 @@ const BookAppointment = () => {
     specialty: null,
     date: null,
     slot: null,
+    doctor: null,
   });
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -54,8 +72,8 @@ const BookAppointment = () => {
     setStep(2);
   }
 
-  function handleDateSlotSelected(date: Date, slot: AppointmentSlot) {
-    setBooking((b) => ({ ...b, date, slot }));
+  function handleDateSlotSelected(date: Date, slot: AppointmentSlot, doctor: Doctor | null) {
+    setBooking((b) => ({ ...b, date, slot, doctor }));
     setStep(3);
   }
 
@@ -65,66 +83,79 @@ const BookAppointment = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <TopNav />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-3xl mx-auto">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
+      <Sidebar />
+      <div className="flex-1 lg:ml-[280px] flex flex-col min-h-screen">
+        <TopNav />
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+          <div className={`mx-auto ${step === 1 ? 'max-w-[720px]' : 'max-w-[1100px]'}`}>
+            {/* Breadcrumb */}
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-2 text-[15px] font-semibold text-slate-500 hover:text-slate-800 mb-5 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Đặt lịch khám bệnh
+            </button>
 
-            {/* Back + Step indicator */}
-            <div className="mb-6 flex items-center gap-4">
-              <button
-                onClick={handleBack}
-                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Quay lại
-              </button>
-              <div className="flex-1" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Bước {step}/{STEPS.length}
-              </span>
+            {/* Stepper */}
+            <div className="flex items-center justify-center gap-0 mb-8">
+              {STEPS.map((s, idx) => {
+                const isActive = s.num === step;
+                const isDone = s.num < step;
+                const Icon = s.icon;
+                return (
+                  <div key={s.num} className="flex items-center flex-1 max-w-[160px]">
+                    <div className="flex flex-col items-center gap-2 w-full relative">
+                      {/* Connector line */}
+                      {idx < STEPS.length - 1 && (
+                        <div
+                          className={`absolute top-[18px] left-[calc(50%+20px)] w-[calc(100%-40px)] h-0.5 ${
+                            isDone ? 'bg-teal-600' : 'bg-slate-200'
+                          }`}
+                        />
+                      )}
+                      {/* Circle */}
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold z-10 transition-all ${
+                          isActive
+                            ? 'bg-teal-600 text-white border-2 border-teal-600'
+                            : isDone
+                            ? 'bg-teal-600 text-white border-2 border-teal-600'
+                            : 'bg-white text-slate-400 border-2 border-slate-200'
+                        }`}
+                      >
+                        {isDone ? (
+                          <Check className="h-4 w-4" />
+                        ) : isActive ? (
+                          <Icon className="h-4 w-4" />
+                        ) : (
+                          s.num
+                        )}
+                      </div>
+                      {/* Label */}
+                      <span
+                        className={`text-[11.5px] font-semibold text-center leading-tight whitespace-pre-line ${
+                          isActive || isDone ? 'text-teal-600' : 'text-slate-400'
+                        }`}
+                      >
+                        {s.num}. {s.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Progress bar */}
-            <div className="mb-2">
-              <p className="text-xs text-primary font-bold uppercase tracking-widest mb-1">
-                QUY TRÌNH ĐẶT LỊCH KHÁM
-              </p>
-              <h1 className="text-2xl font-bold text-foreground mb-3">
-                {step === 1 && 'Chọn chuyên khoa'}
-                {step === 2 && 'Chọn ngày & giờ'}
-                {step === 3 && 'Xác nhận đặt lịch'}
-              </h1>
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${(step / 3) * 100}%` }}
-                />
-              </div>
-              <div className="flex justify-between mt-1">
-                {STEPS.map((label, i) => (
-                  <span
-                    key={label}
-                    className={`text-[10px] font-semibold ${
-                      i + 1 <= step ? 'text-primary' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6">
+            {/* Content */}
+            <div>
               {profileLoading || authLoading ? (
                 <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
                 </div>
               ) : !canBook ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
-                  <p className="text-sm font-medium text-foreground">
+                <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-6 text-center">
+                  <p className="text-sm font-medium text-slate-800">
                     {bookingBlockedMessage()}
                   </p>
                 </div>
@@ -137,6 +168,7 @@ const BookAppointment = () => {
                     <BookingStep2
                       specialty={booking.specialty}
                       onSelect={handleDateSlotSelected}
+                      onBack={() => setStep(1)}
                     />
                   )}
                   {step === 3 &&
@@ -147,6 +179,10 @@ const BookAppointment = () => {
                         specialty={booking.specialty}
                         date={booking.date}
                         slot={booking.slot}
+                        doctor={booking.doctor}
+                        onBack={() => setStep(2)}
+                        onEditSpecialty={() => setStep(1)}
+                        onEditDateTime={() => setStep(2)}
                       />
                     )}
                 </>

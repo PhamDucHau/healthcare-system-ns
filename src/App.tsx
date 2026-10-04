@@ -13,12 +13,17 @@ import AccountMedicalSupportPage from "./pages/account/AccountMedicalSupportPage
 import AccountMedicalHistoryPage from "./pages/account/AccountMedicalHistoryPage.tsx";
 import AccountVitalsPage from "./pages/account/AccountVitalsPage.tsx";
 import AccountSexualHealthPage from "./pages/account/AccountSexualHealthPage.tsx";
+import AccountDemographicsPage from "./pages/account/AccountDemographicsPage.tsx";
 import AccountSettingsPage from "./pages/account/AccountSettingsPage.tsx";
+import AccountDocumentsPage from "./pages/account/AccountDocumentsPage.tsx";
+import AccountAddressPage from "./pages/account/AccountAddressPage.tsx";
 import Labs from "./pages/Labs.tsx";
 import Appointments from "./pages/Appointments.tsx";
 import PatientExamHistoryPage from "./pages/PatientExamHistoryPage.tsx";
 import BookAppointment from "./pages/BookAppointment.tsx";
 import PreConsultation from "./pages/PreConsultation.tsx";
+import HealthDeclaration from "./pages/HealthDeclaration.tsx";
+import OcrProfile from "./pages/OcrProfile.tsx";
 import Support from "./pages/Support.tsx";
 import Messages from "./pages/Messages.tsx";
 import Login, { AdminLogin, DoctorLogin, PatientLogin } from "./pages/Login.tsx";
@@ -104,11 +109,14 @@ const App = () => (
             >
               <Route index element={<Navigate to="personal" replace />} />
               <Route path="personal" element={<AccountPersonalPage />} />
+              <Route path="documents" element={<AccountDocumentsPage />} />
+              <Route path="address" element={<AccountAddressPage />} />
               <Route path="insurance" element={<AccountInsurancePage />} />
               <Route path="medical-support" element={<AccountMedicalSupportPage />} />
               <Route path="medical-history" element={<AccountMedicalHistoryPage />} />
               <Route path="vitals" element={<AccountVitalsPage />} />
               <Route path="sexual-health" element={<AccountSexualHealthPage />} />
+              <Route path="demographics" element={<AccountDemographicsPage />} />
               <Route path="settings" element={<AccountSettingsPage />} />
             </Route>
             <Route
@@ -148,6 +156,22 @@ const App = () => (
               element={
                 <PatientRoute>
                   <PreConsultation />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/health-declaration"
+              element={
+                <PatientRoute>
+                  <HealthDeclaration />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/ocr-profile"
+              element={
+                <PatientRoute>
+                  <OcrProfile />
                 </PatientRoute>
               }
             />

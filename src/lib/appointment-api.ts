@@ -7,6 +7,14 @@ import type {
 } from '@/types/appointment';
 import { format } from 'date-fns';
 
+export type DoctorInfo = {
+  doctor_id: string;
+  full_name: string;
+  specialty: string | null;
+  facility_name: string | null;
+  next_available: string | null;
+};
+
 export async function fetchSpecialties(): Promise<Specialty[]> {
   const { data, error } = await supabase
     .from('specialties')
@@ -16,6 +24,17 @@ export async function fetchSpecialties(): Promise<Specialty[]> {
 
   if (error) throw new Error(error.message);
   return (data ?? []) as Specialty[];
+}
+
+export async function fetchDoctorsBySpecialty(
+  specialtyId: string,
+): Promise<DoctorInfo[]> {
+  const { data, error } = await supabase.rpc('get_doctors_by_specialty', {
+    p_specialty_id: specialtyId,
+  });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as DoctorInfo[];
 }
 
 export async function fetchSlots(
