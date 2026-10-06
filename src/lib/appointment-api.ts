@@ -96,7 +96,71 @@ export async function fetchMyAppointments(): Promise<Appointment[]> {
 
   if (error) throw new Error(error.message);
 
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => {
+  return mapAppointmentRows(data ?? []);
+}
+
+export type AppointmentTabType = 'upcoming' | 'past' | 'cancelled';
+
+const TAB_STATUS_MAP: Record<AppointmentTabType, string[]> = {
+  upcoming: ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'],
+  past: ['COMPLETED'],
+  cancelled: ['CANCELLED', 'NO_SHOW'],
+};
+
+export interface PaginatedAppointments {
+  data: Appointment[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function fetchMyAppointmentsPaginated(
+  tab: AppointmentTabType,
+  page: number = 1,
+  limit: number = 10
+): Promise<PaginatedAppointments> {
+  const statuses = TAB_STATUS_MAP[tab];
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  // Get total count
+  const { count, error: countError } = await supabase
+    .from('appointments')
+    .select('id', { count: 'exact', head: true })
+    .in('status', statuses);
+
+  if (countError) throw new Error(countError.message);
+
+  // Get paginated data
+  const { data, error } = await supabase
+    .from('appointments')
+    .select(`
+      id, patient_id, profile_id, specialty_id, slot_id, status,
+      note, qr_token, qr_expires_at, reminder_at, cancelled_at, created_at,
+      specialties (name),
+      appointment_slots (slot_date, start_time, end_time),
+      pre_consultations ( status )
+    `)
+    .in('status', statuses)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+
+  const total = count ?? 0;
+
+  return {
+    data: mapAppointmentRows(data ?? []),
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+
+function mapAppointmentRows(rows: Record<string, unknown>[]): Appointment[] {
+  return rows.map((row) => {
     const spec = row.specialties as { name: string } | null;
     const slot = row.appointment_slots as {
       slot_date: string;

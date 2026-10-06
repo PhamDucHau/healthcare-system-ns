@@ -5,6 +5,8 @@ import { vi } from 'date-fns/locale';
 import {
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Hospital,
   Loader2,
@@ -26,26 +28,23 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
-  fetchMyAppointments,
+  fetchMyAppointmentsPaginated,
   cancelAppointment,
   mapBookingError,
   fetchPatientProfile,
   canPatientSelfBook,
   bookingBlockedMessage,
+  type AppointmentTabType,
+  type PaginatedAppointments,
 } from '@/lib/appointment-api';
 import { useAuth } from '@/hooks/use-auth';
 import {
   STATUS_LABELS,
   formatSlotTime,
   type Appointment,
-  type AppointmentStatus,
 } from '@/types/appointment';
 
-type TabType = 'upcoming' | 'past' | 'cancelled';
-
-const ACTIVE_STATUSES: AppointmentStatus[] = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'];
-const COMPLETED_STATUSES: AppointmentStatus[] = ['COMPLETED'];
-const CANCELLED_STATUSES: AppointmentStatus[] = ['CANCELLED', 'NO_SHOW'];
+const ITEMS_PER_PAGE = 10;
 
 export default function AppointmentsContent() {
   const navigate = useNavigate();
@@ -54,14 +53,30 @@ export default function AppointmentsContent() {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('upcoming');
+  const [activeTab, setActiveTab] = useState<AppointmentTabType>('upcoming');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [tabCounts, setTabCounts] = useState({ upcoming: 0, past: 0, cancelled: 0 });
+
+  const fetchAppointments = async (tab: AppointmentTabType, page: number) => {
+    setLoading(true);
+    try {
+      const result = await fetchMyAppointmentsPaginated(tab, page, ITEMS_PER_PAGE);
+      setAppointments(result.data);
+      setTotalItems(result.total);
+      setTotalPages(result.totalPages);
+      setTabCounts((prev) => ({ ...prev, [tab]: result.total }));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchMyAppointments()
-      .then(setAppointments)
-      .catch((e: Error) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    void fetchAppointments(activeTab, currentPage);
+  }, [activeTab, currentPage]);
 
   async function handleBookClick() {
     if (authLoading) return;
@@ -82,11 +97,10 @@ export default function AppointmentsContent() {
     setCancelling(id);
     try {
       await cancelAppointment(id);
-      setAppointments((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: 'CANCELLED' as const } : a)),
-      );
       toast.success('Đã hủy lịch hẹn.');
       setPendingCancelId(null);
+      // Refresh current tab data
+      await fetchAppointments(activeTab, currentPage);
     } catch (e) {
       toast.error(mapBookingError((e as Error).message));
     } finally {
@@ -94,21 +108,11 @@ export default function AppointmentsContent() {
     }
   }
 
-  const upcoming = appointments.filter((a) => ACTIVE_STATUSES.includes(a.status));
-  const past = appointments.filter((a) => COMPLETED_STATUSES.includes(a.status));
-  const cancelled = appointments.filter((a) => CANCELLED_STATUSES.includes(a.status));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
-  const getTabContent = () => {
-    switch (activeTab) {
-      case 'upcoming':
-        return upcoming;
-      case 'past':
-        return past;
-      case 'cancelled':
-        return cancelled;
-      default:
-        return [];
-    }
+  const handleTabChange = (tab: AppointmentTabType) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   return (
@@ -139,21 +143,22 @@ export default function AppointmentsContent() {
           <div className="flex gap-2 border-b-[1.5px] border-slate-200 mb-6">
             <TabButton
               active={activeTab === 'upcoming'}
-              onClick={() => setActiveTab('upcoming')}
+              onClick={() => handleTabChange('upcoming')}
+              count={activeTab === 'upcoming' ? totalItems : tabCounts.upcoming}
             >
               Sắp diễn ra
             </TabButton>
             <TabButton
               active={activeTab === 'past'}
-              onClick={() => setActiveTab('past')}
-              count={past.length}
+              onClick={() => handleTabChange('past')}
+              count={activeTab === 'past' ? totalItems : tabCounts.past}
             >
               Lịch sử khám đã qua
             </TabButton>
             <TabButton
               active={activeTab === 'cancelled'}
-              onClick={() => setActiveTab('cancelled')}
-              count={cancelled.length}
+              onClick={() => handleTabChange('cancelled')}
+              count={activeTab === 'cancelled' ? totalItems : tabCounts.cancelled}
             >
               Đã hủy
             </TabButton>
@@ -165,25 +170,65 @@ export default function AppointmentsContent() {
               <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
             </div>
           ) : (
-            <div className="space-y-4">
-              {getTabContent().length === 0 ? (
-                <EmptyState
-                  tab={activeTab}
-                  onBook={() => void handleBookClick()}
-                />
-              ) : (
-                getTabContent().map((apt) => (
-                  <AppointmentCard
-                    key={apt.id}
-                    apt={apt}
+            <>
+              <div className="space-y-4">
+                {appointments.length === 0 ? (
+                  <EmptyState
                     tab={activeTab}
-                    cancelling={cancelling === apt.id}
-                    onCancel={() => setPendingCancelId(apt.id)}
-                    onRebook={() => void handleBookClick()}
+                    onBook={() => void handleBookClick()}
                   />
-                ))
+                ) : (
+                  appointments.map((apt) => (
+                    <AppointmentCard
+                      key={apt.id}
+                      apt={apt}
+                      tab={activeTab}
+                      cancelling={cancelling === apt.id}
+                      onCancel={() => setPendingCancelId(apt.id)}
+                      onRebook={() => void handleBookClick()}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+                  <p className="text-sm text-slate-500">
+                    Hiển thị {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)} trong tổng số {totalItems} lịch hẹn
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-teal-600 text-white'
+                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -358,15 +403,6 @@ function AppointmentCard({
                 <X className="h-4 w-4" />
               )}
               Hủy lịch khám
-            </button>
-          )}
-          {tab === 'past' && (
-            <button
-              onClick={() => toast.info('Đang tải Tóm tắt bệnh án PDF...')}
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors"
-            >
-              <FileText className="h-4 w-4 text-red-500" />
-              Tải Tóm tắt bệnh án
             </button>
           )}
           {tab === 'cancelled' && (
