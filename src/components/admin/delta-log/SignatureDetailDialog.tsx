@@ -11,7 +11,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
+import { decrypt } from '@/lib/crypto';
 import type { SignatureLogEntry } from '@/types/delta-log';
+
+async function safeDecrypt(value: string | null): Promise<string | null> {
+  if (!value) return null;
+  try {
+    return await decrypt(value);
+  } catch {
+    return value;
+  }
+}
 
 type MedicalHistoryItem = string | { condition?: string; details?: string };
 type MedicationItem = string | { name?: string; dose?: string; frequency?: string };
@@ -131,6 +141,14 @@ export default function SignatureDetailDialog({ entry, open, onOpenChange }: Pro
           ? `${slot.slot_date}T${slot.start_time}`
           : entry.signed_at;
 
+        // Decrypt SOAP fields
+        const [decryptedSText, decryptedOText, decryptedAText, decryptedPText] = await Promise.all([
+          safeDecrypt(exam.s_text),
+          safeDecrypt(exam.o_text),
+          safeDecrypt(exam.a_text),
+          safeDecrypt(exam.p_text),
+        ]);
+
         if (!cancelled) {
           setData({
             id: exam.id,
@@ -147,10 +165,10 @@ export default function SignatureDetailDialog({ entry, open, onOpenChange }: Pro
             vitals: vitals,
             pre_consultation: pre_consultation,
             examination: {
-              s_text: exam.s_text,
-              o_text: exam.o_text,
-              a_text: exam.a_text,
-              p_text: exam.p_text,
+              s_text: decryptedSText,
+              o_text: decryptedOText,
+              a_text: decryptedAText,
+              p_text: decryptedPText,
               status: exam.status,
             },
             signature: {
@@ -229,10 +247,6 @@ export default function SignatureDetailDialog({ entry, open, onOpenChange }: Pro
                   <span className="font-medium">
                     {format(parseISO(data.signature.signed_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}
                   </span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Hash (SHA-256): </span>
-                  <span className="font-mono text-xs break-all">{data.signature.data_hash}</span>
                 </div>
               </div>
             </div>
