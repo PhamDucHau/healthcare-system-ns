@@ -57,7 +57,6 @@ export default function AppointmentsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [tabCounts, setTabCounts] = useState({ upcoming: 0, past: 0, cancelled: 0 });
 
   const fetchAppointments = async (tab: AppointmentTabType, page: number) => {
     setLoading(true);
@@ -66,7 +65,6 @@ export default function AppointmentsContent() {
       setAppointments(result.data);
       setTotalItems(result.total);
       setTotalPages(result.totalPages);
-      setTabCounts((prev) => ({ ...prev, [tab]: result.total }));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -144,21 +142,18 @@ export default function AppointmentsContent() {
             <TabButton
               active={activeTab === 'upcoming'}
               onClick={() => handleTabChange('upcoming')}
-              count={activeTab === 'upcoming' ? totalItems : tabCounts.upcoming}
             >
               Sắp diễn ra
             </TabButton>
             <TabButton
               active={activeTab === 'past'}
               onClick={() => handleTabChange('past')}
-              count={activeTab === 'past' ? totalItems : tabCounts.past}
             >
               Lịch sử khám đã qua
             </TabButton>
             <TabButton
               active={activeTab === 'cancelled'}
               onClick={() => handleTabChange('cancelled')}
-              count={activeTab === 'cancelled' ? totalItems : tabCounts.cancelled}
             >
               Đã hủy
             </TabButton>
