@@ -6,6 +6,15 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Area,
+  AreaChart,
+} from 'recharts';
 
 type VitalType = 'bp' | 'hr' | 'bmi' | 'spo2' | 'glucose' | 'temp';
 
@@ -121,78 +130,54 @@ const VITAL_CONFIG: Record<VitalType, Omit<VitalDetailData, 'currentValue' | 'la
   },
 };
 
-function SimpleLineChart({ data }: { data: { label: string; value: number }[] }) {
+function VitalLineChart({ data, unit }: { data: { label: string; value: number }[]; unit: string }) {
   if (data.length === 0) return null;
 
-  const maxValue = Math.max(...data.map(d => d.value));
-  const minValue = Math.min(...data.map(d => d.value));
-  const range = maxValue - minValue || 1;
-  const padding = range * 0.1;
-  const chartMin = minValue - padding;
-  const chartMax = maxValue + padding;
-  const chartRange = chartMax - chartMin;
-
-  const width = 100;
-  const height = 50;
-
-  const points = data.map((d, i) => ({
-    x: (i / (data.length - 1 || 1)) * width,
-    y: height - ((d.value - chartMin) / chartRange) * height,
-    value: d.value,
-    label: d.label,
-  }));
-
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-
   return (
-    <div className="relative h-[180px] w-full rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-      <svg viewBox={`-5 -10 ${width + 10} ${height + 25}`} className="h-full w-full" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#f97316" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#f97316" stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-
-        {/* Area fill */}
-        <path
-          d={`${pathD} L ${width} ${height} L 0 ${height} Z`}
-          fill="url(#lineGradient)"
-        />
-
-        {/* Line */}
-        <path
-          d={pathD}
-          fill="none"
-          stroke="#f97316"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Data points */}
-        {points.map((p, i) => (
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r="4" fill="#fff" stroke="#f97316" strokeWidth="2" />
-            <text
-              x={p.x}
-              y={p.y - 8}
-              textAnchor="middle"
-              className="fill-slate-700 text-[6px] font-semibold"
-            >
-              {p.value} mg/dL
-            </text>
-            <text
-              x={p.x}
-              y={height + 12}
-              textAnchor="middle"
-              className="fill-slate-500 text-[5px]"
-            >
-              {p.label}
-            </text>
-          </g>
-        ))}
-      </svg>
+    <div className="h-[200px] w-full rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
+          <defs>
+            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 11, fill: '#64748b' }}
+            tickLine={false}
+            axisLine={{ stroke: '#e2e8f0' }}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#64748b' }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => `${value}`}
+            domain={['dataMin - 5', 'dataMax + 5']}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+            }}
+            formatter={(value: number) => [`${value} ${unit}`, 'Giá trị']}
+            labelFormatter={(label) => `Ngày: ${label}`}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="#f97316"
+            strokeWidth={2}
+            fill="url(#colorValue)"
+            dot={{ fill: '#fff', stroke: '#f97316', strokeWidth: 2, r: 5 }}
+            activeDot={{ fill: '#f97316', stroke: '#fff', strokeWidth: 2, r: 7 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -289,7 +274,7 @@ export function VitalDetailModal({
                 ↗ {config.trend}
               </span>
             </div>
-            <SimpleLineChart data={chartData} />
+            <VitalLineChart data={chartData} unit={config.unit} />
           </div>
 
           {/* History Table */}
