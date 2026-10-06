@@ -18,6 +18,9 @@ import AccountSettingsPage from "./pages/account/AccountSettingsPage.tsx";
 import AccountDocumentsPage from "./pages/account/AccountDocumentsPage.tsx";
 import AccountAddressPage from "./pages/account/AccountAddressPage.tsx";
 import Labs from "./pages/Labs.tsx";
+import LabResultDetail from "./pages/LabResultDetail.tsx";
+import Prescriptions from "./pages/Prescriptions.tsx";
+import PrescriptionDetail from "./pages/PrescriptionDetail.tsx";
 import Appointments from "./pages/Appointments.tsx";
 import PatientExamHistoryPage from "./pages/PatientExamHistoryPage.tsx";
 import BookAppointment from "./pages/BookAppointment.tsx";
@@ -124,6 +127,30 @@ const App = () => (
               element={
                 <PatientRoute>
                   <Labs />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/labs/detail"
+              element={
+                <PatientRoute>
+                  <LabResultDetail />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/prescriptions"
+              element={
+                <PatientRoute>
+                  <Prescriptions />
+                </PatientRoute>
+              }
+            />
+            <Route
+              path="/prescriptions/detail"
+              element={
+                <PatientRoute>
+                  <PrescriptionDetail />
                 </PatientRoute>
               }
             />

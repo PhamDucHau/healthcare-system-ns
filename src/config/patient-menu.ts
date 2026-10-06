@@ -43,8 +43,8 @@ export const PATIENT_MENU_GROUPS: PatientMenuGroup[] = [
   {
     label: "HỒ SƠ KHÁM & ĐIỀU TRỊ",
     items: [
-      { icon: FlaskConical, label: "Kết quả Xét nghiệm", path: "/labs", iconColor: "text-blue-600", comingSoon: true },
-      { icon: Pill, label: "Đơn thuốc", path: "/prescriptions", iconColor: "text-pink-600", comingSoon: true },
+      { icon: FlaskConical, label: "Kết quả Xét nghiệm", path: "/labs", iconColor: "text-blue-600" },
+      { icon: Pill, label: "Đơn thuốc", path: "/prescriptions", iconColor: "text-pink-600" },
       { icon: MessageCircle, label: "Tin nhắn với Bác sĩ", path: "/messages", iconColor: "text-amber-600", comingSoon: true },
     ],
   },
