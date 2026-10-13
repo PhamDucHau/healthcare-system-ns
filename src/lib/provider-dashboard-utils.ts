@@ -10,7 +10,7 @@ import {
 import { vi } from "date-fns/locale";
 import { formatDistanceToNow } from "date-fns";
 import type { ClinicalTask } from "@/lib/ai-assistant-api";
-import type { AdminAppointment } from "@/types/admin-appointment";
+import { ADMIN_STATUS_LABEL, type AdminAppointment } from "@/types/admin-appointment";
 import type { PatientRecordListRow } from "@/types/patient-portal";
 
 export type DashboardScheduleItem = {
@@ -21,6 +21,11 @@ export type DashboardScheduleItem = {
   mode: string;
   isVideo: boolean;
   href: string;
+  phone: string | null;
+  status: AdminAppointment["status"];
+  statusLabel: string;
+  /** "T6, 16/10/2026" — dùng cho danh sách lịch sắp tới */
+  dateLabel: string;
 };
 
 export type DashboardRecentPatient = {
@@ -28,6 +33,7 @@ export type DashboardRecentPatient = {
   name: string;
   last: string;
   status: string;
+  age: number | null;
 };
 
 export type DashboardClinicalTaskItem = {
@@ -40,11 +46,14 @@ export type DashboardClinicalTaskItem = {
 export type DashboardWeekChartPoint = {
   day: string;
   count: number;
+  isToday: boolean;
 };
 
 export type DashboardTodayStats = {
   total: number;
   remaining: number;
+  /** Giờ của lịch còn lại gần nhất (HH:mm), null nếu không còn */
+  nextTime: string | null;
 };
 
 export type DashboardMonitoringStats = {
@@ -63,6 +72,8 @@ export type RawPatientRow = {
 
 const ACTIVE_STATUSES = new Set(["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"]);
 const EXCLUDED_STATUSES = new Set(["CANCELLED", "NO_SHOW"]);
+const WEEKDAY_SHORT = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+const WEEKDAY_BY_JS_DAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 export function formatDoctorDisplayName(fullName: string | null | undefined): string {
   const trimmed = fullName?.trim();
@@ -78,26 +89,76 @@ export function formatAppointmentTime(startTime: string | null | undefined): str
 
 export function deriveTodayStats(appointments: AdminAppointment[]): DashboardTodayStats {
   const active = appointments.filter((a) => !EXCLUDED_STATUSES.has(a.status));
-  const remaining = active.filter((a) => ACTIVE_STATUSES.has(a.status));
-  return { total: active.length, remaining: remaining.length };
+  const remaining = active
+    .filter((a) => ACTIVE_STATUSES.has(a.status))
+    .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
+  const next = remaining.find((a) => a.start_time);
+  return {
+    total: active.length,
+    remaining: remaining.length,
+    nextTime: next ? formatAppointmentTime(next.start_time) : null,
+  };
+}
+
+function appointmentDate(a: AdminAppointment): string | null {
+  return a.slot_date ?? a.created_at?.slice(0, 10) ?? null;
+}
+
+function formatShortDateLabel(isoDate: string | null): string {
+  if (!isoDate) return "—";
+  try {
+    const d = parseISO(isoDate);
+    return `${WEEKDAY_BY_JS_DAY[d.getDay()]}, ${format(d, "dd/MM/yyyy")}`;
+  } catch {
+    return isoDate;
+  }
+}
+
+function toScheduleItem(a: AdminAppointment): DashboardScheduleItem {
+  return {
+    id: a.id,
+    time: formatAppointmentTime(a.start_time),
+    patient: a.patient_name ?? "Bệnh nhân",
+    type: a.specialty_name ?? a.note ?? "Khám bệnh",
+    mode: a.walk_in ? "Khám không hẹn" : "Khám có hẹn",
+    isVideo: false,
+    href:
+      a.status === "IN_PROGRESS"
+        ? `/provider-portal/examination/${a.id}`
+        : "/provider-portal/appointments",
+    phone: a.patient_phone,
+    status: a.status,
+    statusLabel: ADMIN_STATUS_LABEL[a.status] ?? a.status,
+    dateLabel: formatShortDateLabel(appointmentDate(a)),
+  };
 }
 
 export function deriveTodaySchedule(appointments: AdminAppointment[]): DashboardScheduleItem[] {
   return appointments
     .filter((a) => !EXCLUDED_STATUSES.has(a.status))
     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
-    .map((a) => ({
-      id: a.id,
-      time: formatAppointmentTime(a.start_time),
-      patient: a.patient_name ?? "Bệnh nhân",
-      type: a.specialty_name ?? a.note ?? "Khám bệnh",
-      mode: a.walk_in ? "Khám không hẹn" : "Trực tiếp",
-      isVideo: false,
-      href:
-        a.status === "IN_PROGRESS"
-          ? `/provider-portal/examination/${a.id}`
-          : "/provider-portal/appointments",
-    }));
+    .map(toScheduleItem);
+}
+
+/** Lịch hẹn sau hôm nay (chưa hủy / chưa hoàn thành), sắp theo ngày + giờ tăng dần. */
+export function deriveUpcomingSchedule(
+  appointments: AdminAppointment[],
+  today: string,
+  limit = 3,
+): DashboardScheduleItem[] {
+  return appointments
+    .filter((a) => ACTIVE_STATUSES.has(a.status))
+    .filter((a) => {
+      const d = appointmentDate(a);
+      return d != null && d > today;
+    })
+    .sort((a, b) =>
+      `${appointmentDate(a)} ${a.start_time ?? ""}`.localeCompare(
+        `${appointmentDate(b)} ${b.start_time ?? ""}`,
+      ),
+    )
+    .slice(0, limit)
+    .map(toScheduleItem);
 }
 
 export function deriveWeeklyChart(
@@ -124,8 +185,9 @@ export function deriveWeeklyChart(
     const d = addDays(weekStart, i);
     const key = format(d, "yyyy-MM-dd");
     return {
-      day: format(d, "EEEEEE", { locale: vi }).toUpperCase(),
+      day: WEEKDAY_SHORT[i],
       count: counts.get(key) ?? 0,
+      isToday: isSameDay(d, anchor),
     };
   });
 }
@@ -163,6 +225,18 @@ export function deriveClinicalTaskItems(
     }));
 }
 
+export function ageFromDob(dob: string | null | undefined, now: Date = new Date()): number | null {
+  if (!dob) return null;
+  const d = parseISO(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  let age = now.getFullYear() - d.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < d.getMonth() ||
+    (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
 export function mapPatientRecordToDashboard(row: PatientRecordListRow): DashboardRecentPatient {
   const lastActivity = row.updated_at ?? row.submitted_at;
   let last = "—";
@@ -178,6 +252,7 @@ export function mapPatientRecordToDashboard(row: PatientRecordListRow): Dashboar
     name: row.full_name,
     last,
     status: row.submitted_at ? "Active" : "Draft",
+    age: ageFromDob(row.date_of_birth),
   };
 }
 
@@ -198,6 +273,7 @@ export function mapPatientRow(row: RawPatientRow): DashboardRecentPatient {
     name,
     last,
     status: row.submitted_at ? "Active" : "Draft",
+    age: null,
   };
 }
 
