@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type LucideIcon, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, Pencil, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from '@/components/ui/popover';
 import { exportRowsToCsv } from '@/lib/csv-export';
 import type { MasterDataListParams, MasterDataListResult } from '@/types/master-data';
+import { useOptionalMasterDataActions } from './MasterDataActionsContext';
 
 // ─── Reusable table shell ─────────────────────────────────────────────────────
 
@@ -23,6 +21,8 @@ export type EntityTableQuery = {
   page: number;
   pageSize: number;
 };
+
+export type StatusCounts = { active: number; inactive: number };
 
 type EntityTableProps<T> = {
   entityLabel: string;
@@ -39,6 +39,7 @@ type EntityTableProps<T> = {
   exportColumns?: { key: string; label: string }[];
   hasActiveField?: boolean;
   getIsActive?: (row: T) => boolean;
+  statusCounts?: StatusCounts | null;
   toolbarExtra?: ReactNode;
   searchPlaceholder?: string;
   onExportFetch?: () => Promise<T[]>;
@@ -48,7 +49,9 @@ type EntityTableProps<T> = {
 export function useEntityTableData<T>(
   listFn: (params: MasterDataListParams) => Promise<MasterDataListResult<T>>,
   pageSize = 6,
+  tabKey?: string,
 ) {
+  const setTabCount = useOptionalMasterDataActions()?.setTabCount;
   const [query, setQuery] = useState<EntityTableQuery>({
     search: '',
     status: 'all',
@@ -61,6 +64,7 @@ export function useEntityTableData<T>(
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<StatusCounts | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(query.search.trim()), SEARCH_DEBOUNCE_MS);
@@ -95,6 +99,26 @@ export function useEntityTableData<T>(
     return () => { cancelled = true; };
   }, [debouncedSearch, query.status, query.page, query.pageSize, refreshKey, listFn]);
 
+  // Active / inactive totals for the summary line + tab badge (independent of status filter)
+  useEffect(() => {
+    let cancelled = false;
+    const base = { search: debouncedSearch || undefined, page: 1, limit: 1 };
+    Promise.all([
+      listFn({ ...base, status: 'active' }),
+      listFn({ ...base, status: 'inactive' }),
+    ])
+      .then(([active, inactive]) => {
+        if (cancelled) return;
+        const counts = { active: active.total, inactive: inactive.total };
+        setStatusCounts(counts);
+        if (tabKey && setTabCount && !debouncedSearch) {
+          setTabCount(tabKey, counts.active + counts.inactive);
+        }
+      })
+      .catch(() => { if (!cancelled) setStatusCounts(null); });
+    return () => { cancelled = true; };
+  }, [debouncedSearch, refreshKey, listFn, tabKey, setTabCount]);
+
   const onQueryChange = useCallback((patch: Partial<EntityTableQuery>) => {
     setQuery((current) => ({
       ...current,
@@ -127,6 +151,7 @@ export function useEntityTableData<T>(
     total,
     loading,
     exporting,
+    statusCounts,
     query,
     onQueryChange,
     reload,
@@ -149,12 +174,12 @@ export function EntityTable<T>({
   exportColumns,
   hasActiveField = false,
   getIsActive,
+  statusCounts,
   toolbarExtra,
   searchPlaceholder,
   onExportFetch,
   exporting = false,
 }: EntityTableProps<T>) {
-  const [filterOpen, setFilterOpen] = useState(false);
   const [exportingLocal, setExportingLocal] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
@@ -189,71 +214,72 @@ export function EntityTable<T>({
   const isEmpty = total === 0 && !loading;
 
   return (
-    <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden mb-12">
+    <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden mb-12">
       {/* Toolbar */}
-      <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+      <div className="p-4 sm:px-5 border-b border-border/40 space-y-3">
+        <label className="relative flex items-center">
+          <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
             type="search"
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
             placeholder={searchPlaceholder ?? `Tìm kiếm ${entityLabel}...`}
-            className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            aria-label={searchPlaceholder ?? `Tìm kiếm ${entityLabel}`}
+            className="w-full h-10 rounded-lg border border-border bg-muted/40 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
-        </div>
-        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-          {/* <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-            {filtered.length} bản ghi được tìm thấy
-          </span> */}
-          <div className="flex items-center gap-2">
-            {toolbarExtra}
-            {hasActiveField && (
-            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-              <PopoverTrigger asChild>
+        </label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {hasActiveField && statusCounts ? (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {([
+                ['active', `${statusCounts.active} hoạt động`],
+                ['inactive', `${statusCounts.inactive} vô hiệu`],
+              ] as const).map(([value, label], i) => {
+                const selected = query.status === value;
+                return (
+                  <span key={value} className="flex items-center gap-1.5">
+                    {i > 0 && <span aria-hidden>·</span>}
+                    <button
+                      type="button"
+                      onClick={() => onQueryChange({ status: selected ? 'all' : value })}
+                      aria-pressed={selected}
+                      title={selected ? 'Bỏ lọc' : `Chỉ hiện bản ghi ${value === 'active' ? 'hoạt động' : 'vô hiệu'}`}
+                      className={`rounded px-1 py-0.5 transition-colors cursor-pointer hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                        selected ? 'bg-accent text-primary font-semibold' : ''
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  </span>
+                );
+              })}
+              {query.status !== 'all' && (
                 <button
                   type="button"
-                  className={`p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors ${
-                    query.status !== 'all' ? 'border-primary text-primary bg-accent/20' : ''
-                  }`}
-                  title="Lọc trạng thái"
+                  onClick={() => onQueryChange({ status: 'all' })}
+                  className="ml-1 font-semibold text-primary hover:underline cursor-pointer"
                 >
-                  <Filter className="h-4 w-4" />
+                  Bỏ lọc
                 </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-44 p-2">
-                {([
-                  ['all', 'Tất cả'],
-                  ['active', 'Hoạt động'],
-                  ['inactive', 'Vô hiệu'],
-                ] as const).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => { onQueryChange({ status: value }); setFilterOpen(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      query.status === value
-                        ? 'bg-accent/30 text-primary font-semibold'
-                        : 'hover:bg-muted text-foreground'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">{total} {entityLabel}</span>
           )}
-          {getExportRow && exportColumns && onExportFetch && (
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={total === 0 || isExporting}
-              className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-              title="Xuất CSV"
-            >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {toolbarExtra}
+            {getExportRow && exportColumns && onExportFetch && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={total === 0 || isExporting}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Xuất CSV"
+              >
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                Xuất CSV
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -274,12 +300,12 @@ export function EntityTable<T>({
         <>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-card">
-                <tr className="border-b border-border/30">
+              <thead className="bg-muted/40">
+                <tr className="border-b border-border/40">
                   {headers.map((h, i) => (
                     <th
                       key={h || i}
-                      className={`px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground ${
+                      className={`px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground ${
                         i === headers.length - 1 ? 'text-right' : ''
                       }`}
                     >
@@ -295,7 +321,7 @@ export function EntityTable<T>({
                     <tr
                       key={getRowKey(row)}
                       className={`hover:bg-muted/30 transition-colors h-14 ${
-                        inactive ? 'opacity-75' : ''
+                        inactive ? '[&>td:not(:last-child)]:opacity-60' : ''
                       }`}
                     >
                       {renderRow(row)}
@@ -365,9 +391,9 @@ export function ActiveBadge({ active }: { active: boolean }) {
   );
 }
 
-// ─── Action button ────────────────────────────────────────────────────────────
+// ─── Row action buttons ───────────────────────────────────────────────────────
 
-type ActionBtnProps = {
+type IconActionBtnProps = {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
@@ -375,29 +401,81 @@ type ActionBtnProps = {
   disabled?: boolean;
 };
 
-export function ActionBtn({ icon: Icon, label, onClick, variant = 'default', disabled }: ActionBtnProps) {
+/** Icon-only row action (Sửa / Xoá) */
+function IconActionBtn({ icon: Icon, label, onClick, variant = 'default', disabled }: IconActionBtnProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={label}
-      className={`flex items-center gap-1 text-xs font-semibold transition-colors disabled:opacity-40 ${
+      aria-label={label}
+      className={`grid h-8 w-8 place-items-center rounded-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-40 disabled:cursor-not-allowed ${
         variant === 'destructive'
-          ? 'text-primary hover:text-destructive'
-          : 'text-muted-foreground hover:text-primary'
+          ? 'text-primary hover:bg-accent'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
       <Icon className="h-4 w-4" />
-      {label}
     </button>
   );
 }
 
+/** Standard actions cell: toggle Hoạt động/Vô hiệu + edit + delete */
+export function RowActions({
+  active, toggling, onToggle, onEdit, onDelete,
+}: {
+  active: boolean;
+  toggling?: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex justify-end items-center gap-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={toggling}
+        className="mr-1 inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {toggling && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        {active ? 'Vô hiệu' : 'Kích hoạt'}
+      </button>
+      <IconActionBtn icon={Pencil} label="Sửa" onClick={onEdit} />
+      <IconActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={onDelete} />
+    </div>
+  );
+}
+
+/** Flip is_active via the entity's upsert function, then reload the table */
+export function useToggleActive<P>(
+  save: (payload: P) => Promise<void>,
+  reload: () => void,
+) {
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const toggle = useCallback(async (row: P & { id: string; is_active: boolean }) => {
+    setTogglingId(row.id);
+    try {
+      await save({ ...row, is_active: !row.is_active });
+      toast.success(row.is_active ? 'Đã vô hiệu hóa.' : 'Đã kích hoạt.');
+      reload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setTogglingId(null);
+    }
+  }, [save, reload]);
+
+  return { togglingId, toggle };
+}
+
 // ─── Shared cell classes ──────────────────────────────────────────────────────
 
-export const cellCls = 'px-6 py-4';
-export const cellPrimaryCls = 'px-6 py-4 font-semibold text-sm';
-export const cellMutedCls = 'px-6 py-4 text-sm text-muted-foreground';
+export const cellCls = 'px-5 py-3';
+export const cellPrimaryCls = 'px-5 py-3 font-semibold text-sm';
+export const cellMutedCls = 'px-5 py-3 text-sm text-muted-foreground';
 
 // ─── Shared input / field classes ─────────────────────────────────────────────
 

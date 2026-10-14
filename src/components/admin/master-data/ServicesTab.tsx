@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { listServicesAdmin, upsertService, deleteService, fetchSpecialtiesAdmin } from '@/lib/master-data-api';
@@ -7,14 +6,15 @@ import type { Service, Specialty } from '@/types/master-data';
 import { formatVND } from '@/types/master-data';
 import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
-  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  EntityTable, ActiveBadge, RowActions, useToggleActive, ActiveStatusField, DeleteConfirmDialog,
   Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
 export default function ServicesTab() {
   const {
-    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
-  } = useEntityTableData(listServicesAdmin);
+    rows, total, loading, exporting, statusCounts, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listServicesAdmin, 6, 'services');
+  const { togglingId, toggle } = useToggleActive(upsertService, reload);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -43,6 +43,7 @@ export default function ServicesTab() {
   return (
     <>
       <EntityTable
+        statusCounts={statusCounts}
         entityLabel="dịch vụ"
         title="Dịch vụ"
         loading={loading}
@@ -81,10 +82,13 @@ export default function ServicesTab() {
             <td className={cellMutedCls}>{r.duration_minutes} phút</td>
             <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
             <td className={`${cellCls} text-right`}>
-              <div className="flex justify-end items-center gap-4">
-                <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
-              </div>
+              <RowActions
+                active={r.is_active}
+                toggling={togglingId === r.id}
+                onToggle={() => toggle(r)}
+                onEdit={() => openEdit(r)}
+                onDelete={() => setDeleteTarget(r)}
+              />
             </td>
           </>
         )}
