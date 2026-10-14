@@ -120,8 +120,8 @@ const STATUS_TABS: { value: PatientRecordStatusFilter; label: string; dot: strin
   { value: "active", label: "Đang hoạt động", dot: "bg-[#22A55A]" },
   { value: "unverified", label: "Đã nộp", dot: "bg-[#1D4FD8]" },
   { value: "draft", label: "Bản nháp", dot: "bg-[#E3A21A]" },
-  { value: "rejected", label: "Đã từ chối", dot: "bg-primary" },
   { value: "inactive", label: "Ngừng hoạt động", dot: "bg-[#7A726D]" },
+  { value: "rejected", label: "Đã từ chối", dot: "bg-primary" },
 ];
 
 const MONO_CELL = "font-mono text-xs text-[#4A4440]";
@@ -142,7 +142,18 @@ function statusClass(status: PatientRecordListRow["status"]) {
 }
 
 function createdByRoleLabel(role: PatientCreatedByRole | null): string {
-  return role === "patient" ? "Tự đăng ký" : formatCreatedByRole(role);
+  switch (role) {
+    case "patient":
+      return "Tự đăng ký";
+    case "doctor":
+      return "Bác sĩ tạo";
+    case "nurse":
+      return "Điều dưỡng tạo";
+    case "admin":
+      return "Quản trị tạo";
+    default:
+      return formatCreatedByRole(role);
+  }
 }
 
 function createdByRoleClass(role: PatientCreatedByRole | null) {
@@ -464,11 +475,12 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
 
             <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[#7A726D]">
               <Label htmlFor="date-from" className="text-xs font-normal text-[#7A726D]">
-                Ngày tạo
+                Cập nhật
               </Label>
               <Input
                 id="date-from"
                 type="date"
+                aria-label="Cập nhật từ ngày"
                 value={filters.dateFrom}
                 onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
                 className={`${fieldClass} w-[136px]`}
@@ -477,7 +489,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
               <Input
                 id="date-to"
                 type="date"
-                aria-label="Đến ngày"
+                aria-label="Cập nhật đến ngày"
                 value={filters.dateTo}
                 onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
                 className={`${fieldClass} w-[136px]`}
