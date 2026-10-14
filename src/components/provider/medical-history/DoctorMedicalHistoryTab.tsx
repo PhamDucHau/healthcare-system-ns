@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Download, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { listDoctorAppointmentsAuditLog } from '@/lib/delta-log-api';
 import type { AppointmentsAuditEntry, AppointmentAction, AppointmentsAuditListParams, DeltaLogListResult } from '@/types/delta-log';
 import { exportRowsToCsv } from '@/lib/csv-export';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AppointmentDetailDialog from '@/components/admin/delta-log/AppointmentDetailDialog';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 10;
 
 const ACTION_FILTER_OPTIONS: { value: AppointmentAction | ''; label: string }[] = [
-  { value: '', label: 'Tất cả' },
+  { value: '', label: 'Mọi hành động' },
   { value: 'CREATE_WALKIN', label: 'Tạo walk-in' },
   { value: 'CHECKIN', label: 'Check-in' },
   { value: 'CANCEL', label: 'Hủy' },
@@ -30,11 +29,11 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE_WALKIN: 'bg-green-50 text-green-700 border border-green-200',
-  CHECKIN: 'bg-blue-50 text-blue-700 border border-blue-200',
-  CANCEL: 'bg-red-50 text-red-700 border border-red-200',
-  RESCHEDULE: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
-  BULK_CANCEL: 'bg-red-50 text-red-700 border border-red-200',
+  CREATE_WALKIN: 'bg-green-50 text-green-700',
+  CHECKIN: 'bg-blue-50 text-blue-700',
+  CANCEL: 'bg-red-50 text-red-700',
+  RESCHEDULE: 'bg-amber-50 text-amber-700',
+  BULK_CANCEL: 'bg-red-50 text-red-700',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -48,13 +47,13 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: 'bg-blue-50 text-blue-700 border border-blue-200',
-  CONFIRMED: 'bg-blue-50 text-blue-700 border border-blue-200',
-  CHECKED_IN: 'bg-teal-50 text-teal-700 border border-teal-200',
-  IN_PROGRESS: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
-  COMPLETED: 'bg-green-50 text-green-700 border border-green-200',
-  CANCELLED: 'bg-gray-50 text-gray-600 border border-gray-200',
-  NO_SHOW: 'bg-red-50 text-red-700 border border-red-200',
+  SCHEDULED: 'bg-blue-50 text-blue-700',
+  CONFIRMED: 'bg-blue-50 text-blue-700',
+  CHECKED_IN: 'bg-green-50 text-green-700',
+  IN_PROGRESS: 'bg-amber-50 text-amber-700',
+  COMPLETED: 'bg-muted text-foreground/70',
+  CANCELLED: 'bg-red-50 text-red-700',
+  NO_SHOW: 'bg-red-50 text-red-700',
 };
 
 const BASE_EXPORT_COLUMNS = [
@@ -68,6 +67,12 @@ const TAIL_EXPORT_COLUMNS = [
   { key: 'status', label: 'Trạng thái' },
   { key: 'notes', label: 'Ghi chú' },
 ];
+
+const CONTROL_CLASS =
+  'h-9 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary';
+const TH_CLASS = 'px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap';
+const PAGE_BTN_CLASS =
+  'min-w-[28px] h-7 px-1.5 rounded-md flex items-center justify-center border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
 type Query = {
   search: string;
@@ -84,13 +89,15 @@ type Props = {
   showPatientColumn?: boolean;
   showDoctorColumn?: boolean;
   searchPlaceholder?: string;
+  description?: string;
 };
 
 export default function DoctorMedicalHistoryTab({
   listLogs = listDoctorAppointmentsAuditLog,
   showPatientColumn = true,
   showDoctorColumn = false,
-  searchPlaceholder = 'Tìm kiếm bệnh nhân...',
+  searchPlaceholder = 'Tìm bệnh nhân…',
+  description = 'Lịch sử khám của các bệnh nhân bạn đã điều trị',
 }: Props) {
   const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
   const [filterAction, setFilterAction] = useState<AppointmentAction | ''>('');
@@ -99,7 +106,6 @@ export default function DoctorMedicalHistoryTab({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -168,7 +174,6 @@ export default function DoctorMedicalHistoryTab({
     return pages;
   }, [totalPages, safePage]);
 
-  const filterLabel = ACTION_FILTER_OPTIONS.find((o) => o.value === filterAction)?.label ?? 'Tất cả';
   const searchNorm = query.search.trim().toLowerCase();
 
   async function handleExport() {
@@ -205,225 +210,187 @@ export default function DoctorMedicalHistoryTab({
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
-      <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <input
-            type="search"
-            value={query.search}
-            onChange={(e) => onQueryChange({ search: e.target.value })}
-            placeholder={searchPlaceholder}
-            className="w-full bg-background border border-border/50 rounded-lg py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <p className="text-sm text-muted-foreground lg:flex-1">{description}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="relative sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="search"
+              value={query.search}
+              onChange={(e) => onQueryChange({ search: e.target.value })}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              className={`${CONTROL_CLASS} w-full pl-9 pr-3 placeholder:text-muted-foreground`}
+            />
+          </div>
           <div className="flex items-center gap-2">
-            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={`p-2 rounded-lg border border-border/50 text-muted-foreground hover:bg-muted transition-colors ${
-                    filterAction ? 'border-primary/50 text-primary bg-accent/20' : ''
-                  }`}
-                  title="Lọc theo hành động"
-                >
-                  <Filter className="h-4 w-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-48 p-2">
-                <p className="px-3 py-1 text-[10px] font-semibold uppercase text-muted-foreground">Lọc theo hành động</p>
-                {ACTION_FILTER_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onClick={() => { setFilterAction(o.value); setFilterOpen(false); onQueryChange({ page: 1 }); }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      filterAction === o.value
-                        ? 'bg-accent/30 text-primary font-semibold'
-                        : 'hover:bg-muted text-foreground'
-                    }`}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-            {filterAction && (
-              <span className="text-xs text-muted-foreground hidden sm:inline">{filterLabel}</span>
-            )}
+            <select
+              value={filterAction}
+              onChange={(e) => { setFilterAction(e.target.value as AppointmentAction | ''); onQueryChange({ page: 1 }); }}
+              aria-label="Lọc theo hành động"
+              className={`${CONTROL_CLASS} flex-1 sm:flex-none px-3 cursor-pointer ${filterAction ? 'border-primary text-primary' : ''}`}
+            >
+              {ACTION_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={handleExport}
               disabled={total === 0 || exporting}
-              className="p-2 rounded-lg border border-border/50 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-              title="Xuất CSV"
+              className={`${CONTROL_CLASS} inline-flex items-center gap-1.5 px-3 font-medium hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Xuất CSV
             </button>
           </div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-      ) : total === 0 ? (
-        <div className="p-12 text-center text-sm text-muted-foreground">
-          {searchNorm || filterAction
-            ? searchNorm
-              ? `Không tìm thấy kết quả cho "${query.search.trim()}".`
-              : 'Không có bản ghi phù hợp với bộ lọc.'
-            : 'Chưa có lịch sử khám bệnh.'}
-        </div>
-      ) : (
-        <>
-          {/* Mobile card view */}
-          <div className="md:hidden divide-y divide-border/30">
-            {entries.map((e) => (
-              <div key={e.id} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi })}
-                  </span>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_COLORS[e.action] ?? 'bg-muted text-muted-foreground'}`}>
-                    {ACTION_LABELS[e.action] ?? e.action}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {showDoctorColumn ? (e.doctor_name ?? '—') : (e.patient_name ?? '—')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{e.specialty_name ?? '—'}</p>
-                  </div>
-                  {e.new_status && (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium shrink-0 ${STATUS_COLORS[e.new_status] ?? 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
-                      {STATUS_LABELS[e.new_status] ?? e.new_status}
-                    </span>
-                  )}
-                </div>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        ) : total === 0 ? (
+          <div className="p-12 text-center text-sm text-muted-foreground">
+            {searchNorm || filterAction
+              ? searchNorm
+                ? `Không tìm thấy kết quả cho "${query.search.trim()}".`
+                : 'Không có bản ghi phù hợp với bộ lọc.'
+              : 'Chưa có lịch sử khám bệnh.'}
+          </div>
+        ) : (
+          <>
+            {/* Mobile card view */}
+            <div className="md:hidden divide-y divide-border/60">
+              {entries.map((e) => (
                 <button
+                  key={e.id}
                   type="button"
                   onClick={() => setDetailId(e.appointment_id)}
-                  className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+                  className="w-full text-left p-4 flex flex-col gap-2 hover:bg-muted/40 transition-colors cursor-pointer"
                 >
-                  Xem chi tiết
-                  <ChevronRight className="h-3 w-3" />
+                  <div className="flex items-center justify-between gap-2">
+                    <TimeCell iso={e.performed_at} />
+                    <ActionBadge action={e.action} />
+                  </div>
+                  <div className="flex items-center justify-between gap-2 w-full">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold truncate">
+                        {showDoctorColumn ? (e.doctor_name ?? '—') : (e.patient_name ?? '—')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{e.specialty_name ?? '—'}</p>
+                    </div>
+                    <StatusBadge status={e.new_status} />
+                  </div>
+                  <span className="self-end inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                    Xem chi tiết <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
                 </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop table view */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-card">
-                <tr className="border-b border-border/30">
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Thời gian</th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hành động</th>
-                  {showPatientColumn ? (
-                    <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bệnh nhân</th>
-                  ) : null}
-                  {showDoctorColumn ? (
-                    <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bác sĩ</th>
-                  ) : null}
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Chuyên khoa</th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trạng thái</th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden xl:table-cell">Ghi chú</th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chi tiết</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30">
-                {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-muted/30 transition-colors h-14">
-                    <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
-                      {format(parseISO(e.performed_at), 'dd/MM/yy HH:mm', { locale: vi })}
-                    </td>
-                    <td className="px-4 lg:px-6 py-4">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${ACTION_COLORS[e.action] ?? 'bg-muted text-muted-foreground'}`}>
-                        {ACTION_LABELS[e.action] ?? e.action}
-                      </span>
-                    </td>
-                    {showPatientColumn ? (
-                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.patient_name ?? '—'}</td>
-                    ) : null}
-                    {showDoctorColumn ? (
-                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">{e.doctor_name ?? '—'}</td>
-                    ) : null}
-                    <td className="px-4 lg:px-6 py-4 text-sm hidden lg:table-cell">{e.specialty_name ?? '—'}</td>
-                    <td className="px-4 lg:px-6 py-4">
-                      {e.new_status ? (
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[e.new_status] ?? 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
-                          {STATUS_LABELS[e.new_status] ?? e.new_status}
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td className="px-4 lg:px-6 py-4 text-xs text-muted-foreground max-w-[200px] truncate hidden xl:table-cell">
-                      {e.notes ?? '—'}
-                    </td>
-                    <td className="px-4 lg:px-6 py-4">
-                      <button
-                        type="button"
-                        onClick={() => setDetailId(e.appointment_id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-                      >
-                        Xem chi tiết
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {total > query.pageSize && (
-            <div className="px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/30">
-              <p className="text-xs text-muted-foreground">
-                Hiển thị {from} đến {to} của {total} bản ghi
-              </p>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={safePage <= 1}
-                  onClick={() => onQueryChange({ page: safePage - 1 })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border/50 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                {visiblePages.map((n, idx) => (
-                  n === 'ellipsis' ? (
-                    <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-muted-foreground">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => onQueryChange({ page: n })}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
-                        n === safePage
-                          ? 'bg-primary text-primary-foreground'
-                          : 'border border-border/50 text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  )
-                ))}
-                <button
-                  type="button"
-                  disabled={safePage >= totalPages}
-                  onClick={() => onQueryChange({ page: safePage + 1 })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border/50 text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              ))}
             </div>
-          )}
-        </>
-      )}
+
+            {/* Desktop table view */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/40 border-b border-border">
+                  <tr>
+                    <th className={TH_CLASS}>Thời gian</th>
+                    {showPatientColumn ? <th className={TH_CLASS}>Bệnh nhân</th> : null}
+                    {showDoctorColumn ? <th className={TH_CLASS}>Bác sĩ</th> : null}
+                    <th className={`${TH_CLASS} hidden lg:table-cell`}>Chuyên khoa</th>
+                    <th className={TH_CLASS}>Hành động</th>
+                    <th className={TH_CLASS}>Trạng thái</th>
+                    <th className={`${TH_CLASS} hidden xl:table-cell`}>Ghi chú</th>
+                    <th className={TH_CLASS}><span className="sr-only">Chi tiết</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {entries.map((e) => (
+                    <tr
+                      key={e.id}
+                      onClick={() => setDetailId(e.appointment_id)}
+                      className="h-12 cursor-pointer hover:bg-muted/40 transition-colors"
+                    >
+                      <td className="px-4 py-2 whitespace-nowrap"><TimeCell iso={e.performed_at} /></td>
+                      {showPatientColumn ? (
+                        <td className="px-4 py-2 font-semibold max-w-[280px] truncate">{e.patient_name ?? '—'}</td>
+                      ) : null}
+                      {showDoctorColumn ? (
+                        <td className="px-4 py-2 font-semibold max-w-[280px] truncate">{e.doctor_name ?? '—'}</td>
+                      ) : null}
+                      <td className="px-4 py-2 text-foreground/80 hidden lg:table-cell">{e.specialty_name ?? '—'}</td>
+                      <td className="px-4 py-2"><ActionBadge action={e.action} /></td>
+                      <td className="px-4 py-2"><StatusBadge status={e.new_status} /></td>
+                      <td className="px-4 py-2 text-muted-foreground max-w-[220px] truncate hidden xl:table-cell">
+                        {e.notes || <span className="text-muted-foreground/60">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(ev) => { ev.stopPropagation(); setDetailId(e.appointment_id); }}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                        >
+                          Xem chi tiết <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border bg-muted/40 text-xs text-muted-foreground">
+              <p>
+                Hiển thị <span className="font-semibold text-foreground">{from}–{to}</span> / {total} bản ghi
+              </p>
+              {totalPages > 1 && (
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    aria-label="Trang trước"
+                    disabled={safePage <= 1}
+                    onClick={() => onQueryChange({ page: safePage - 1 })}
+                    className={PAGE_BTN_CLASS}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {visiblePages.map((n, idx) => (
+                    n === 'ellipsis' ? (
+                      <span key={`ellipsis-${idx}`} className="w-7 h-7 flex items-center justify-center">
+                        ...
+                      </span>
+                    ) : n === safePage ? (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-current="page"
+                        className="min-w-[28px] h-7 px-1.5 rounded-md flex items-center justify-center bg-primary text-primary-foreground font-semibold"
+                      >
+                        {n}
+                      </button>
+                    ) : (
+                      <button key={n} type="button" onClick={() => onQueryChange({ page: n })} className={PAGE_BTN_CLASS}>
+                        {n}
+                      </button>
+                    )
+                  ))}
+                  <button
+                    type="button"
+                    aria-label="Trang sau"
+                    disabled={safePage >= totalPages}
+                    onClick={() => onQueryChange({ page: safePage + 1 })}
+                    className={PAGE_BTN_CLASS}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       <AppointmentDetailDialog
         appointmentId={detailId}
@@ -431,5 +398,32 @@ export default function DoctorMedicalHistoryTab({
         onOpenChange={(open) => { if (!open) setDetailId(null); }}
       />
     </div>
+  );
+}
+
+function TimeCell({ iso }: { iso: string }) {
+  const d = parseISO(iso);
+  return (
+    <span className="tabular-nums">
+      <span className="font-mono text-[13px] font-medium text-foreground">{format(d, 'HH:mm', { locale: vi })}</span>{' '}
+      <span className="text-xs text-muted-foreground">{format(d, 'dd/MM/yy', { locale: vi })}</span>
+    </span>
+  );
+}
+
+function ActionBadge({ action }: { action: string }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap ${ACTION_COLORS[action] ?? 'bg-muted text-muted-foreground'}`}>
+      {ACTION_LABELS[action] ?? action}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-muted-foreground/60">—</span>;
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap ${STATUS_COLORS[status] ?? 'bg-muted text-muted-foreground'}`}>
+      {STATUS_LABELS[status] ?? status}
+    </span>
   );
 }
