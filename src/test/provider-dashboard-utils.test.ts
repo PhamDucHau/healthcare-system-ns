@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { AdminAppointment } from "@/types/admin-appointment";
 import type { ClinicalTask } from "@/lib/ai-assistant-api";
 import {
+  ageFromDob,
   deriveClinicalTaskItems,
+  deriveUpcomingSchedule,
   deriveMonitoringStats,
   deriveRecentPatients,
   deriveTodaySchedule,
@@ -71,6 +73,40 @@ describe("provider-dashboard-utils", () => {
     ]);
     expect(schedule.map((s) => s.id)).toEqual(["early", "late"]);
     expect(schedule[0].mode).toBe("Khám không hẹn");
+  });
+
+  it("exposes next remaining time in today stats", () => {
+    const stats = deriveTodayStats([
+      appt({ id: "done", status: "COMPLETED", start_time: "07:00:00" }),
+      appt({ id: "b", status: "CONFIRMED", start_time: "10:30:00" }),
+      appt({ id: "a", status: "CHECKED_IN", start_time: "09:15:00" }),
+    ]);
+    expect(stats.nextTime).toBe("09:15");
+    expect(deriveTodayStats([appt({ status: "COMPLETED" })]).nextTime).toBeNull();
+  });
+
+  it("derives upcoming schedule after today sorted by date and time", () => {
+    const upcoming = deriveUpcomingSchedule(
+      [
+        appt({ id: "today", slot_date: "2026-10-02" }),
+        appt({ id: "late", slot_date: "2026-10-31", start_time: "11:00:00" }),
+        appt({ id: "cancel", slot_date: "2026-10-05", status: "CANCELLED" }),
+        appt({ id: "early", slot_date: "2026-10-16", start_time: "10:00:00" }),
+        appt({ id: "mid", slot_date: "2026-10-29", start_time: "15:00:00" }),
+      ],
+      "2026-10-02",
+      2,
+    );
+    expect(upcoming.map((u) => u.id)).toEqual(["early", "mid"]);
+    expect(upcoming[0].dateLabel).toBe("T6, 16/10/2026");
+    expect(upcoming[0].statusLabel).toBe("Chờ khám");
+  });
+
+  it("computes age from date of birth", () => {
+    const now = new Date("2026-10-02T12:00:00");
+    expect(ageFromDob("1999-11-23", now)).toBe(26);
+    expect(ageFromDob("1989-03-21", now)).toBe(37);
+    expect(ageFromDob(null, now)).toBeNull();
   });
 
   it("builds weekly chart with seven days", () => {

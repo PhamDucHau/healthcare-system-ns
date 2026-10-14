@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { fetchClinicalTasks } from "@/lib/ai-assistant-api";
 import { fetchDoctorAppointments } from "@/lib/doctor-appointment-api";
@@ -8,6 +9,7 @@ import {
   deriveClinicalTaskItems,
   deriveTodaySchedule,
   deriveTodayStats,
+  deriveUpcomingSchedule,
   deriveWeeklyChart,
   formatDoctorDisplayName,
   getWeekRange,
@@ -28,9 +30,12 @@ export type ProviderDashboardData = {
   todayStats: DashboardTodayStats;
   monitoringStats: DashboardMonitoringStats;
   todaySchedule: DashboardScheduleItem[];
+  upcomingSchedule: DashboardScheduleItem[];
   weeklyChart: DashboardWeekChartPoint[];
   clinicalTasks: DashboardClinicalTaskItem[];
 };
+
+const UPCOMING_WINDOW_DAYS = 60;
 
 const EMPTY_MONITORING: DashboardMonitoringStats = { total: 0, newThisWeek: 0 };
 
@@ -111,24 +116,30 @@ export function useProviderDashboardRecentPatients() {
 async function loadProviderDashboard(anchor: Date): Promise<ProviderDashboardData> {
   const { today, dateFrom, dateTo } = getWeekRange(anchor);
 
-  const [profileResult, todayApptsResult, weekApptsResult, tasksResult] =
+  const upcomingFrom = format(addDays(anchor, 1), "yyyy-MM-dd");
+  const upcomingTo = format(addDays(anchor, UPCOMING_WINDOW_DAYS), "yyyy-MM-dd");
+
+  const [profileResult, todayApptsResult, weekApptsResult, tasksResult, upcomingApptsResult] =
     await Promise.allSettled([
       getMyDoctorProfile(),
       fetchDoctorAppointments({ date: today }),
       fetchDoctorAppointments({ dateFrom, dateTo }),
       fetchClinicalTasks("doctor"),
+      fetchDoctorAppointments({ dateFrom: upcomingFrom, dateTo: upcomingTo }),
     ]);
 
   const profile = settled(profileResult, null);
   const todayAppts = settled(todayApptsResult, [] as AdminAppointment[]);
   const weekAppts = settled(weekApptsResult, [] as AdminAppointment[]);
   const tasks = settled(tasksResult, [] as ClinicalTask[]);
+  const upcomingAppts = settled(upcomingApptsResult, [] as AdminAppointment[]);
 
   return {
     doctorName: formatDoctorDisplayName(profile?.full_name),
     todayStats: deriveTodayStats(todayAppts),
     monitoringStats: EMPTY_MONITORING,
     todaySchedule: deriveTodaySchedule(todayAppts),
+    upcomingSchedule: deriveUpcomingSchedule(upcomingAppts, today, 3),
     weeklyChart: deriveWeeklyChart(weekAppts, anchor),
     clinicalTasks: deriveClinicalTaskItems(tasks, 4, anchor),
   };
