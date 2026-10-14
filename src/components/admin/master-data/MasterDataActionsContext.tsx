@@ -10,6 +10,8 @@ type MasterDataActionsContextValue = {
   setActiveTab: (tab: string) => void;
   registerAddAction: (tab: string, action: AddAction | null) => void;
   currentAddAction: AddAction | null;
+  tabCounts: Record<string, number>;
+  setTabCount: (tab: string, count: number) => void;
 };
 
 const MasterDataActionsContext = createContext<MasterDataActionsContextValue | null>(null);
@@ -35,11 +37,17 @@ export function MasterDataActionsProvider({
     });
   }, []);
 
+  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+
+  const setTabCount = useCallback((tab: string, count: number) => {
+    setTabCounts((prev) => (prev[tab] === count ? prev : { ...prev, [tab]: count }));
+  }, []);
+
   const currentAddAction = addActions[activeTab] ?? null;
 
   const value = useMemo(
-    () => ({ activeTab, setActiveTab, registerAddAction, currentAddAction }),
-    [activeTab, registerAddAction, currentAddAction],
+    () => ({ activeTab, setActiveTab, registerAddAction, currentAddAction, tabCounts, setTabCount }),
+    [activeTab, registerAddAction, currentAddAction, tabCounts, setTabCount],
   );
 
   return (
@@ -53,6 +61,11 @@ export function useMasterDataActions() {
   const ctx = useContext(MasterDataActionsContext);
   if (!ctx) throw new Error('useMasterDataActions must be used within MasterDataActionsProvider');
   return ctx;
+}
+
+/** Same as useMasterDataActions but returns null outside the provider */
+export function useOptionalMasterDataActions() {
+  return useContext(MasterDataActionsContext);
 }
 
 /** Register add action for a tab; cleans up on unmount */

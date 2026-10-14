@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,12 +12,13 @@ import type { DoctorSchedule, Doctor, Facility, Room } from '@/types/master-data
 import type { Specialty } from '@/types/master-data';
 import { formatWorkDays, formatTime, DOW_LABELS } from '@/types/master-data';
 import { useRegisterAddAction } from './MasterDataActionsContext';
-import { EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog, Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls } from './shared';
+import { EntityTable, ActiveBadge, RowActions, useToggleActive, ActiveStatusField, DeleteConfirmDialog, Field, FormActions, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls } from './shared';
 
 export default function DoctorSchedulesTab() {
   const {
-    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
-  } = useEntityTableData(listDoctorSchedulesAdmin);
+    rows, total, loading, exporting, statusCounts, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listDoctorSchedulesAdmin, 6, 'schedules');
+  const { togglingId, toggle } = useToggleActive(upsertDoctorSchedule, reload);
   const [doctors, setDoctors]   = useState<Doctor[]>([]);
   const [specialties, setSpec]  = useState<Specialty[]>([]);
   const [facilities, setFac]    = useState<Facility[]>([]);
@@ -64,6 +65,7 @@ export default function DoctorSchedulesTab() {
   return (
     <>
       <EntityTable
+        statusCounts={statusCounts}
         entityLabel="lịch làm việc"
         title="Lịch BS"
         loading={loading}
@@ -120,10 +122,13 @@ export default function DoctorSchedulesTab() {
             <td className={`${cellCls} text-sm`}>{r.slot_duration_minutes}'</td>
             <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
             <td className={`${cellCls} text-right`}>
-              <div className="flex justify-end items-center gap-4">
-                <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
-              </div>
+              <RowActions
+                active={r.is_active}
+                toggling={togglingId === r.id}
+                onToggle={() => toggle(r)}
+                onEdit={() => openEdit(r)}
+                onDelete={() => setDeleteTarget(r)}
+              />
             </td>
           </>
         )}

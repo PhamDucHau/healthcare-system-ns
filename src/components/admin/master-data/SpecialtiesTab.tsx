@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { listSpecialtiesAdmin, upsertSpecialty, deleteSpecialty } from '@/lib/master-data-api';
 import type { Specialty } from '@/types/master-data';
 import { useRegisterAddAction } from './MasterDataActionsContext';
 import {
-  EntityTable, ActiveBadge, ActionBtn, ActiveStatusField, DeleteConfirmDialog,
+  EntityTable, ActiveBadge, RowActions, useToggleActive, ActiveStatusField, DeleteConfirmDialog,
   Field, inputCls, useEntityDialog, useEntityTableData, cellPrimaryCls, cellMutedCls, cellCls,
 } from './shared';
 
@@ -22,8 +22,9 @@ const EXPORT_COLUMNS = [
 
 export default function SpecialtiesTab() {
   const {
-    rows, total, loading, exporting, query, onQueryChange, reload, fetchExportRows,
-  } = useEntityTableData(listSpecialtiesAdmin);
+    rows, total, loading, exporting, statusCounts, query, onQueryChange, reload, fetchExportRows,
+  } = useEntityTableData(listSpecialtiesAdmin, 6, 'specialties');
+  const { togglingId, toggle } = useToggleActive(upsertSpecialty, reload);
   const [deleteTarget, setDeleteTarget] = useState<Specialty | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { open, editing, openAdd, openEdit, close } = useEntityDialog<Specialty>();
@@ -45,6 +46,7 @@ export default function SpecialtiesTab() {
   return (
     <>
       <EntityTable
+        statusCounts={statusCounts}
         entityLabel="chuyên khoa"
         title="Chuyên khoa"
         loading={loading}
@@ -70,10 +72,13 @@ export default function SpecialtiesTab() {
             <td className={cellMutedCls}>{r.description ?? '—'}</td>
             <td className={cellCls}><ActiveBadge active={r.is_active} /></td>
             <td className={`${cellCls} text-right`}>
-              <div className="flex justify-end items-center gap-4">
-                <ActionBtn icon={Pencil} label="Sửa" onClick={() => openEdit(r)} />
-                <ActionBtn icon={Trash2} label="Xoá" variant="destructive" onClick={() => setDeleteTarget(r)} />
-              </div>
+              <RowActions
+                active={r.is_active}
+                toggling={togglingId === r.id}
+                onToggle={() => toggle(r)}
+                onEdit={() => openEdit(r)}
+                onDelete={() => setDeleteTarget(r)}
+              />
             </td>
           </>
         )}
