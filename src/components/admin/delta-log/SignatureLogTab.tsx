@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from 'lucide-react';
+import { Filter, Loader2, Search } from 'lucide-react';
+import {
+  DeltaLogCsvExportButton,
+  DeltaLogPagination,
+  deltaLogSearchInputClass,
+} from '@/components/admin/delta-log/delta-log-ui';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { listSignatureLogs } from '@/lib/delta-log-api';
 import type { SignatureLogEntry, SignatureTargetType } from '@/types/delta-log';
@@ -52,7 +58,11 @@ type Query = {
   pageSize: number;
 };
 
-export default function SignatureLogTab() {
+type SignatureLogTabProps = {
+  embedded?: boolean;
+};
+
+export default function SignatureLogTab({ embedded = false }: SignatureLogTabProps) {
   const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
   const [filterTarget, setFilterTarget] = useState<SignatureTargetType | ''>('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -157,7 +167,7 @@ export default function SignatureLogTab() {
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
+    <div className={cn(embedded ? 'overflow-hidden' : 'bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden')}>
       <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -166,7 +176,7 @@ export default function SignatureLogTab() {
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
             placeholder="Tìm người ký hoặc bệnh nhân..."
-            className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className={deltaLogSearchInputClass}
           />
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
@@ -204,15 +214,11 @@ export default function SignatureLogTab() {
             {filterTarget && (
               <span className="text-xs text-muted-foreground hidden sm:inline">{filterLabel}</span>
             )}
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={total === 0 || exporting}
-              className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-              title="Xuất CSV"
-            >
-              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            </button>
+            <DeltaLogCsvExportButton
+              exporting={exporting}
+              disabled={total === 0}
+              onClick={() => void handleExport()}
+            />
           </div>
         </div>
       </div>
@@ -300,51 +306,15 @@ export default function SignatureLogTab() {
             </table>
           </div>
 
-          {total > query.pageSize && (
-            <div className="px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/30">
-              <p className="text-xs text-muted-foreground">
-                Hiển thị {from} đến {to} của {total} bản ghi
-              </p>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={safePage <= 1}
-                  onClick={() => onQueryChange({ page: safePage - 1 })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                {visiblePages.map((n, idx) => (
-                  n === 'ellipsis' ? (
-                    <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-xs text-muted-foreground">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => onQueryChange({ page: n })}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-colors ${
-                        n === safePage
-                          ? 'bg-primary text-primary-foreground'
-                          : 'border border-border text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  )
-                ))}
-                <button
-                  type="button"
-                  disabled={safePage >= totalPages}
-                  onClick={() => onQueryChange({ page: safePage + 1 })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          <DeltaLogPagination
+            from={from}
+            to={to}
+            total={total}
+            safePage={safePage}
+            totalPages={totalPages}
+            visiblePages={visiblePages}
+            onPageChange={(page) => onQueryChange({ page })}
+          />
         </>
       )}
 
