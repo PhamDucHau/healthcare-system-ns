@@ -13,8 +13,8 @@ import {
   Pencil,
   RefreshCw,
   Search,
+  Plus,
   Trash2,
-  UserRoundPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import AdminEditPatientDialog from "@/components/admin/patients/AdminEditPatientDialog";
@@ -115,40 +115,58 @@ function formatDateTime(iso: string | null): string {
   }
 }
 
+const STATUS_TABS: { value: PatientRecordStatusFilter; label: string; dot: string }[] = [
+  { value: "all", label: "Tất cả", dot: "bg-[#9A928D]" },
+  { value: "active", label: "Đang hoạt động", dot: "bg-[#22A55A]" },
+  { value: "unverified", label: "Đã nộp", dot: "bg-[#1D4FD8]" },
+  { value: "draft", label: "Bản nháp", dot: "bg-[#E3A21A]" },
+  { value: "rejected", label: "Đã từ chối", dot: "bg-primary" },
+  { value: "inactive", label: "Ngừng hoạt động", dot: "bg-[#7A726D]" },
+];
+
+const MONO_CELL = "font-mono text-xs text-[#4A4440]";
+
 function statusClass(status: PatientRecordListRow["status"]) {
   switch (status) {
     case "Đang hoạt động":
-      return "bg-emerald-100 text-emerald-800";
+      return "bg-[#E9F7EE] text-[#157F3D]";
     case "Đã nộp":
-      return "bg-green-100 text-green-800";
+      return "bg-[#EAF0FF] text-[#1D4FD8]";
     case "Đã từ chối":
-      return "bg-rose-100 text-rose-800";
+      return "bg-[#FCEBEF] text-primary";
     case "Ngừng hoạt động":
-      return "bg-slate-100 text-slate-700";
+      return "bg-[#F0EEEC] text-[#57524E]";
     default:
-      return "bg-amber-100 text-amber-800";
+      return "bg-[#FFF4DD] text-[#A65F00]";
   }
 }
 
+function createdByRoleLabel(role: PatientCreatedByRole | null): string {
+  return role === "patient" ? "Tự đăng ký" : formatCreatedByRole(role);
+}
+
 function createdByRoleClass(role: PatientCreatedByRole | null) {
-  switch (role) {
-    case "patient":
-      return "bg-sky-100 text-sky-800";
-    case "doctor":
-      return "bg-violet-100 text-violet-800";
-    case "nurse":
-      return "bg-teal-100 text-teal-800";
-    case "admin":
-      return "bg-slate-100 text-slate-800";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
+  return role === "patient" || role == null ? "text-[#4A4440]" : "text-[#6D3FC9]";
+}
+
+function splitDateTime(iso: string | null): { date: string; time: string } {
+  const full = formatDateTime(iso);
+  const [date, time = ""] = full.split(" ");
+  return { date, time };
 }
 
 function getVisiblePages(current: number, total: number): number[] {
   if (total <= 1) return [1];
   const pages = new Set<number>([1, total, current, current - 1, current + 1]);
   return [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+}
+
+function pagerButtonClass(current: boolean): string {
+  return `grid h-7 min-w-7 place-items-center rounded-md px-1.5 text-xs transition-colors disabled:cursor-not-allowed ${
+    current
+      ? "bg-primary font-semibold text-primary-foreground"
+      : "cursor-pointer border border-[#E1DDDA] bg-white text-foreground hover:bg-[#FAF9F8] disabled:text-[#B5ADA8]"
+  }`;
 }
 
 function hasActiveFilters(filters: PatientRecordsFilters, search: string): boolean {
@@ -178,10 +196,10 @@ function SortableHead({ label, field, sort, onSort, className }: SortableHeadPro
       <button
         type="button"
         onClick={() => onSort(field)}
-        className="inline-flex items-center gap-1 font-semibold text-foreground transition-colors hover:text-foreground"
+        className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#7A726D] transition-colors hover:text-foreground"
       >
         {label}
-        <Icon className={`h-3.5 w-3.5 ${active ? "text-primary" : "text-muted-foreground/70"}`} />
+        <Icon className={`h-3 w-3 ${active ? "text-primary" : "text-[#B5ADA8]"}`} aria-hidden="true" />
       </button>
     </TableHead>
   );
@@ -247,12 +265,39 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
     placeholderData: (previous) => previous,
   });
 
-  const rows = data?.rows ?? [];
+  const countParams = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      createdByRole: filters.createdByRole,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined,
+    }),
+    [debouncedSearch, filters.createdByRole, filters.dateFrom, filters.dateTo],
+  );
+
+  const { data: statusCounts, refetch: refetchCounts } = useQuery({
+    queryKey: ["patient-records", "status-counts", countParams] as const,
+    queryFn: async () => {
+      const results = await Promise.all(
+        STATUS_TABS.map(({ value }) =>
+          searchPatientRecords(supabase, { ...countParams, status: value, page: 1, limit: 1 }),
+        ),
+      );
+      return Object.fromEntries(
+        STATUS_TABS.map(({ value }, i) => [value, results[i].error ? null : results[i].total]),
+      ) as Partial<Record<PatientRecordStatusFilter, number | null>>;
+    },
+    placeholderData: (previous) => previous,
+  });
+
+  const rows = useMemo(() => data?.rows ?? [], [data]);
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const visiblePages = getVisiblePages(page, totalPages);
   const showingFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const showingTo = total === 0 ? 0 : Math.min(page * pageSize, total);
+
+  const refreshAll = () => Promise.all([refetch(), refetchCounts()]);
 
   const openDetail = (id: string) => {
     setSelectedId(id);
@@ -271,7 +316,7 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
     } else {
       toast.success(`Đã xóa hồ sơ ${deleteTarget.full_name}`);
       setDeleteTarget(null);
-      void refetch();
+      void refreshAll();
     }
   };
 
@@ -292,160 +337,174 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
   };
 
   const title = portal === "admin" ? "Quản lý hồ sơ bệnh nhân" : "Hồ sơ bệnh nhân";
-  const stickyActionClass =
-    "sticky right-0 z-10 min-w-[4.5rem] border-l bg-white group-even:bg-[#FCFCFC] group-hover:bg-[#F9FAFB] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]";
-  const stickyHeadClass =
-    "sticky right-0 z-30 min-w-[4.5rem] border-l border-b-2 border-border bg-[#F8FAFC] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]";
+  const filtersActive = hasActiveFilters(filters, debouncedSearch);
+  const duplicateIdNumbers = useMemo(() => {
+    const counts = new Map<string, number>();
+    rows.forEach((row) => {
+      if (row.id_number) counts.set(row.id_number, (counts.get(row.id_number) ?? 0) + 1);
+    });
+    return new Set([...counts].filter(([, n]) => n > 1).map(([id]) => id));
+  }, [rows]);
+
+  const headClass =
+    "whitespace-nowrap bg-[#FAF9F8] text-[11px] font-semibold uppercase tracking-wider text-[#7A726D]";
+  const fieldClass =
+    "h-8 rounded-[7px] border-[#E1DDDA] bg-[#FAF9F8] text-[13px] shadow-none focus-visible:ring-primary/30";
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-              <FileUser className="h-7 w-7 text-primary" aria-hidden="true" />
-              {title}
-            </h1>
-            {/* {total > 0 ? (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tổng <span className="font-semibold text-foreground">{total}</span> hồ sơ
-              </p>
-            ) : null} */}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button type="button" className="min-h-10 shrink-0" onClick={() => setNewPatientOpen(true)}>
-              <UserRoundPlus className="h-4 w-4" aria-hidden="true" />
-              Tạo hồ sơ
-            </Button>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
+      <div className="space-y-3">
+        <h1
+          className={
+            portal === "admin"
+              ? "text-xl font-semibold tracking-tight text-foreground"
+              : "sr-only"
+          }
+        >
+          {title}
+        </h1>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div
+            role="tablist"
+            aria-label="Lọc theo trạng thái hồ sơ"
+            className="flex flex-wrap gap-0.5 rounded-lg bg-[#EDEAE7] p-[3px]"
+          >
+            {STATUS_TABS.map((tab) => {
+              const selected = filters.status === tab.value;
+              const count = statusCounts?.[tab.value];
+              return (
+                <button
+                  key={tab.value}
                   type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 shrink-0"
-                  disabled={isFetching}
-                  aria-label="Làm mới danh sách"
-                  onClick={() => {
-                    void refetch().then(() => toast.success("Đã làm mới danh sách"));
-                  }}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setFilters((prev) => ({ ...prev, status: tab.value }))}
+                  className={`flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[12.5px] font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                    selected
+                      ? "bg-white text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+                      : "text-[#7A726D] hover:text-foreground"
+                  }`}
                 >
-                  {isFetching ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Làm mới</TooltipContent>
-            </Tooltip>
+                  <span className={`h-1.5 w-1.5 rounded-full ${tab.dot}`} aria-hidden="true" />
+                  {tab.label}
+                  {count != null ? (
+                    <span className="text-[11px] font-medium text-[#9A928D] tabular-nums">{count}</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
+
+          <div className="flex-1" />
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 shrink-0 rounded-[7px] border-[#D9D5D1] bg-white px-3 font-medium hover:bg-[#FAF9F8]"
+            disabled={isFetching}
+            aria-label="Làm mới danh sách"
+            onClick={() => {
+              void refreshAll().then(() =>
+                toast.success("Đã làm mới danh sách"),
+              );
+            }}
+          >
+            {isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            Làm mới
+          </Button>
+          <Button
+            type="button"
+            className="h-8 shrink-0 rounded-[7px] px-3.5 font-semibold"
+            onClick={() => setNewPatientOpen(true)}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Tạo hồ sơ
+          </Button>
         </div>
 
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div className="relative w-full max-w-[560px] shrink-0">
-            <Search
-              className="absolute left-3 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              type="search"
-              placeholder="Tìm theo tên, email, SĐT, CCCD, mã BHYT…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-11 border-2 border-neutral-300 bg-white pl-10 focus-visible:border-neutral-400"
-              aria-label="Tìm hồ sơ bệnh nhân"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-foreground">Trạng thái</Label>
-              <Select
-                value={filters.status}
-                onValueChange={(value: PatientRecordsFilters["status"]) =>
-                  setFilters((prev) => ({ ...prev, status: value }))
-                }
-              >
-                <SelectTrigger className="h-10 w-[180px] bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="active">Đang hoạt động</SelectItem>
-                  <SelectItem value="unverified">Đã nộp</SelectItem>
-                  <SelectItem value="draft">Bản nháp</SelectItem>
-                  <SelectItem value="inactive">Ngừng hoạt động</SelectItem>
-                  <SelectItem value="rejected">Đã từ chối</SelectItem>
-                </SelectContent>
-              </Select>
+        <div className="overflow-hidden rounded-[10px] border border-[#E8E5E2] bg-white">
+          <div className="flex flex-wrap items-center gap-2 border-b border-[#EFECEA] px-3 py-2.5">
+            <div className="relative min-w-[220px] max-w-[420px] flex-[1_1_260px]">
+              <Search
+                className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#7A726D]"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                placeholder="Tên, email, SĐT, CCCD, mã BHYT…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className={`${fieldClass} pl-8`}
+                aria-label="Tìm hồ sơ bệnh nhân"
+              />
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-foreground">Nguồn tạo</Label>
-              <Select
-                value={filters.createdByRole}
-                onValueChange={(value: PatientRecordsFilters["createdByRole"]) =>
-                  setFilters((prev) => ({ ...prev, createdByRole: value }))
-                }
-              >
-                <SelectTrigger className="h-10 w-[160px] bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="patient">Bệnh nhân</SelectItem>
-                  <SelectItem value="doctor">Bác sĩ</SelectItem>
-                  <SelectItem value="nurse">Điều dưỡng</SelectItem>
-                  <SelectItem value="admin">Quản trị</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select
+              value={filters.createdByRole}
+              onValueChange={(value: PatientRecordsFilters["createdByRole"]) =>
+                setFilters((prev) => ({ ...prev, createdByRole: value }))
+              }
+            >
+              <SelectTrigger className={`${fieldClass} w-[190px]`} aria-label="Nguồn tạo">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Mọi nguồn tạo</SelectItem>
+                <SelectItem value="patient">Bệnh nhân tự đăng ký</SelectItem>
+                <SelectItem value="doctor">Bác sĩ tạo</SelectItem>
+                <SelectItem value="nurse">Điều dưỡng tạo</SelectItem>
+                <SelectItem value="admin">Quản trị tạo</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-1">
-              <Label htmlFor="date-from" className="text-xs font-semibold text-foreground">
-                Từ ngày
+            <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[#7A726D]">
+              <Label htmlFor="date-from" className="text-xs font-normal text-[#7A726D]">
+                Ngày tạo
               </Label>
               <Input
                 id="date-from"
                 type="date"
                 value={filters.dateFrom}
                 onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-                className="h-10 w-[140px] border-neutral-300 bg-white"
+                className={`${fieldClass} w-[136px]`}
               />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="date-to" className="text-xs font-semibold text-foreground">
-                Đến ngày
-              </Label>
+              <span aria-hidden="true">–</span>
               <Input
                 id="date-to"
                 type="date"
+                aria-label="Đến ngày"
                 value={filters.dateTo}
                 onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-                className="h-10 w-[140px] border-neutral-300 bg-white"
+                className={`${fieldClass} w-[136px]`}
               />
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 shrink-0 border-neutral-300 bg-white px-4"
-              disabled={!hasActiveFilters(filters, debouncedSearch)}
-              onClick={resetFilters}
-            >
-              Xóa bộ lọc
-            </Button>
-          </div>
-        </div>
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="h-8 cursor-pointer rounded-md px-2 text-[13px] font-semibold text-primary transition-colors hover:bg-primary/5"
+              >
+                Xóa bộ lọc
+              </button>
+            ) : null}
 
-        <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="flex-1" />
+            <span className="whitespace-nowrap text-xs text-[#7A726D] tabular-nums">
+              {total} hồ sơ
+            </span>
+          </div>
+
           {isLoading && !data ? (
             <div className="space-y-0 p-0">
               {Array.from({ length: pageSize }).map((_, i) => (
-                <div key={i} className="flex gap-3 border-b px-4 py-3 last:border-0">
-                  <Skeleton className="h-4 w-32" />
+                <div key={i} className="flex gap-3 border-b border-[#F0EDEB] px-4 py-4 last:border-0">
+                  <Skeleton className="h-4 w-40" />
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-4 flex-1" />
                 </div>
@@ -462,13 +521,13 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
             </div>
           ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-              <FileUser className="h-10 w-10 text-muted-foreground/40" aria-hidden="true" />
-              <p className="text-sm text-muted-foreground">
-                {hasActiveFilters(filters, debouncedSearch)
-                  ? "Không có kết quả phù hợp với bộ lọc hiện tại."
+              <FileUser className="h-10 w-10 text-[#B5ADA8]" aria-hidden="true" />
+              <p className="text-sm text-[#7A726D]">
+                {filtersActive
+                  ? "Không có hồ sơ phù hợp bộ lọc."
                   : "Chưa có hồ sơ bệnh nhân nào trong hệ thống."}
               </p>
-              {hasActiveFilters(filters, debouncedSearch) ? (
+              {filtersActive ? (
                 <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
                   Xóa bộ lọc
                 </Button>
@@ -476,156 +535,150 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
             </div>
           ) : (
             <>
-              <Table className="min-w-[1000px] text-sm [&_td]:px-3 [&_td]:py-2.5 [&_th]:px-3 [&_th]:py-2.5">
-                <TableHeader className="sticky top-0 z-20 bg-[#F8FAFC] [&_th]:font-semibold [&_th]:text-foreground [&_tr]:border-b-2 [&_tr]:border-border">
+              <Table className="min-w-[1100px] text-[13px] [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_td]:px-2.5 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 [&_th]:h-auto [&_th]:px-2.5 [&_th]:py-2.5">
+                <TableHeader className="[&_tr]:border-b [&_tr]:border-[#EFECEA]">
                   <TableRow className="hover:bg-transparent">
                     <SortableHead
                       label="Họ tên"
                       field="full_name"
                       sort={sort}
                       onSort={toggleSort}
-                      className="min-w-[140px] max-w-[220px] bg-[#F8FAFC]"
+                      className={`${headClass} min-w-[220px]`}
                     />
                     <SortableHead
                       label="Ngày sinh"
                       field="date_of_birth"
                       sort={sort}
                       onSort={toggleSort}
-                      className="whitespace-nowrap bg-[#F8FAFC]"
+                      className={headClass}
                     />
-                    <TableHead className="whitespace-nowrap bg-[#F8FAFC]">
-                      SĐT
-                    </TableHead>
-                    <TableHead className="hidden max-w-[200px] bg-[#F8FAFC] xl:table-cell">
-                      Email
-                    </TableHead>
-                    <TableHead className="hidden whitespace-nowrap bg-[#F8FAFC] lg:table-cell">
-                      Số CCCD
-                    </TableHead>
-                    <TableHead className="hidden whitespace-nowrap bg-[#F8FAFC] lg:table-cell">
-                      Mã BHYT
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap bg-[#F8FAFC] lg:hidden">
-                      Giấy tờ
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap bg-[#F8FAFC]">
-                      Trạng thái
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap bg-[#F8FAFC]">
-                      Nguồn tạo
-                    </TableHead>
+                    <TableHead className={headClass}>SĐT</TableHead>
+                    <TableHead className={headClass}>Số CCCD</TableHead>
+                    <TableHead className={`${headClass} min-w-[150px]`}>Mã BHYT</TableHead>
+                    <TableHead className={headClass}>Trạng thái</TableHead>
+                    <TableHead className={headClass}>Nguồn tạo</TableHead>
                     <SortableHead
                       label="Cập nhật"
                       field="updated_at"
                       sort={sort}
                       onSort={toggleSort}
-                      className="whitespace-nowrap bg-[#F8FAFC]"
+                      className={headClass}
                     />
-                    <TableHead className={`${stickyHeadClass} text-right`}>
-                      Thao tác
+                    <TableHead className={`${headClass} w-[76px]`}>
+                      <span className="sr-only">Thao tác</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      className="group cursor-pointer border-b border-border/50 even:bg-[#FCFCFC] hover:bg-[#F9FAFB]"
-                      onClick={() => openDetail(row.id)}
-                    >
-                      <TableCell
-                        className="min-w-[140px] max-w-[220px] truncate font-medium"
-                        title={row.full_name}
+                  {rows.map((row) => {
+                    const updated = splitDateTime(row.updated_at);
+                    const duplicate = Boolean(row.id_number && duplicateIdNumbers.has(row.id_number));
+                    return (
+                      <TableRow
+                        key={row.id}
+                        className="h-[50px] cursor-pointer border-b border-[#F0EDEB] transition-colors hover:bg-[#FBFAF9]"
+                        onClick={() => openDetail(row.id)}
                       >
-                        {row.full_name}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">
-                        {formatDob(row.date_of_birth)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">
-                        {row.phone_number ?? "—"}
-                      </TableCell>
-                      <TableCell
-                        className="hidden max-w-[200px] truncate xl:table-cell"
-                        title={row.email_address ?? undefined}
-                      >
-                        {row.email_address ?? "—"}
-                      </TableCell>
-                      <TableCell className="hidden whitespace-nowrap tabular-nums lg:table-cell">
-                        {row.id_number ?? "—"}
-                      </TableCell>
-                      <TableCell className="hidden whitespace-nowrap tabular-nums lg:table-cell">
-                        {row.member_id ?? "—"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs tabular-nums lg:hidden">
-                        <div>{row.id_number ?? "—"}</div>
-                        <div className="text-muted-foreground">{row.member_id ?? "—"}</div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(row.status)}`}
+                        <TableCell className="max-w-[280px] py-1.5">
+                          <div className="flex min-w-0 flex-col leading-tight">
+                            <span className="truncate font-semibold text-foreground" title={row.full_name}>
+                              {row.full_name}
+                            </span>
+                            <span
+                              className={`truncate text-[11.5px] ${row.email_address ? "text-[#7A726D]" : "text-[#B5ADA8]"}`}
+                              title={row.email_address ?? undefined}
+                            >
+                              {row.email_address ?? "Chưa có email"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap py-1.5 text-[#4A4440] tabular-nums">
+                          {formatDob(row.date_of_birth)}
+                        </TableCell>
+                        <TableCell className={`whitespace-nowrap py-1.5 ${MONO_CELL}`}>
+                          {row.phone_number ?? "—"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap py-1.5">
+                          <div className="flex flex-col leading-tight">
+                            <span className={MONO_CELL}>{row.id_number ?? "—"}</span>
+                            {duplicate ? (
+                              <span className="text-[10.5px] font-semibold text-[#A65F00]">Trùng CCCD</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          className={`max-w-[220px] truncate whitespace-nowrap py-1.5 ${MONO_CELL}`}
+                          title={row.member_id ?? undefined}
                         >
-                          {row.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${createdByRoleClass(row.created_by_role)}`}
+                          {row.member_id ?? "—"}
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <span
+                            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-[3px] text-[11.5px] font-semibold ${statusClass(row.status)}`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                            {row.status}
+                          </span>
+                        </TableCell>
+                        <TableCell
+                          className={`whitespace-nowrap py-1.5 text-xs ${createdByRoleClass(row.created_by_role)}`}
                         >
-                          {formatCreatedByRole(row.created_by_role)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
-                        {formatDateTime(row.updated_at)}
-                      </TableCell>
-                      <TableCell
-                        className={`${stickyActionClass} text-right`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-end gap-0.5">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => openDetail(row.id)}
-                                className="rounded-md p-1.5 text-primary transition-colors hover:bg-primary/10"
-                                aria-label="Sửa hồ sơ"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Sửa</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => setDeleteTarget(row)}
-                                className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10"
-                                aria-label="Xóa hồ sơ"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Xóa</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          {createdByRoleLabel(row.created_by_role)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap py-1.5">
+                          <div className="flex flex-col leading-tight">
+                            <span className="text-xs text-[#4A4440] tabular-nums">{updated.date}</span>
+                            {updated.time ? (
+                              <span className="font-mono text-[11px] text-[#9A928D]">{updated.time}</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-0.5">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => openDetail(row.id)}
+                                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-md text-[#7A726D] transition-colors hover:bg-[#F0EEEC] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                  aria-label="Sửa hồ sơ"
+                                >
+                                  <Pencil className="h-[15px] w-[15px]" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Chỉnh sửa</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteTarget(row)}
+                                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-md text-[#7A726D] transition-colors hover:bg-[#FCEBEF] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                  aria-label="Xóa hồ sơ"
+                                >
+                                  <Trash2 className="h-[15px] w-[15px]" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Xóa</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
 
-              <div className="flex flex-col gap-4 border-t px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAF9F8] px-4 py-2 text-xs text-[#7A726D]">
+                <div className="flex flex-wrap items-center gap-3">
                   <span>
                     Hiển thị{" "}
-                    <span className="font-semibold text-foreground">
+                    <span className="font-semibold text-foreground tabular-nums">
                       {showingFrom}–{showingTo}
                     </span>{" "}
                     / {total} hồ sơ
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <span>Số dòng</span>
                     <Select
                       value={String(pageSize)}
@@ -633,7 +686,10 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                         setPageSize(Number(value) as (typeof PAGE_SIZE_OPTIONS)[number])
                       }
                     >
-                      <SelectTrigger className="h-8 w-[72px] bg-white">
+                      <SelectTrigger
+                        className="h-[26px] w-[60px] rounded-md border-[#E1DDDA] bg-white px-2 text-xs"
+                        aria-label="Số dòng mỗi trang"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -651,51 +707,45 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
+                    className={pagerButtonClass(false)}
                     disabled={page <= 1 || isFetching}
                     aria-label="Trang trước"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
 
                   {visiblePages.map((pageNumber, index) => {
                     const prev = visiblePages[index - 1];
                     const showEllipsis = prev != null && pageNumber - prev > 1;
+                    const current = pageNumber === page;
                     return (
                       <span key={pageNumber} className="flex items-center gap-1">
-                        {showEllipsis ? (
-                          <span className="px-1 text-muted-foreground">…</span>
-                        ) : null}
-                        <Button
+                        {showEllipsis ? <span className="px-1">…</span> : null}
+                        <button
                           type="button"
-                          variant={pageNumber === page ? "default" : "outline"}
-                          size="sm"
-                          className="h-8 min-w-8 px-2"
+                          className={pagerButtonClass(current)}
+                          aria-current={current ? "page" : undefined}
                           disabled={isFetching}
                           onClick={() => setPage(pageNumber)}
                         >
                           {pageNumber}
-                        </Button>
+                        </button>
                       </span>
                     );
                   })}
 
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
+                    className={pagerButtonClass(false)}
                     disabled={page >= totalPages || isFetching}
                     aria-label="Trang sau"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             </>
@@ -706,14 +756,14 @@ const PatientRecordsManagement = ({ portal }: PatientRecordsManagementProps) => 
           profileId={selectedId}
           open={editOpen}
           onClose={() => setEditOpen(false)}
-          onSuccess={() => void refetch()}
+          onSuccess={() => void refreshAll()}
           canReview={portal === "admin"}
         />
 
         <AdminNewPatientDialog
           open={newPatientOpen}
           onClose={() => setNewPatientOpen(false)}
-          onSuccess={() => void refetch()}
+          onSuccess={() => void refreshAll()}
           portal={portal === "doctor" ? "provider" : "admin"}
         />
 
