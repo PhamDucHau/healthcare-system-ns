@@ -1,23 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { format, subDays, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
-import { vi } from "date-fns/locale";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  format, parseISO, isValid, differenceInYears,
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+} from "date-fns";
 import {
   CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Loader2,
-  Search, MoreHorizontal, CheckCircle2, CalendarClock, XCircle, Trash2, Activity,
-  AlertTriangle, ClipboardList, HeartPulse, Mail,
+  Search, MoreHorizontal, CheckCircle2, CalendarClock, XCircle, Trash2,
+  HeartPulse, Mail, FileText,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 import { searchAdminAppointments } from "@/lib/admin-appointment-api";
@@ -26,10 +27,10 @@ import { sendPreConsultReminder } from "@/lib/doctor-appointment-api";
 import { fetchSpecialties } from "@/lib/appointment-api";
 import { fetchDoctors } from "@/lib/master-data-api";
 
-import { UI_WALK_IN, UI_CHECK_IN, UI_CHECKED_IN, DOCTOR_PREFIX } from "@/config/ui-labels";
+import { UI_CHECK_IN, UI_CHECKED_IN, DOCTOR_PREFIX } from "@/config/ui-labels";
 import {
   ADMIN_STATUS_LABEL, ADMIN_STATUS_COLOR, ADMIN_STATUS_DOT, WALK_IN_LABEL,
-  type AdminAppointment, type AdminAppointmentStatus,
+  type AdminAppointment, type AdminAppointmentStatus, type AdminAppointmentsListParams,
 } from "@/types/admin-appointment";
 
 import WalkInDialog from "./appointments/WalkInDialog";
@@ -43,15 +44,30 @@ const APPOINTMENT_LIST_PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 const ADMIN_APPOINTMENTS_QUERY_KEY = ["admin-appointments"] as const;
 
-const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string }[] = [
-  { value: "__all__",    label: "Tất cả trạng thái" },
-  { value: "CONFIRMED",  label: "Chờ khám" },
-  { value: "CHECKED_IN", label: UI_CHECKED_IN },
-  { value: "IN_PROGRESS",label: "Đang khám" },
-  { value: "COMPLETED",  label: "Hoàn thành" },
-  { value: "CANCELLED",  label: "Đã hủy" },
-  { value: "NO_SHOW",    label: "Không đến" },
+type ViewMode = "all" | "today" | "week" | "month";
+
+const VIEW_MODES: { value: ViewMode; label: string }[] = [
+  { value: "all",   label: "Tất cả" },
+  { value: "today", label: "Hôm nay" },
+  { value: "week",  label: "Tuần này" },
+  { value: "month", label: "Tháng này" },
 ];
+
+const ALL_STATUSES: { value: AdminAppointmentStatus | "__all__"; label: string; dot: string }[] = [
+  { value: "__all__",    label: "Tất cả trạng thái", dot: "bg-muted-foreground/40" },
+  { value: "CONFIRMED",  label: "Chờ khám",          dot: ADMIN_STATUS_DOT.CONFIRMED },
+  { value: "CHECKED_IN", label: UI_CHECKED_IN,       dot: ADMIN_STATUS_DOT.CHECKED_IN },
+  { value: "IN_PROGRESS",label: "Đang khám",         dot: ADMIN_STATUS_DOT.IN_PROGRESS },
+  { value: "COMPLETED",  label: "Hoàn thành",        dot: ADMIN_STATUS_DOT.COMPLETED },
+  { value: "CANCELLED",  label: "Đã hủy",            dot: ADMIN_STATUS_DOT.CANCELLED },
+  { value: "NO_SHOW",    label: "Không đến",         dot: ADMIN_STATUS_DOT.NO_SHOW },
+];
+
+const WEEKDAY_SHORT = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+
+/** Cột bảng: chọn · ngày giờ · bệnh nhân · chuyên khoa · loại · bác sĩ · trạng thái · thao tác */
+const ROW_GRID =
+  "grid grid-cols-[2rem_9.5rem_minmax(14rem,1fr)_8rem_7rem_9rem_8.5rem_10rem] items-center gap-3";
 
 function avatarInitial(name: string | null): string {
   if (!name) return "?";
@@ -59,25 +75,29 @@ function avatarInitial(name: string | null): string {
   return (parts[parts.length - 1]?.charAt(0) ?? "?").toUpperCase();
 }
 
-const AVATAR_COLORS = [
-  "bg-red-100 text-red-700",
-  "bg-blue-100 text-blue-700",
-  "bg-green-100 text-green-700",
-  "bg-yellow-100 text-yellow-700",
-  "bg-purple-100 text-purple-700",
-  "bg-pink-100 text-pink-700",
-];
+function safeParse(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = parseISO(value);
+  return isValid(d) ? d : null;
+}
 
-function avatarColor(id: string): string {
-  const idx = id.charCodeAt(0) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx];
+function rangeFor(mode: ViewMode, ref: Date): Pick<AdminAppointmentsListParams, "dateFrom" | "dateTo"> {
+  const f = (d: Date) => format(d, "yyyy-MM-dd");
+  switch (mode) {
+    case "today": return { dateFrom: f(ref), dateTo: f(ref) };
+    case "week":  return {
+      dateFrom: f(startOfWeek(ref, { weekStartsOn: 1 })),
+      dateTo:   f(endOfWeek(ref,   { weekStartsOn: 1 })),
+    };
+    case "month": return { dateFrom: f(startOfMonth(ref)), dateTo: f(endOfMonth(ref)) };
+    default:      return { dateFrom: undefined, dateTo: undefined };
+  }
 }
 
 export default function AdminAppointmentsContent() {
-  const today = new Date();
+  const todayStr = format(new Date(), "yyyy-MM-dd");
 
-  const [currentDate, setCurrentDate] = useState<Date>(today);
-  const [viewMode, setViewMode] = useState<"all" | "today" | "week" | "month">("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [specialtyFilter, setSpecialtyFilter] = useState<string>("__all__");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
   const [doctorFilter, setDoctorFilter] = useState<string>("__all__");
@@ -95,12 +115,6 @@ export default function AdminAppointmentsContent() {
   const [vitalSignsAppt, setVitalSignsAppt] = useState<AdminAppointment | null>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
 
-  const dateStr   = format(currentDate, "yyyy-MM-dd");
-  const weekStart = format(startOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy-MM-dd");
-  const weekEnd   = format(endOfWeek(currentDate,   { weekStartsOn: 1 }), "yyyy-MM-dd");
-  const monthStart = format(startOfMonth(currentDate), "yyyy-MM-dd");
-  const monthEnd   = format(endOfMonth(currentDate),   "yyyy-MM-dd");
-
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearch(searchInput.trim());
@@ -111,35 +125,27 @@ export default function AdminAppointmentsContent() {
   useEffect(() => {
     setListPage(1);
     setSelectedIds(new Set());
-  }, [
-    viewMode, dateStr, weekStart, weekEnd, monthStart, monthEnd,
-    specialtyFilter, statusFilter, doctorFilter, debouncedSearch,
-  ]);
+  }, [viewMode, todayStr, specialtyFilter, statusFilter, doctorFilter, debouncedSearch]);
 
-  const listQueryParams = useMemo(
+  /** Bộ lọc dùng chung (không gồm khoảng ngày / phân trang). */
+  const baseFilters = useMemo(
     () => ({
       search: debouncedSearch || undefined,
-      page: listPage,
-      limit: APPOINTMENT_LIST_PAGE_SIZE,
       status: statusFilter === "__all__" ? undefined : statusFilter,
-      dateFrom:
-        viewMode === "today" ? dateStr
-        : viewMode === "week" ? weekStart
-        : viewMode === "month" ? monthStart
-        : undefined,
-      dateTo:
-        viewMode === "today" ? dateStr
-        : viewMode === "week" ? weekEnd
-        : viewMode === "month" ? monthEnd
-        : undefined,
       specialtyId: specialtyFilter === "__all__" ? undefined : specialtyFilter,
       doctorId: doctorFilter === "__all__" ? undefined : doctorFilter,
     }),
-    [
-      debouncedSearch, listPage, statusFilter,
-      viewMode, dateStr, weekStart, weekEnd, monthStart, monthEnd,
-      specialtyFilter, doctorFilter,
-    ],
+    [debouncedSearch, statusFilter, specialtyFilter, doctorFilter],
+  );
+
+  const listQueryParams = useMemo<AdminAppointmentsListParams>(
+    () => ({
+      ...baseFilters,
+      ...rangeFor(viewMode, parseISO(todayStr)),
+      page: listPage,
+      limit: APPOINTMENT_LIST_PAGE_SIZE,
+    }),
+    [baseFilters, viewMode, todayStr, listPage],
   );
 
   const { data: appointmentListData, isFetching, refetch } = useQuery({
@@ -148,6 +154,24 @@ export default function AdminAppointmentsContent() {
       const { rows, total, error } = await searchAdminAppointments(listQueryParams);
       if (error) throw error;
       return { rows, total };
+    },
+    placeholderData: (previous) => previous,
+  });
+
+  /** Số lượng theo từng khoảng thời gian — hiển thị trên tab phân đoạn. */
+  const { data: rangeCounts, refetch: refetchCounts } = useQuery({
+    queryKey: [...ADMIN_APPOINTMENTS_QUERY_KEY, "range-counts", baseFilters, todayStr],
+    queryFn: async () => {
+      const ref = parseISO(todayStr);
+      const entries = await Promise.all(
+        VIEW_MODES.map(async ({ value }) => {
+          const { total, error } = await searchAdminAppointments({
+            ...baseFilters, ...rangeFor(value, ref), page: 1, limit: 1,
+          });
+          return [value, error ? null : total] as const;
+        }),
+      );
+      return Object.fromEntries(entries) as Record<ViewMode, number | null>;
     },
     placeholderData: (previous) => previous,
   });
@@ -178,9 +202,14 @@ export default function AdminAppointmentsContent() {
   const refresh = () => {
     setSelectedIds(new Set());
     void refetch();
+    void refetchCounts();
   };
 
   // ── Selection helpers ──────────────────────────────────────────────────────
+
+  const selectableIds = appointments
+    .filter((a) => !["CANCELLED", "COMPLETED"].includes(a.status))
+    .map((a) => a.id);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -191,16 +220,7 @@ export default function AdminAppointmentsContent() {
   };
 
   const selectAll = () => {
-    const selectableIds = appointments
-      .filter((a) => !["CANCELLED", "COMPLETED"].includes(a.status))
-      .map((a) => a.id);
     setSelectedIds((prev) => prev.size === selectableIds.length ? new Set() : new Set(selectableIds));
-  };
-
-  // ── Date navigation ────────────────────────────────────────────────────────
-
-  const navigateDate = (dir: -1 | 1) => {
-    setCurrentDate((d) => (dir === -1 ? subDays(d, 1) : addDays(d, 1)));
   };
 
   async function handlePreConsultReminder(appt: AdminAppointment) {
@@ -223,64 +243,72 @@ export default function AdminAppointmentsContent() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-0.5">
-            Bảng Điều khiển
-          </p>
-          {viewMode !== "all" && (
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate(-1)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-3xl font-bold text-foreground">
-                {format(currentDate, "dd/MM/yyyy")}
-              </h1>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate(1)}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          {viewMode !== "all" && (
-            <p className="text-sm text-muted-foreground mt-0.5 capitalize">
-              {format(currentDate, "EEEE", { locale: vi })}
-            </p>
-          )}
-        </div>
+  const statusCurrent = ALL_STATUSES.find((s) => s.value === statusFilter) ?? ALL_STATUSES[0];
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* View mode */}
-          <div className="flex rounded-lg border overflow-hidden text-sm">
-            {(["all", "today", "week", "month"] as const).map((m) => (
+  return (
+    <div className="space-y-3">
+      {/* ── Toolbar ──────────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div
+          role="tablist"
+          aria-label="Khoảng thời gian"
+          className="flex gap-0.5 rounded-lg bg-muted p-[3px]"
+        >
+          {VIEW_MODES.map((m) => {
+            const active = viewMode === m.value;
+            const count = rangeCounts?.[m.value];
+            return (
               <button
-                key={m}
+                key={m.value}
                 type="button"
-                onClick={() => setViewMode(m)}
-                className={`px-3 py-1.5 font-medium transition-colors ${
-                  viewMode === m
-                    ? "bg-foreground text-background"
-                    : "bg-background text-muted-foreground hover:bg-muted"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setViewMode(m.value)}
+                className={`flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-3 text-[12.5px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  active
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {m === "all" ? "Tất cả" : m === "today" ? "Hôm nay" : m === "week" ? "Tuần" : "Tháng"}
+                {m.label}
+                {count != null && (
+                  <span className="text-[11px] font-medium text-muted-foreground">{count}</span>
+                )}
               </button>
-            ))}
-          </div>
-
-          <Button onClick={() => setWalkInOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-             Lịch hẹn trực tiếp
-          </Button>
+            );
+          })}
         </div>
-      </div>
 
-      {/* ── Filters ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative w-full min-w-[12rem] max-w-[22rem] flex-1 sm:w-auto">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Tìm bệnh nhân"
+            className="h-[34px] bg-card pl-9"
+            placeholder="Tìm bệnh nhân (tên, SĐT, CCCD)…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger
+            aria-label="Lọc theo trạng thái"
+            className={`h-[34px] w-[13rem] bg-card ${statusFilter !== "__all__" ? "border-primary" : ""}`}
+          >
+            <span className="flex items-center gap-2">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${statusCurrent.dot}`} />
+              <SelectValue placeholder="Tất cả trạng thái" />
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {ALL_STATUSES.map((s) => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger aria-label="Lọc theo chuyên khoa" className="h-[34px] w-[11rem] bg-card">
             <SelectValue placeholder="Tất cả chuyên khoa" />
           </SelectTrigger>
           <SelectContent>
@@ -291,19 +319,8 @@ export default function AdminAppointmentsContent() {
           </SelectContent>
         </Select>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Tất cả trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            {ALL_STATUSES.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger aria-label="Lọc theo bác sĩ" className="h-[34px] w-[11rem] bg-card">
             <SelectValue placeholder="Tất cả bác sĩ" />
           </SelectTrigger>
           <SelectContent>
@@ -314,30 +331,33 @@ export default function AdminAppointmentsContent() {
           </SelectContent>
         </Select>
 
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Tìm BN (tên, SĐT, CCCD)…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </div>
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {appointmentTotal} lịch hẹn
+        </span>
 
-        <Button variant="outline" size="icon" onClick={refresh} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+        <div className="flex-1" />
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 cursor-pointer bg-card"
+          onClick={refresh}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+          Làm mới
+        </Button>
+        <Button size="sm" className="h-8 cursor-pointer" onClick={() => setWalkInOpen(true)}>
+          <Plus className="mr-1 h-4 w-4" />
+          {WALK_IN_LABEL}
         </Button>
       </div>
 
       {/* ── Bulk actions bar ─────────────────────────────────────────────────── */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg bg-primary/5 border border-primary/20 px-4 py-2.5">
+        <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2">
           <span className="text-sm font-medium">{selectedIds.size} lịch đã chọn</span>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => setBulkCancelOpen(true)}
-          >
+          <Button size="sm" variant="destructive" onClick={() => setBulkCancelOpen(true)}>
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
             Hủy tất cả
           </Button>
@@ -348,38 +368,38 @@ export default function AdminAppointmentsContent() {
       )}
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border bg-card overflow-hidden">
-        {isFetching && appointments.length === 0 ? (
-          <div className="flex items-center justify-center py-24 gap-2 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Đang tải…</span>
-          </div>
-        ) : (
-          <>
-            {/* Table header */}
-            <div className="grid grid-cols-[2.5rem_7.5rem_1fr_8rem_9rem_8rem_6rem] items-center gap-3 border-b px-4 py-3 bg-muted/40">
+      <div className="overflow-hidden rounded-[10px] border bg-card">
+        <div className="overflow-x-auto">
+          <div className="min-w-[68rem]">
+            <div className={`${ROW_GRID} border-b bg-muted/40 px-4 py-2.5`}>
               <Checkbox
-                checked={
-                  appointments.length > 0 &&
-                  selectedIds.size === appointments.filter((a) => !["CANCELLED","COMPLETED"].includes(a.status)).length
-                }
+                aria-label="Chọn tất cả"
+                checked={selectableIds.length > 0 && selectedIds.size === selectableIds.length}
                 onCheckedChange={selectAll}
+                disabled={selectableIds.length === 0}
               />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Giờ</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bệnh nhân</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chuyên khoa</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bác sĩ</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trạng thái</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Thao tác</span>
+              {["Ngày · Giờ", "Bệnh nhân", "Chuyên khoa", "Loại", "Bác sĩ", "Trạng thái"].map((h) => (
+                <span key={h} className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {h}
+                </span>
+              ))}
+              <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Thao tác
+              </span>
             </div>
 
-            {appointments.length === 0 ? (
-              <div className="py-20 text-center">
-                <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Không có lịch hẹn nào.</p>
+            {isFetching && appointments.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Đang tải…</span>
+              </div>
+            ) : appointments.length === 0 ? (
+              <div className="py-16 text-center">
+                <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Không có lịch hẹn phù hợp bộ lọc.</p>
                 <Button className="mt-4" size="sm" onClick={() => setWalkInOpen(true)}>
                   <Plus className="mr-1.5 h-4 w-4" />
-                  Tạo lịch hẹn trực tiếp
+                  {WALK_IN_LABEL}
                 </Button>
               </div>
             ) : (
@@ -388,13 +408,16 @@ export default function AdminAppointmentsContent() {
                   <AppointmentRow
                     key={appt.id}
                     appt={appt}
+                    todayStr={todayStr}
                     selected={selectedIds.has(appt.id)}
                     onToggle={() => toggleSelect(appt.id)}
-                    onClick={() => setVitalSignsAppt(appt)}
-                    onCheckin={() => {
-                      /* inline quick-checkin done via vital signs sheet */
-                      setVitalSignsAppt(appt);
-                    }}
+                    onOpen={() =>
+                      appt.status === "COMPLETED" || appt.status === "CANCELLED" || appt.status === "NO_SHOW"
+                        ? setDetailAppt(appt)
+                        : setVitalSignsAppt(appt)
+                    }
+                    onCheckin={() => setVitalSignsAppt(appt)}
+                    onViewDetail={() => setDetailAppt(appt)}
                     onCancel={() => setCancelAppt(appt)}
                     onReschedule={() => setRescheduleAppt(appt)}
                     onVitalSigns={() => setVitalSignsAppt(appt)}
@@ -404,48 +427,48 @@ export default function AdminAppointmentsContent() {
                 ))}
               </div>
             )}
-          </>
-        )}
-      </div>
-
-      {appointmentTotal > 0 ? (
-        <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted-foreground">
-            Hiển thị{" "}
-            <span className="font-semibold text-foreground">
-              {appointmentFrom}–{appointmentTo}
-            </span>{" "}
-            / {appointmentTotal} lịch hẹn
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              disabled={listPage <= 1 || isFetching}
-              onClick={() => setListPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Trước
-            </Button>
-            <span className="min-w-[72px] text-center text-xs font-medium text-muted-foreground">
-              {listPage}/{appointmentTotalPages}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              disabled={listPage >= appointmentTotalPages || isFetching}
-              onClick={() => setListPage((p) => Math.min(appointmentTotalPages, p + 1))}
-            >
-              Sau
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
           </div>
         </div>
-      ) : null}
+
+        {appointmentTotal > 0 ? (
+          <div className="flex flex-col gap-2 border-t bg-muted/30 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Hiển thị{" "}
+              <span className="font-semibold text-foreground">
+                {appointmentFrom}–{appointmentTo}
+              </span>{" "}
+              / {appointmentTotal} lịch hẹn
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 bg-card"
+                aria-label="Trang trước"
+                disabled={listPage <= 1 || isFetching}
+                onClick={() => setListPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[56px] text-center text-xs font-medium text-muted-foreground">
+                {listPage}/{appointmentTotalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 bg-card"
+                aria-label="Trang sau"
+                disabled={listPage >= appointmentTotalPages || isFetching}
+                onClick={() => setListPage((p) => Math.min(appointmentTotalPages, p + 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* ── Walk-in dialog ───────────────────────────────────────────────────── */}
       <WalkInDialog
@@ -503,10 +526,12 @@ export default function AdminAppointmentsContent() {
 
 interface RowProps {
   appt: AdminAppointment;
+  todayStr: string;
   selected: boolean;
   onToggle: () => void;
-  onClick: () => void;
+  onOpen: () => void;
   onCheckin: () => void;
+  onViewDetail: () => void;
   onCancel: () => void;
   onReschedule: () => void;
   onVitalSigns: () => void;
@@ -514,16 +539,30 @@ interface RowProps {
   reminding: boolean;
 }
 
+function Chip({ className, children, title }: { className: string; children: ReactNode; title?: string }) {
+  return (
+    <span
+      title={title}
+      className={`whitespace-nowrap rounded-lg px-1.5 text-[10.5px] font-semibold leading-[18px] ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 function AppointmentRow({
-  appt, selected, onToggle, onClick, onCheckin, onCancel, onReschedule,
+  appt, todayStr, selected, onToggle, onOpen, onCheckin, onViewDetail, onCancel, onReschedule,
   onVitalSigns, onPreConsultReminder, reminding,
 }: RowProps) {
   const initials = avatarInitial(appt.patient_name);
-  const color    = avatarColor(appt.id);
 
-  const timeDisplay = appt.walk_in && !appt.slot_id
-    ? WALK_IN_LABEL
-    : appt.start_time?.slice(0, 5) ?? "—";
+  const apptDate = safeParse(appt.slot_date) ?? safeParse(appt.created_at);
+  const apptDateStr = apptDate ? format(apptDate, "yyyy-MM-dd") : null;
+  const isToday = apptDateStr === todayStr;
+  const timeText = appt.start_time?.slice(0, 5) ?? null;
+  const dob = safeParse(appt.patient_dob);
+  const age = dob ? differenceInYears(new Date(), dob) : null;
+  const subtitle = [appt.patient_phone, age != null ? `${age} tuổi` : null].filter(Boolean).join(" · ");
 
   const isSelectable = !["CANCELLED", "COMPLETED"].includes(appt.status);
   const canCheckin     = appt.status === "CONFIRMED";
@@ -533,93 +572,136 @@ function AppointmentRow({
   const canRemindPreConsult =
     !appointmentHasPreConsult(appt) &&
     ["CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(appt.status);
+  const isDone = appt.status === "COMPLETED";
 
   return (
     <div
-      className={`grid grid-cols-[2.5rem_7.5rem_1fr_8rem_9rem_8rem_6rem] items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5" : ""}`}
-      onClick={onClick}
+      className={`${ROW_GRID} relative min-h-[52px] cursor-pointer px-4 py-2 transition-colors duration-150 hover:bg-muted/30 ${
+        selected ? "bg-primary/5" : isToday ? "bg-primary/[0.03]" : ""
+      }`}
+      style={isToday ? { boxShadow: "inset 3px 0 0 hsl(var(--primary))" } : undefined}
+      onClick={onOpen}
     >
       {/* Checkbox */}
       <div onClick={(e) => e.stopPropagation()}>
         <Checkbox
+          aria-label={`Chọn lịch hẹn ${appt.patient_name ?? ""}`}
           checked={selected}
           onCheckedChange={onToggle}
           disabled={!isSelectable}
         />
       </div>
 
-      {/* Time */}
-      <span className={`font-bold ${timeDisplay === WALK_IN_LABEL ? "text-orange-600 text-[11px] leading-tight" : "text-base text-foreground"}`}>
-        {timeDisplay}
-      </span>
+      {/* Date · time */}
+      <div className="flex items-baseline gap-2 whitespace-nowrap">
+        <span
+          className={`font-mono text-[13.5px] font-semibold ${
+            timeText ? "text-foreground" : "text-orange-600"
+          }`}
+        >
+          {timeText ?? "--:--"}
+        </span>
+        {apptDate && (
+          <span className="text-xs text-muted-foreground">
+            {WEEKDAY_SHORT[apptDate.getDay()]} {format(apptDate, "dd/MM/yyyy")}
+          </span>
+        )}
+      </div>
 
       {/* Patient */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center font-semibold text-sm ${color}`}>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700">
           {initials}
-        </div>
-        <div className="min-w-0">
-          <p className="font-medium text-sm truncate flex items-center gap-1.5">
-            {appt.patient_name || "—"}
+        </span>
+        <div className="min-w-0 leading-tight">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{appt.patient_name || "—"}</span>
             {appt.pre_consult_drug_allergy && (
-              <span title="Dị ứng thuốc (khai báo trước khám)">
-                <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
-              </span>
+              <Chip className="bg-primary/10 text-primary" title="Dị ứng thuốc (khai báo trước khám)">
+                Dị ứng thuốc
+              </Chip>
             )}
             {appt.pre_consult_severe_pain && (
-              <span title="Đau dữ dội (khai báo trước khám)">
-                <Activity className="h-3.5 w-3.5 text-orange-600 shrink-0" />
-              </span>
+              <Chip className="bg-orange-50 text-orange-700" title="Đau dữ dội (khai báo trước khám)">
+                Đau dữ dội
+              </Chip>
             )}
             {appointmentHasPreConsult(appt) && (
-              <span title="Đã khai báo y tế trước khám">
-                <ClipboardList className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-              </span>
+              <Chip className="bg-emerald-50 text-emerald-700" title="Đã khai báo y tế trước khám">
+                Có khai báo
+              </Chip>
             )}
-          </p>
-          <p className="text-xs text-muted-foreground font-mono">
-            {/* #{appt.id.slice(0, 6).toUpperCase()} */}
-            {appt.walk_in && (
-              <Badge variant="secondary" className="text-[10px] px-1 py-0 whitespace-nowrap">{WALK_IN_LABEL}</Badge>
-            )}
-          </p>
+          </div>
+          {subtitle && (
+            <span className="block truncate text-[11.5px] text-muted-foreground">{subtitle}</span>
+          )}
         </div>
       </div>
 
       {/* Specialty */}
-      <div className="hidden sm:block">
-        {appt.specialty_name ? (
-          <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-xs font-medium">
-            {appt.specialty_name}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </div>
+      <span className="truncate text-sm text-foreground/80">{appt.specialty_name ?? "—"}</span>
+
+      {/* Type */}
+      <span className={`truncate text-sm ${appt.walk_in ? "text-orange-600" : "text-foreground/80"}`}>
+        {appt.walk_in ? "Không hẹn" : "Có hẹn"}
+      </span>
 
       {/* Doctor */}
-      <p className="text-sm text-muted-foreground truncate hidden md:block">
+      <span className="truncate text-sm text-foreground/80">
         {appt.doctor_name ? `${DOCTOR_PREFIX} ${appt.doctor_name.split(" ").pop()}` : "—"}
-      </p>
+      </span>
 
       {/* Status */}
-      <div>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${ADMIN_STATUS_COLOR[appt.status]}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${ADMIN_STATUS_DOT[appt.status]}`} />
-          {ADMIN_STATUS_LABEL[appt.status]}
-        </span>
-      </div>
+      <span
+        className={`inline-flex items-center gap-1.5 justify-self-start whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${ADMIN_STATUS_COLOR[appt.status]}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${ADMIN_STATUS_DOT[appt.status]}`} />
+        {ADMIN_STATUS_LABEL[appt.status]}
+      </span>
 
       {/* Actions */}
-      <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-        {appt.status !== "COMPLETED" && (
+      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {canCheckin && (
+          <Button size="sm" className="h-[30px] cursor-pointer px-3 text-[12.5px]" onClick={onCheckin}>
+            {UI_CHECK_IN}
+          </Button>
+        )}
+        {(appt.status === "CHECKED_IN" || appt.status === "IN_PROGRESS") && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] cursor-pointer px-3 text-[12.5px]"
+            onClick={onVitalSigns}
+          >
+            Sinh hiệu
+          </Button>
+        )}
+        {isDone && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] cursor-pointer px-3 text-[12.5px]"
+            onClick={onViewDetail}
+          >
+            Xem phiếu
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Thao tác khác"
+              className="h-[30px] w-[30px] cursor-pointer"
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={onViewDetail}>
+              <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+              Xem chi tiết
+            </DropdownMenuItem>
             {canCheckin && (
               <DropdownMenuItem onClick={onCheckin}>
                 <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
@@ -640,6 +722,7 @@ function AppointmentRow({
                 Nhắc nhở khai báo
               </DropdownMenuItem>
             )}
+            {(canReschedule || canCancel) && <DropdownMenuSeparator />}
             {canReschedule && (
               <DropdownMenuItem onClick={onReschedule}>
                 <CalendarClock className="mr-2 h-4 w-4 text-amber-500" />
@@ -655,14 +738,8 @@ function AppointmentRow({
                 Hủy lịch
               </DropdownMenuItem>
             )}
-            {!canVitalSigns && !canRemindPreConsult && !canCheckin && !canReschedule && !canCancel && (
-              <DropdownMenuItem disabled>
-                Không có thao tác
-              </DropdownMenuItem>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
-        )}
       </div>
     </div>
   );
