@@ -1,63 +1,42 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { vi } from "date-fns/locale";
-import {
-  Brain, CalendarIcon, Filter, Loader2, RotateCcw, TrendingDown, TrendingUp,
-} from "lucide-react";
-import {
-  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
+import { Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { fetchSpecialties } from "@/lib/appointment-api";
 import {
   resolveAiAccuracyDateRange,
+  SOAP_SECTION_LABELS,
   toDoctorChartRows,
   toSoapChartRows,
   type AiAccuracyDatePreset,
+  type SoapChartRow,
 } from "@/lib/ai-accuracy-stats";
 import { getAiAccuracyStats, type AiAccuracyStatsFilters } from "@/lib/emr-api";
 import { cn } from "@/lib/utils";
 
-const PRESETS: { value: AiAccuracyDatePreset; label: string }[] = [
+const AI_KEEP_COLOR = "#C41740";
+const AI_EDIT_COLOR = "#F1B6C4";
+
+const TIME_PRESETS: { value: AiAccuracyDatePreset; label: string }[] = [
   { value: "all", label: "Tất cả" },
   { value: "today", label: "Hôm nay" },
   { value: "7d", label: "7 ngày" },
   { value: "30d", label: "30 ngày" },
-  { value: "custom", label: "Tùy chọn" },
 ];
-
-function formatDateDisplay(date: Date | undefined): string {
-  if (!date) return "";
-  return format(date, "dd/MM/yyyy", { locale: vi });
-}
-
-function formatDateIso(date: Date | undefined): string | null {
-  if (!date) return null;
-  return format(date, "yyyy-MM-dd");
-}
 
 export default function AdminAiAccuracyPage() {
   const [preset, setPreset] = useState<AiAccuracyDatePreset>("all");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [specialtyId, setSpecialtyId] = useState("__all__");
 
   const filters = useMemo<AiAccuracyStatsFilters>(() => {
-    const range = resolveAiAccuracyDateRange(preset, formatDateIso(dateFrom), formatDateIso(dateTo));
+    const range = resolveAiAccuracyDateRange(preset, null, null);
     return {
       dateFrom: range.dateFrom,
       dateTo: range.dateTo,
       specialtyId: specialtyId === "__all__" ? null : specialtyId,
     };
-  }, [preset, dateFrom, dateTo, specialtyId]);
+  }, [preset, specialtyId]);
 
   const { data: specialties = [] } = useQuery({
     queryKey: ["ai-accuracy-specialties"],
@@ -79,18 +58,8 @@ export default function AdminAiAccuracyPage() {
   const hasData = (stats?.total_signed_with_ai ?? 0) > 0;
   const hasActiveFilters = Boolean(filters.dateFrom || filters.dateTo || filters.specialtyId);
 
-  function handlePresetChange(next: AiAccuracyDatePreset) {
-    setPreset(next);
-    if (next !== "custom") {
-      setDateFrom(undefined);
-      setDateTo(undefined);
-    }
-  }
-
   function handleReset() {
     setPreset("all");
-    setDateFrom(undefined);
-    setDateTo(undefined);
     setSpecialtyId("__all__");
   }
 
@@ -110,232 +79,169 @@ export default function AdminAiAccuracyPage() {
   const editRate = stats?.edit_rate_pct ?? 0;
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Brain className="h-6 w-6 text-primary" />
-          Báo cáo độ chính xác AI
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Thống kê tỷ lệ nội dung bệnh án do AI sinh ra được bác sĩ giữ nguyên hoặc chỉnh sửa.
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+          Báo cáo <span className="text-muted-foreground/60 mx-1">›</span> AI
         </p>
-      </div>
+        <h1 className="text-2xl font-bold text-foreground mt-1">Báo cáo độ chính xác AI</h1>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
+          Tỷ lệ nội dung SOAP do AI sinh ra được bác sĩ giữ nguyên hoặc chỉnh sửa trước khi ký duyệt.
+        </p>
+      </header>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="h-4 w-4 text-primary" />
-            Bộ lọc
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Khoảng thời gian</p>
-            <div className="flex flex-wrap gap-2">
-              {PRESETS.map((item) => (
-                <Button
-                  key={item.value}
-                  type="button"
-                  size="sm"
-                  variant={preset === item.value ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => handlePresetChange(item.value)}
+      <Card className="border-border/40 shadow-sm">
+        <CardContent className="pt-5 pb-5 space-y-5">
+          <FilterRow label="Thời gian">
+            {TIME_PRESETS.map((item) => (
+              <FilterPill
+                key={item.value}
+                active={preset === item.value}
+                onClick={() => setPreset(item.value)}
+              >
+                {item.label}
+              </FilterPill>
+            ))}
+          </FilterRow>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <FilterRow label="Chuyên khoa" className="flex-1">
+              <FilterPill
+                active={specialtyId === "__all__"}
+                onClick={() => setSpecialtyId("__all__")}
+              >
+                Tất cả
+              </FilterPill>
+              {specialties.map((s) => (
+                <FilterPill
+                  key={s.id}
+                  active={specialtyId === s.id}
+                  onClick={() => setSpecialtyId(s.id)}
                 >
-                  {item.label}
-                </Button>
+                  {s.name}
+                </FilterPill>
               ))}
-            </div>
-          </div>
-
-          {preset === "custom" && (
-            <div className="grid gap-3 sm:grid-cols-2 max-w-md">
-              <DatePickerField
-                label="Từ ngày"
-                value={dateFrom}
-                onChange={setDateFrom}
-              />
-              <DatePickerField
-                label="Đến ngày"
-                value={dateTo}
-                onChange={setDateTo}
-                disabledDate={(date) => (dateFrom ? date < dateFrom : false)}
-              />
-            </div>
-          )}
-
-          <div className="space-y-2 max-w-xs">
-            <label htmlFor="ai-accuracy-specialty" className="text-xs font-medium text-muted-foreground">
-              Chuyên khoa
-            </label>
-            <Select value={specialtyId} onValueChange={setSpecialtyId}>
-              <SelectTrigger id="ai-accuracy-specialty" className="cursor-pointer">
-                <SelectValue placeholder="Tất cả chuyên khoa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Tất cả chuyên khoa</SelectItem>
-                {specialties.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-wrap gap-2 items-center">
-            <Button
+            </FilterRow>
+            <button
               type="button"
-              variant="outline"
-              className="cursor-pointer"
               onClick={handleReset}
               disabled={!hasActiveFilters && preset === "all" && specialtyId === "__all__"}
+              className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0 self-start sm:self-auto"
             >
-              <RotateCcw className="h-4 w-4" />
               Xóa lọc
-            </Button>
-            {isFetching && stats && (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            )}
+            </button>
           </div>
+          {isFetching && stats && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
+          )}
         </CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Tổng hồ sơ có AI baseline"
+        <MetricCard
+          title="Hồ sơ có AI baseline"
           value={String(stats?.total_signed_with_ai ?? 0)}
           subtitle="Hồ sơ đã ký có dữ liệu AI"
         />
-        <StatCard
+        <MetricCard
           title="Bác sĩ đã chỉnh sửa"
           value={String(stats?.doctor_edited_count ?? 0)}
           subtitle="Có thay đổi so với AI"
-          icon={<TrendingDown className="h-4 w-4 text-amber-500" />}
         />
-        <StatCard
+        <MetricCard
           title="Tỷ lệ giữ nguyên AI"
           value={`${retention}%`}
           subtitle="Nội dung AI được giữ"
-          icon={<TrendingUp className="h-4 w-4 text-emerald-500" />}
+          valueClassName="text-emerald-600"
         />
-        <StatCard
+        <MetricCard
           title="Tỷ lệ chỉnh sửa"
           value={`${editRate}%`}
           subtitle="Bác sĩ thay đổi nội dung"
+          valueClassName="text-primary"
         />
       </div>
 
       {hasData ? (
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Chỉ số theo thành phần SOAP</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Tỷ lệ giữ nguyên AI so với chỉnh sửa của bác sĩ trên từng phần S/O/A/P.
+          <Card className="border-border/40 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Theo thành phần SOAP</CardTitle>
+              <p className="text-xs text-muted-foreground font-normal">
+                Tỷ lệ giữ nguyên so với chỉnh sửa trên từng mục S/O/A/P.
               </p>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={soapRows} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fontSize: 12 }}
-                    stroke="hsl(var(--muted-foreground))"
-                    unit="%"
-                  />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [`${value}%`, name]}
-                    labelFormatter={(_, payload) => {
-                      const row = payload?.[0]?.payload;
-                      if (!row) return "";
-                      return `${row.label} · ${row.editedCount} hồ sơ đã sửa`;
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="retentionPct"
-                    name="Giữ nguyên AI"
-                    fill="hsl(var(--primary))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="editPct"
-                    name="Chỉnh sửa"
-                    fill="hsl(var(--primary) / 0.35)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <SoapComponentChart rows={soapRows} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Hiệu suất theo bác sĩ</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Tỷ lệ giữ nguyên nội dung AI trên hồ sơ đã ký của từng bác sĩ.
+          <Card className="border-border/40 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Hiệu suất theo bác sĩ</CardTitle>
+              <p className="text-xs text-muted-foreground font-normal">
+                Tỷ lệ giữ nguyên nội dung AI trên hồ sơ đã ký.
               </p>
             </CardHeader>
             <CardContent>
               {doctorRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Chưa có dữ liệu bác sĩ.</p>
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(280, doctorRows.length * 44)}>
-                  <BarChart data={doctorRows} layout="vertical" margin={{ left: 8, right: 16 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                    <XAxis
-                      type="number"
-                      domain={[0, 100]}
-                      tick={{ fontSize: 12 }}
-                      stroke="hsl(var(--muted-foreground))"
-                      unit="%"
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="doctorName"
-                      width={120}
-                      tick={{ fontSize: 12 }}
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <Tooltip
-                      formatter={(value: number) => [`${value}%`, "Giữ nguyên AI"]}
-                      labelFormatter={(_, payload) => {
-                        const row = payload?.[0]?.payload;
-                        if (!row) return "";
-                        return `${row.doctorName} · ${row.total} hồ sơ · sửa ${row.editRatePct}%`;
-                      }}
-                    />
-                    <Bar
-                      dataKey="retentionPct"
-                      name="Giữ nguyên AI"
-                      fill="hsl(var(--primary))"
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <ul className="space-y-5">
+                  {doctorRows.map((row) => (
+                    <li key={row.doctorId} className="space-y-2">
+                      <div className="flex items-start justify-between gap-3 text-sm">
+                        <p className="font-medium text-foreground leading-snug min-w-0">
+                          {row.doctorName}
+                        </p>
+                        <div className="text-right shrink-0 text-xs text-muted-foreground">
+                          <p>
+                            {row.total} hồ sơ · sửa {row.editedCount}
+                          </p>
+                          <p className="text-sm font-semibold text-foreground mt-0.5">
+                            {row.retentionPct}%
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        className="h-2.5 w-full rounded-full bg-muted overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={row.retentionPct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${row.doctorName}: ${row.retentionPct}% giữ nguyên AI`}
+                      >
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, row.retentionPct))}%`,
+                            backgroundColor: AI_KEEP_COLOR,
+                          }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </CardContent>
           </Card>
         </div>
       ) : (
-        <Card>
+        <Card className="border-border/40">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             Chưa có dữ liệu trong bộ lọc đã chọn
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Giải thích chỉ số</CardTitle>
+      <Card className="border-border/40 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">Giải thích chỉ số</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
+        <CardContent className="text-sm text-muted-foreground leading-relaxed">
           <p>
-            Hệ thống so sánh bản SOAP do AI đề xuất với bản cuối cùng bác sĩ ký duyệt,
-            tính tỷ lệ chênh lệch văn bản (Delta Log Service).
-          </p>
-          <p>
-            Chỉ tài khoản Quản trị viên mới truy cập được màn hình này.
+            Hệ thống so sánh bản SOAP do AI đề xuất với bản cuối cùng bác sĩ ký duyệt và tính tỷ lệ
+            chênh lệch văn bản. Chỉ tài khoản Quản trị viên được truy cập màn hình này.
           </p>
         </CardContent>
       </Card>
@@ -343,64 +249,133 @@ export default function AdminAiAccuracyPage() {
   );
 }
 
-function DatePickerField({
+function FilterRow({
   label,
-  value,
-  onChange,
-  disabledDate,
+  children,
+  className,
 }: {
   label: string;
-  value: Date | undefined;
-  onChange: (date: Date | undefined) => void;
-  disabledDate?: (date: Date) => boolean;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", className)}>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "h-9 w-full justify-start text-left font-normal cursor-pointer",
-              !value && "text-muted-foreground",
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? formatDateDisplay(value) : label}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value}
-            onSelect={onChange}
-            disabled={disabledDate}
-            locale={vi}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
+      <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
 }
 
-function StatCard({
-  title, value, subtitle, icon,
+function FilterPill({
+  active,
+  onClick,
+  children,
 }: {
-  title: string; value: string; subtitle: string; icon?: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-start justify-between">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</p>
-          {icon}
-        </div>
-        <p className="text-3xl font-bold mt-2">{value}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors cursor-pointer border",
+        active
+          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+          : "bg-card text-foreground border-border/60 hover:bg-muted/50",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  valueClassName,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  valueClassName?: string;
+}) {
+  return (
+    <Card className="border-border/40 shadow-sm">
+      <CardContent className="pt-5 pb-5">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        <p className={cn("text-3xl font-bold mt-2 tabular-nums", valueClassName)}>{value}</p>
         <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function SoapComponentChart({ rows }: { rows: SoapChartRow[] }) {
+  const maxBarHeight = 160;
+
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-2 sm:gap-4 px-1">
+        {rows.map((row) => (
+          <div key={row.section} className="flex-1 flex flex-col items-center min-w-0">
+            <div className="flex items-end justify-center gap-1.5 h-[200px] w-full">
+              <SoapBar
+                pct={row.retentionPct}
+                color={AI_KEEP_COLOR}
+                maxHeight={maxBarHeight}
+              />
+              <SoapBar
+                pct={row.editPct}
+                color={AI_EDIT_COLOR}
+                maxHeight={maxBarHeight}
+              />
+            </div>
+            <div className="mt-3 text-center">
+              <p className="text-lg font-bold text-foreground leading-none">{row.section}</p>
+              <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+                {SOAP_SECTION_LABELS[row.section]}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-6 mt-6 pt-4 border-t border-border/40 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AI_KEEP_COLOR }} />
+          Giữ nguyên AI
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AI_EDIT_COLOR }} />
+          Chỉnh sửa
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SoapBar({
+  pct,
+  color,
+  maxHeight,
+}: {
+  pct: number;
+  color: string;
+  maxHeight: number;
+}) {
+  const height = Math.max(4, (pct / 100) * maxHeight);
+  const display = `${pct}%`;
+
+  return (
+    <div className="flex flex-col items-center justify-end flex-1 max-w-[36px] h-full">
+      <span className="text-[10px] font-semibold text-foreground mb-1 tabular-nums">{display}</span>
+      <div
+        className="w-full rounded-t-md min-h-[4px] transition-all"
+        style={{ height, backgroundColor: color }}
+        title={display}
+      />
+    </div>
   );
 }
