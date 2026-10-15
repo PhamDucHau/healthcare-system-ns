@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Download, Loader2, Search } from 'lucide-react';
+import {
+  DeltaLogCsvExportButton,
+  DeltaLogDetailLink,
+  DeltaLogPagination,
+  deltaLogSearchInputClass,
+} from '@/components/admin/delta-log/delta-log-ui';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   listDoctorExaminationActivityLog,
@@ -36,6 +43,8 @@ type Props = {
   showPatientColumn?: boolean;
   searchPlaceholder?: string;
   soapEmptyMessage?: string;
+  portalToolbar?: boolean;
+  embedded?: boolean;
 };
 
 export default function DoctorExamActivityLogTab({
@@ -44,6 +53,8 @@ export default function DoctorExamActivityLogTab({
   showPatientColumn = true,
   searchPlaceholder = 'Tìm bệnh nhân hoặc bác sĩ...',
   soapEmptyMessage,
+  portalToolbar = false,
+  embedded = false,
 }: Props) {
   const [query, setQuery] = useState<Query>({ search: '', page: 1, pageSize: PAGE_SIZE });
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -157,8 +168,22 @@ export default function DoctorExamActivityLogTab({
 
   const searchNorm = query.search.trim().toLowerCase();
 
+  const openDetail = (e: DoctorExamActivityLogEntry) => {
+    setDetailExamId(e.exam_id);
+    setDetailPatientName(displayPatientName(e.patient_name));
+    setDetailDoctorName(e.actor_name);
+    setDetailUpdatedAt(e.created_at);
+    setDetailChangedFields(e.changed_fields);
+  };
+
+  const searchClass = portalToolbar
+    ? deltaLogSearchInputClass
+    : 'w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary';
+
   return (
-    <div className="bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden">
+    <div className={cn(
+      embedded ? 'overflow-hidden' : 'bg-card rounded-2xl border border-border/30 shadow-sm overflow-hidden',
+    )}>
       <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card border-b border-border/30">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -167,18 +192,27 @@ export default function DoctorExamActivityLogTab({
             value={query.search}
             onChange={(e) => onQueryChange({ search: e.target.value })}
             placeholder={searchPlaceholder}
-            className="w-full bg-muted border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className={searchClass}
           />
         </div>
-        <button
-          type="button"
-          onClick={() => void handleExport()}
-          disabled={total === 0 || exporting}
-          className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 self-end sm:self-auto"
-          title="Xuất CSV"
-        >
-          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        </button>
+        {portalToolbar ? (
+          <DeltaLogCsvExportButton
+            exporting={exporting}
+            disabled={total === 0}
+            onClick={() => void handleExport()}
+            className="self-end sm:self-auto"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={total === 0 || exporting}
+            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 self-end sm:self-auto"
+            title="Xuất CSV"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -207,20 +241,18 @@ export default function DoctorExamActivityLogTab({
                   <p className="text-xs text-muted-foreground">{e.actor_name ?? '—'}</p>
                 ) : null}
                 <p className="text-sm text-slate-700">{e.message}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDetailExamId(e.exam_id);
-                    setDetailPatientName(displayPatientName(e.patient_name));
-                    setDetailDoctorName(e.actor_name);
-                    setDetailUpdatedAt(e.created_at);
-                    setDetailChangedFields(e.changed_fields);
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-                >
-                  Xem chi tiết
-                  <ChevronRight className="h-3 w-3" />
-                </button>
+                {portalToolbar ? (
+                  <DeltaLogDetailLink onClick={() => openDetail(e)} className="w-full justify-center" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openDetail(e)}
+                    className="w-full inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    Xem chi tiết
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -260,20 +292,18 @@ export default function DoctorExamActivityLogTab({
                     ) : null}
                     <td className="px-4 lg:px-6 py-4 text-sm text-slate-700">{e.message}</td>
                     <td className="px-4 lg:px-6 py-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDetailExamId(e.exam_id);
-                          setDetailPatientName(displayPatientName(e.patient_name));
-                          setDetailDoctorName(e.actor_name);
-                          setDetailUpdatedAt(e.created_at);
-                          setDetailChangedFields(e.changed_fields);
-                        }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-                      >
-                        Xem chi tiết
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
+                      {portalToolbar ? (
+                        <DeltaLogDetailLink onClick={() => openDetail(e)} />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openDetail(e)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                          Xem chi tiết
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -281,7 +311,17 @@ export default function DoctorExamActivityLogTab({
             </table>
           </div>
 
-          {total > query.pageSize && (
+          {portalToolbar ? (
+            <DeltaLogPagination
+              from={from}
+              to={to}
+              total={total}
+              safePage={safePage}
+              totalPages={totalPages}
+              visiblePages={visiblePages}
+              onPageChange={(page) => onQueryChange({ page })}
+            />
+          ) : total > query.pageSize ? (
             <div className="px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/30">
               <p className="text-xs text-muted-foreground">
                 Hiển thị {from} đến {to} của {total} bản ghi
@@ -325,7 +365,7 @@ export default function DoctorExamActivityLogTab({
                 </button>
               </div>
             </div>
-          )}
+          ) : null}
         </>
       )}
 
