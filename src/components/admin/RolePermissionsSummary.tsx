@@ -1,58 +1,41 @@
-import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getPermissionCategoryLabel,
   getPermissionDisplayName,
   groupPermissionsByCategory,
 } from "@/config/rbac-permissions";
+import type { PermissionRow } from "@/lib/admin-api";
+import { cn } from "@/lib/utils";
 
-export type RolePermission = {
-  id: string;
-  slug: string;
-  name: string;
-  category: string;
-};
+const COLLAPSE_THRESHOLD = 10;
 
-const COLLAPSE_THRESHOLD = 6;
-
-function PermissionBadge({ permission }: { permission: RolePermission }) {
+function PermissionChip({ permission }: { permission: PermissionRow }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant="outline" className="text-xs font-normal cursor-default">
+        <span className="inline-flex cursor-default items-center whitespace-nowrap rounded-full border border-[#E1DDDA] bg-[#FAF9F8] px-[9px] py-[3px] text-xs text-foreground">
           {getPermissionDisplayName(permission)}
-        </Badge>
+        </span>
       </TooltipTrigger>
-      <TooltipContent side="top" className="font-mono text-xs text-muted-foreground">
-        {permission.slug}
-      </TooltipContent>
+      <TooltipContent className="font-mono text-xs">{permission.slug}</TooltipContent>
     </Tooltip>
   );
 }
 
-function GroupedPermissions({ grouped }: { grouped: [string, RolePermission[]][] }) {
+function GroupedPermissions({ groups }: { groups: [string, PermissionRow[]][] }) {
   return (
-    <div className="space-y-2.5">
-      {grouped.map(([category, perms]) => (
-        <div key={category}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+    <div className="mt-1 flex flex-col gap-2">
+      {groups.map(([category, perms]) => (
+        <div key={category} className="flex flex-col gap-[5px]">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#9A928D]">
             {getPermissionCategoryLabel(category)}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {perms.map((p) => (
-              <PermissionBadge key={p.id} permission={p} />
+          </span>
+          <div className="flex flex-wrap gap-[5px]">
+            {perms.map((permission) => (
+              <PermissionChip key={permission.id} permission={permission} />
             ))}
           </div>
         </div>
@@ -61,57 +44,46 @@ function GroupedPermissions({ grouped }: { grouped: [string, RolePermission[]][]
   );
 }
 
-type RolePermissionsSummaryProps = {
-  permissions: RolePermission[];
-};
-
-const RolePermissionsSummary = ({ permissions }: RolePermissionsSummaryProps) => {
-  const grouped = useMemo(
-    () => groupPermissionsByCategory(permissions),
-    [permissions],
-  );
-  const [expanded, setExpanded] = useState(false);
+export function RolePermissionsSummary({ permissions }: { permissions: PermissionRow[] }) {
+  const groups = groupPermissionsByCategory(permissions);
 
   if (permissions.length === 0) {
-    return <span className="text-xs text-muted-foreground">Không có quyền hạn</span>;
+    return <p className="text-xs text-[#9A928D]">Không có quyền hạn</p>;
   }
 
-  const categoryCount = grouped.length;
-  const shouldCollapse = permissions.length > COLLAPSE_THRESHOLD;
+  const categoryCount = groups.length;
 
-  if (!shouldCollapse) {
-    return (
-      <TooltipProvider delayDuration={300}>
-        <GroupedPermissions grouped={grouped} />
-      </TooltipProvider>
-    );
+  if (permissions.length <= COLLAPSE_THRESHOLD) {
+    return <GroupedPermissions groups={groups} />;
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span>
-              {permissions.length} quyền · {categoryCount} nhóm
-            </span>
-            <ChevronDown
-              className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
-            />
-            <span className="text-primary font-medium">
-              {expanded ? "Thu gọn" : "Xem chi tiết"}
-            </span>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3">
-          <GroupedPermissions grouped={grouped} />
-        </CollapsibleContent>
-      </Collapsible>
-    </TooltipProvider>
+    <Collapsible className="group">
+      <GroupedPermissions groups={groups.slice(0, 1)} />
+      <CollapsibleContent>
+        <GroupedPermissions groups={groups.slice(1)} />
+      </CollapsibleContent>
+      <CollapsibleTrigger
+        className={cn(
+          "mt-1 inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-xs text-[#7A726D]",
+          "transition-colors duration-200 hover:text-foreground",
+        )}
+      >
+        {permissions.length} quyền · {categoryCount} nhóm ·{" "}
+        <span className="font-semibold text-primary group-data-[state=open]:hidden">Xem chi tiết</span>
+        <span className="hidden font-semibold text-primary group-data-[state=open]:inline">Thu gọn</span>
+        <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
+    </Collapsible>
   );
-};
+}
 
 export default RolePermissionsSummary;
+
+export function PermissionCountBadge({ count }: { count: number }) {
+  return (
+    <Badge variant="secondary" className="font-normal">
+      {count} quyền
+    </Badge>
+  );
+}
